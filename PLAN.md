@@ -21,9 +21,9 @@
 
 ## Phase 2: Configuration & Hot-Reloading
 
-- [ ] Create `config.yaml` parser.
-- [ ] Implement `fsnotify` to detect file changes.
-- [ ] Logic for "Diffing": Determine if a change requires a full FFmpeg restart or just a filter update.
+- [x] Create `config.yaml` parser.
+- [x] Implement `fsnotify` to detect file changes.
+- [x] Logic for "Diffing": Determine if a change requires a full FFmpeg restart or just a filter update.
 
 ## Phase 3: The FFmpeg Wrapper (The Core)
 
