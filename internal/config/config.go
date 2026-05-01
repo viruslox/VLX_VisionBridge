@@ -7,41 +7,20 @@ import (
 	"sync"
 	"time"
 
+	"github.com/user/go-live-orchestrator/internal/models"
+
 	"github.com/fsnotify/fsnotify"
 	"gopkg.in/yaml.v3"
 )
 
-type OutputSettings struct {
-	Resolution   string `yaml:"resolution"`
-	FPS          int    `yaml:"fps"`
-	VideoBitrate string `yaml:"video_bitrate"`
-	AudioBitrate string `yaml:"audio_bitrate"`
-}
-
-type Layer struct {
-	ID        int    `yaml:"id"`
-	Active    bool   `yaml:"active"`
-	InputType string `yaml:"input_type"` // e.g., folder, loop, srt
-	InputPath string `yaml:"input_path"`
-	Media     string `yaml:"media"`      // Video+Audio, Video Only, Audio Only
-	Scale     string `yaml:"scale"`
-	Crop      string `yaml:"crop"`
-	Position  string `yaml:"position"`
-}
-
-type Config struct {
-	Output OutputSettings `yaml:"output"`
-	Layers []Layer        `yaml:"layers"`
-}
-
 // LoadConfig parses the YAML configuration file.
-func LoadConfig(path string) (*Config, error) {
+func LoadConfig(path string) (*models.Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
-	var cfg Config
+	var cfg models.Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, err
 	}
@@ -55,7 +34,7 @@ type DiffResult struct {
 }
 
 // DiffConfigs determines if a change requires a full FFmpeg restart or just a filter update.
-func DiffConfigs(oldConfig, newConfig *Config) DiffResult {
+func DiffConfigs(oldConfig, newConfig *models.Config) DiffResult {
 	if oldConfig == nil || newConfig == nil {
 		return DiffResult{RequiresRestart: true}
 	}
@@ -69,12 +48,12 @@ func DiffConfigs(oldConfig, newConfig *Config) DiffResult {
 	}
 
 	// Check layers
-	oldLayers := make(map[int]Layer)
+	oldLayers := make(map[int]models.Layer)
 	for _, l := range oldConfig.Layers {
 		oldLayers[l.ID] = l
 	}
 
-	newLayers := make(map[int]Layer)
+	newLayers := make(map[int]models.Layer)
 	for _, l := range newConfig.Layers {
 		newLayers[l.ID] = l
 	}
@@ -105,14 +84,14 @@ func DiffConfigs(oldConfig, newConfig *Config) DiffResult {
 // Watcher handles watching the config file for changes
 type Watcher struct {
 	path      string
-	onChange  func(*Config, DiffResult)
-	current   *Config
+	onChange  func(*models.Config, DiffResult)
+	current   *models.Config
 	mu        sync.Mutex
 	cancel    context.CancelFunc
 	wg        sync.WaitGroup
 }
 
-func NewWatcher(path string, onChange func(*Config, DiffResult)) *Watcher {
+func NewWatcher(path string, onChange func(*models.Config, DiffResult)) *Watcher {
 	return &Watcher{
 		path:     path,
 		onChange: onChange,

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/user/go-live-orchestrator/internal/models"
 )
 
 func TestLoadConfig(t *testing.T) {
@@ -49,18 +51,18 @@ layers:
 }
 
 func TestDiffConfigs(t *testing.T) {
-	oldCfg := &Config{
-		Output: OutputSettings{Resolution: "1920x1080", FPS: 30},
-		Layers: []Layer{
+	oldCfg := &models.Config{
+		Output: models.OutputSettings{Resolution: "1920x1080", FPS: 30},
+		Layers: []models.Layer{
 			{ID: 1, Active: true, InputType: "loop", InputPath: "test.mp4", Scale: "100%"},
 			{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Scale: "50%"},
 		},
 	}
 
 	// Test case 1: No change
-	newCfg1 := &Config{
-		Output: OutputSettings{Resolution: "1920x1080", FPS: 30},
-		Layers: []Layer{
+	newCfg1 := &models.Config{
+		Output: models.OutputSettings{Resolution: "1920x1080", FPS: 30},
+		Layers: []models.Layer{
 			{ID: 1, Active: true, InputType: "loop", InputPath: "test.mp4", Scale: "100%"},
 			{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Scale: "50%"},
 		},
@@ -71,8 +73,8 @@ func TestDiffConfigs(t *testing.T) {
 	}
 
 	// Test case 2: Output change -> requires restart
-	newCfg2 := &Config{
-		Output: OutputSettings{Resolution: "1280x720", FPS: 30},
+	newCfg2 := &models.Config{
+		Output: models.OutputSettings{Resolution: "1280x720", FPS: 30},
 		Layers: oldCfg.Layers,
 	}
 	diff2 := DiffConfigs(oldCfg, newCfg2)
@@ -81,9 +83,9 @@ func TestDiffConfigs(t *testing.T) {
 	}
 
 	// Test case 3: Filter update (change active state)
-	newCfg3 := &Config{
+	newCfg3 := &models.Config{
 		Output: oldCfg.Output,
-		Layers: []Layer{
+		Layers: []models.Layer{
 			{ID: 1, Active: false, InputType: "loop", InputPath: "test.mp4", Scale: "100%"},
 			{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Scale: "50%"},
 		},
@@ -94,9 +96,9 @@ func TestDiffConfigs(t *testing.T) {
 	}
 
 	// Test case 4: Input path change -> requires restart
-	newCfg4 := &Config{
+	newCfg4 := &models.Config{
 		Output: oldCfg.Output,
-		Layers: []Layer{
+		Layers: []models.Layer{
 			{ID: 1, Active: true, InputType: "loop", InputPath: "new.mp4", Scale: "100%"},
 			{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Scale: "50%"},
 		},
@@ -137,7 +139,7 @@ layers:
 	}
 
 	ch := make(chan DiffResult, 1)
-	watcher := NewWatcher(configFile, func(cfg *Config, diff DiffResult) {
+	watcher := NewWatcher(configFile, func(cfg *models.Config, diff DiffResult) {
 		ch <- diff
 	})
 

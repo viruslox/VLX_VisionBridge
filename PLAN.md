@@ -2,8 +2,8 @@
 
 ## Phase 1: Environment & Project Scaffolding
 
-- [ ] Initialize Go module `github.com/user/go-live-orchestrator`.
-- [ ] Setup Directory Structure:
+- [x] Initialize Go module `github.com/user/go-live-orchestrator`.
+- [x] Setup Directory Structure:
 
     ```text
     ├── cmd/server/main.go
@@ -17,7 +17,7 @@
     └── scripts/         # Deployment & Systemd setup
     ```
 
-- [ ] Implement basic PostgreSQL connection pool.
+- [x] Implement basic PostgreSQL connection pool.
 
 ## Phase 2: Configuration & Hot-Reloading
 
@@ -27,9 +27,9 @@
 
 ## Phase 3: The FFmpeg Wrapper (The Core)
 
-- [ ] Develop the logic to convert "Layer 0-9" structs into an FFmpeg `filter_complex` string.
-- [ ] Implement coordinate calculation (handling 'center', 'top-left', and 5% padding).
-- [ ] Handle input types: `folder` (image sequence), `loop` (video), `SRT`.
+- [x] Develop the logic to convert "Layer 0-9" structs into an FFmpeg `filter_complex` string.
+- [x] Implement coordinate calculation (handling 'center', 'top-left', and 5% padding).
+- [x] Handle input types: `folder` (image sequence), `loop` (video), `SRT`.
 
 ## Phase 4: Output & Multi-Streaming
 
