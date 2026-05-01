@@ -69,33 +69,34 @@ func outputsRequireRestart(old, new models.OutputSettings) bool {
 func layersDiff(old, new []models.Layer) DiffResult {
 	var result DiffResult
 
-	oldLayers := make(map[int]models.Layer)
-	for _, l := range old {
-		oldLayers[l.ID] = l
-	}
-
-	newLayers := make(map[int]models.Layer)
-	for _, l := range new {
-		newLayers[l.ID] = l
-	}
-
-	for id, newL := range newLayers {
-		oldL, exists := oldLayers[id]
-		if !exists {
-			result.RequiresRestart = true // Adding a new layer conceptually needs restart here if inputs change
-			continue
+	for _, newL := range new {
+		var found bool
+		for _, oldL := range old {
+			if oldL.ID == newL.ID {
+				found = true
+				if oldL.InputType != newL.InputType || oldL.InputPath != newL.InputPath || oldL.Media != newL.Media {
+					result.RequiresRestart = true
+				} else if oldL.Active != newL.Active || oldL.Scale != newL.Scale || oldL.Crop != newL.Crop || oldL.Position != newL.Position {
+					result.RequiresFilterUpdate = true
+				}
+				break
+			}
 		}
-
-		if oldL.InputType != newL.InputType || oldL.InputPath != newL.InputPath || oldL.Media != newL.Media {
+		if !found {
 			result.RequiresRestart = true
-		} else if oldL.Active != newL.Active || oldL.Scale != newL.Scale || oldL.Crop != newL.Crop || oldL.Position != newL.Position {
-			result.RequiresFilterUpdate = true
 		}
 	}
 
-	for id := range oldLayers {
-		if _, exists := newLayers[id]; !exists {
-			result.RequiresRestart = true // Removing a layer conceptually needs restart
+	for _, oldL := range old {
+		var found bool
+		for _, newL := range new {
+			if newL.ID == oldL.ID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			result.RequiresRestart = true
 		}
 	}
 
