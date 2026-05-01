@@ -7,9 +7,11 @@ import (
 	_ "github.com/lib/pq"
 )
 
+var driverName = "postgres"
+
 // InitDB initializes a PostgreSQL connection pool.
 func InitDB(dsn string) (*sql.DB, error) {
-	db, err := sql.Open("postgres", dsn)
+	db, err := sql.Open(driverName, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
