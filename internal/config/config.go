@@ -97,12 +97,12 @@ func DiffConfigs(oldConfig, newConfig *models.Config) DiffResult {
 
 // Watcher handles watching the config file for changes
 type Watcher struct {
-	path      string
-	onChange  func(*models.Config, DiffResult)
-	current   *models.Config
-	mu        sync.Mutex
-	cancel    context.CancelFunc
-	wg        sync.WaitGroup
+	path     string
+	onChange func(*models.Config, DiffResult)
+	current  *models.Config
+	mu       sync.Mutex
+	cancel   context.CancelFunc
+	wg       sync.WaitGroup
 }
 
 func NewWatcher(path string, onChange func(*models.Config, DiffResult)) *Watcher {

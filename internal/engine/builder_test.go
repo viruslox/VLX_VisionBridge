@@ -145,8 +145,8 @@ func TestBuildFFmpegArgs(t *testing.T) {
 func TestBuildFFmpegArgs_10SRT(t *testing.T) {
 	cfg := &models.Config{
 		Output: models.OutputSettings{
-			Resolution:   "1920x1080",
-			FPS:          60,
+			Resolution: "1920x1080",
+			FPS:        60,
 		},
 		Layers: make([]models.Layer, 10),
 	}

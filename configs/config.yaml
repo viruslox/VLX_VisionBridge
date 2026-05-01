@@ -1,0 +1,18 @@
+database:
+  dsn: ""
+output:
+  resolution: "1920x1080"
+  fps: 30
+  video_bitrate: "6000k"
+  audio_bitrate: "160k"
+  destinations:
+    - "rtmp://localhost/live/test"
+layers:
+  - id: 0
+    active: true
+    input_type: "loop"
+    input_path: "./test.mp4"
+    media: "Video+Audio"
+    scale: "1920:-1"
+    crop: "1920:1080:0:0"
+    position: "center"

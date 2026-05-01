@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"os"
 	"os/exec"
@@ -25,31 +26,7 @@ func main() {
 
 	log.Println("Starting Go-Live Orchestrator...")
 
-	// 1. Setup Database
-	// Using a default DSN for now, this should ideally come from env or config
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		dsn = "postgres://localhost:5432/live_db?sslmode=disable"
-	}
-	dbConn, err := db.InitDB(dsn)
-	if err != nil {
-		log.Printf("Warning: Failed to connect to database: %v. Logging to DB will be disabled.", err)
-	} else {
-		defer dbConn.Close()
-		if err := db.SetupTables(dbConn); err != nil {
-			log.Fatalf("Failed to setup database tables: %v", err)
-		}
-	}
-
-	// 2. Setup Context for Graceful Shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// 3. Setup Process Manager
-	pm := engine.NewProcessManager(dbConn)
-	defer pm.Stop()
-
-	// 4. Setup Config Watcher
+	// 1. Setup Configuration
 	configPath := "configs/config.yaml"
 	if os.Getenv("CONFIG_PATH") != "" {
 		configPath = os.Getenv("CONFIG_PATH")
@@ -60,6 +37,37 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load initial configuration from %s: %v", configPath, err)
 	}
+
+	// 2. Setup Database
+	var dbConn *sql.DB
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = initialConfig.Database.DSN
+	}
+
+	if dsn != "" {
+		var err error
+		dbConn, err = db.InitDB(dsn)
+		if err != nil {
+			log.Printf("Warning: Failed to connect to database: %v. Logging to DB will be disabled.", err)
+			dbConn = nil
+		} else {
+			defer dbConn.Close()
+			if err := db.SetupTables(dbConn); err != nil {
+				log.Fatalf("Failed to setup database tables: %v", err)
+			}
+		}
+	} else {
+		log.Println("Warning: No database DSN provided. Logging to DB will be disabled.")
+	}
+
+	// 3. Setup Context for Graceful Shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// 4. Setup Process Manager
+	pm := engine.NewProcessManager(dbConn)
+	defer pm.Stop()
 
 	// Start Process Manager with initial config
 	if err := pm.Start(ctx, initialConfig); err != nil {
@@ -77,7 +85,6 @@ func main() {
 			}
 		} else if diff.RequiresFilterUpdate {
 			log.Println("Filter update required. Currently requiring full restart until live-update is implemented.")
-			// Fallback to restart for now if we haven't implemented filter live-updates yet
 			pm.Stop()
 			if err := pm.Start(ctx, newCfg); err != nil {
 				log.Printf("Failed to restart process manager: %v", err)
@@ -100,6 +107,5 @@ func main() {
 	log.Printf("Received signal: %v. Initiating graceful shutdown...", sig)
 	cancel() // Cancel context
 
-	// pm.Stop() and watcher.Stop() will be called via defer
 	log.Println("Shutdown complete.")
 }
