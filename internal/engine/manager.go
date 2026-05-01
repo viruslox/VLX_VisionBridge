@@ -115,54 +115,12 @@ func (pm *ProcessManager) monitor() {
 			continue
 		}
 
-		// Create command without context to allow graceful SIGTERM before context kill
-		cmd := exec.Command("ffmpeg", args...)
-
-		pm.mu.Lock()
-		pm.cmd = cmd
-		pm.mu.Unlock()
-
-		if pm.db != nil {
-			_ = db.LogStreamEvent(pm.db, "start", "Starting FFmpeg process")
-		}
-		log.Println("Starting FFmpeg process...")
-
-		// Start the process asynchronously to allow monitoring for context cancellation
-		err = cmd.Start()
-		if err != nil {
-			log.Printf("Failed to start FFmpeg: %v", err)
+		started, runErr := pm.runProcess(ctx, args)
+		if !started {
+			log.Printf("Failed to start FFmpeg: %v", runErr)
 			time.Sleep(backoff)
 			continue
 		}
-
-		// Monitor context cancellation and kill process if graceful shutdown takes too long
-		done := make(chan error, 1)
-		go func() {
-			done <- cmd.Wait()
-		}()
-
-		var runErr error
-		select {
-		case <-ctx.Done():
-			log.Println("Context cancelled, waiting for FFmpeg to stop...")
-			select {
-			case <-time.After(5 * time.Second):
-				log.Println("FFmpeg process did not stop gracefully, killing it...")
-				if cmd.Process != nil {
-					_ = cmd.Process.Kill()
-				}
-				runErr = <-done
-			case runErr = <-done:
-				log.Println("FFmpeg process stopped gracefully.")
-			}
-			// We break out of the loop next time
-		case runErr = <-done:
-			// Process exited on its own
-		}
-
-		pm.mu.Lock()
-		pm.cmd = nil
-		pm.mu.Unlock()
 
 		if ctx.Err() != nil {
 			// Context cancelled, normal shutdown
@@ -191,4 +149,59 @@ func (pm *ProcessManager) monitor() {
 			backoff = maxBackoff
 		}
 	}
+}
+
+func (pm *ProcessManager) runProcess(ctx context.Context, args []string) (bool, error) {
+	// Create command without context to allow graceful SIGTERM before context kill
+	cmd := exec.Command("ffmpeg", args...)
+
+	pm.mu.Lock()
+	pm.cmd = cmd
+	pm.mu.Unlock()
+
+	defer func() {
+		pm.mu.Lock()
+		pm.cmd = nil
+		pm.mu.Unlock()
+	}()
+
+	if pm.db != nil {
+		_ = db.LogStreamEvent(pm.db, "start", "Starting FFmpeg process")
+	}
+	log.Println("Starting FFmpeg process...")
+
+	// Start the process asynchronously to allow monitoring for context cancellation
+	err := cmd.Start()
+	if err != nil {
+		return false, err
+	}
+
+	return true, pm.waitForProcess(ctx, cmd)
+}
+
+func (pm *ProcessManager) waitForProcess(ctx context.Context, cmd *exec.Cmd) error {
+	done := make(chan error, 1)
+	go func() {
+		done <- cmd.Wait()
+	}()
+
+	var runErr error
+	select {
+	case <-ctx.Done():
+		log.Println("Context cancelled, waiting for FFmpeg to stop...")
+		select {
+		case <-time.After(5 * time.Second):
+			log.Println("FFmpeg process did not stop gracefully, killing it...")
+			if cmd.Process != nil {
+				_ = cmd.Process.Kill()
+			}
+			runErr = <-done
+		case runErr = <-done:
+			log.Println("FFmpeg process stopped gracefully.")
+		}
+	case runErr = <-done:
+		// Process exited on its own
+	}
+
+	return runErr
 }
