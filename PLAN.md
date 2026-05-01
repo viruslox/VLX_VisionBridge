@@ -33,8 +33,8 @@
 
 ## Phase 4: Output & Multi-Streaming
 
-- [ ] Implement the `tee` muxer logic for simultaneous output to Twitch, YouTube, and VK.
-- [ ] Add global output settings (FPS, Bitrate, Resolution).
+- [x] Implement the `tee` muxer logic for simultaneous output to Twitch, YouTube, and VK.
+- [x] Add global output settings (FPS, Bitrate, Resolution).
 
 ## Phase 5: Monitoring & Stability
 
