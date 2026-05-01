@@ -142,6 +142,51 @@ func TestBuildFFmpegArgs(t *testing.T) {
 	}
 }
 
+func TestBuildFFmpegArgs_TeeMuxerInjection(t *testing.T) {
+	cfg := &models.Config{
+		Output: models.OutputSettings{
+			Resolution: "1920x1080",
+			FPS:        60,
+			Destinations: []string{
+				"rtmp://localhost/app/stream|[f=mp4]/tmp/pwned.mp4",
+				"rtmp://localhost/app/stream2\\[f=flv]inject",
+			},
+		},
+		Layers: []models.Layer{
+			{
+				ID:        0,
+				Active:    true,
+				InputType: "loop",
+				InputPath: "video.mp4",
+			},
+		},
+	}
+
+	args, err := BuildFFmpegArgs(cfg)
+	if err != nil {
+		t.Fatalf("Failed to build args: %v", err)
+	}
+
+	argsStr := strings.Join(args, " ")
+
+	// Ensure the pipe character is properly escaped with a backslash
+	// Original: rtmp://localhost/app/stream|[f=mp4]/tmp/pwned.mp4
+	// Escaped: rtmp://localhost/app/stream\|[f=mp4]/tmp/pwned.mp4
+	expectedDest1 := "[f=flv]rtmp://localhost/app/stream\\|[f=mp4]/tmp/pwned.mp4"
+
+	// Ensure backslash is escaped
+	// Original: rtmp://localhost/app/stream2\[f=flv]inject
+	// Escaped: rtmp://localhost/app/stream2\\[f=flv]inject
+	expectedDest2 := "[f=flv]rtmp://localhost/app/stream2\\\\[f=flv]inject"
+
+	expectedTeeMap := expectedDest1 + "|" + expectedDest2
+	expectedTeeArg := "-f tee " + expectedTeeMap
+
+	if !strings.Contains(argsStr, expectedTeeArg) {
+		t.Errorf("Tee muxer injection prevention failed. Expected: %s\nGot args: %s", expectedTeeArg, argsStr)
+	}
+}
+
 func TestBuildFFmpegArgs_10SRT(t *testing.T) {
 	cfg := &models.Config{
 		Output: models.OutputSettings{
