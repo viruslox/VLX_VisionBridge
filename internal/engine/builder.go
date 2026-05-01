@@ -164,7 +164,10 @@ func BuildFFmpegArgs(cfg *models.Config) ([]string, error) {
 	if len(cfg.Output.Destinations) > 0 {
 		var teeDestinations []string
 		for _, dest := range cfg.Output.Destinations {
-			teeDestinations = append(teeDestinations, fmt.Sprintf("[f=flv]%s", dest))
+			// Escape '\' and '|' to prevent tee muxer injection
+			escaped := strings.ReplaceAll(dest, "\\", "\\\\")
+			escaped = strings.ReplaceAll(escaped, "|", "\\|")
+			teeDestinations = append(teeDestinations, fmt.Sprintf("[f=flv]%s", escaped))
 		}
 
 		teeMap := strings.Join(teeDestinations, "|")
