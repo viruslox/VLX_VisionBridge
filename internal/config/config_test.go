@@ -170,3 +170,23 @@ layers:
 		t.Fatalf("Timed out waiting for watcher callback")
 	}
 }
+
+func BenchmarkLayersDiff(b *testing.B) {
+	oldLayers := []models.Layer{
+		{ID: 1, Active: true, InputType: "loop", InputPath: "test1.mp4", Scale: "100%"},
+		{ID: 2, Active: false, InputType: "srt", InputPath: "srt://1", Scale: "50%"},
+		{ID: 3, Active: true, InputType: "folder", InputPath: "fld1", Scale: "100%"},
+		{ID: 4, Active: true, InputType: "loop", InputPath: "test2.mp4", Scale: "100%"},
+	}
+	newLayers := []models.Layer{
+		{ID: 1, Active: true, InputType: "loop", InputPath: "test1.mp4", Scale: "100%"},
+		{ID: 2, Active: true, InputType: "srt", InputPath: "srt://1", Scale: "50%"},
+		{ID: 3, Active: true, InputType: "folder", InputPath: "fld1", Scale: "100%"},
+		{ID: 5, Active: true, InputType: "loop", InputPath: "test3.mp4", Scale: "100%"},
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		layersDiff(oldLayers, newLayers)
+	}
+}
