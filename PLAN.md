@@ -52,10 +52,9 @@
 - [ ] CPU profiling to ensure "OFF" sources consume 0% resources.
 - [ ] Network latency optimization for SRT.
 
-## Work Agenda
+## Phase 7: Build & Setup
 
-- **Week 1-2**: Phase 1 & 2 (Scaffolding, Configuration, Hot-Reloading).
-- **Week 3-4**: Phase 3 (FFmpeg Wrapper Core).
-- **Week 5**: Phase 4 (Output & Multi-Streaming).
-- **Week 6**: Phase 5 (Monitoring & Stability).
-- **Week 7**: Phase 6 (Testing & Optimization).
+- [ ] Create build script that creates execuatable and configuration files templates
+- [ ] Configuration file(s) template must offer all available options (each one briefly explained).
+- [ ] Normal user have to be able of build, install, execute the application. (no root user allowed).
+- [ ] build script and executable to inform the user if any pre-requisite/3rd part is missing.
