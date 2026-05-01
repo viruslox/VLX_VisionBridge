@@ -63,7 +63,7 @@ func BuildFFmpegArgs(cfg *models.Config) ([]string, error) {
 			args = append(args, "-stream_loop", "-1", "-i", layer.InputPath)
 		case "srt":
 			// Assuming standard srt URL
-			args = append(args, "-i", layer.InputPath)
+			args = append(args, "-fflags", "nobuffer", "-flags", "low_delay", "-i", layer.InputPath)
 		default:
 			// Fallback generic input
 			args = append(args, "-i", layer.InputPath)

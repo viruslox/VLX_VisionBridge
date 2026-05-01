@@ -48,9 +48,9 @@
 
 ## Phase 6: Testing & Optimization
 
-- [ ] Stress test with 10 concurrent SRT inputs.
-- [ ] CPU profiling to ensure "OFF" sources consume 0% resources.
-- [ ] Network latency optimization for SRT.
+- [x] Stress test with 10 concurrent SRT inputs.
+- [x] CPU profiling to ensure "OFF" sources consume 0% resources.
+- [x] Network latency optimization for SRT.
 
 ## Phase 7: Build & Setup
 
