@@ -39,36 +39,43 @@ func DiffConfigs(oldConfig, newConfig *models.Config) DiffResult {
 		return DiffResult{RequiresRestart: true}
 	}
 
-	var result DiffResult
-
-	// Check if output settings changed (requires restart)
-	if oldConfig.Output.Resolution != newConfig.Output.Resolution ||
-		oldConfig.Output.FPS != newConfig.Output.FPS ||
-		oldConfig.Output.VideoBitrate != newConfig.Output.VideoBitrate ||
-		oldConfig.Output.AudioBitrate != newConfig.Output.AudioBitrate {
-		result.RequiresRestart = true
-		return result
+	if outputsRequireRestart(oldConfig.Output, newConfig.Output) {
+		return DiffResult{RequiresRestart: true}
 	}
 
-	if len(oldConfig.Output.Destinations) != len(newConfig.Output.Destinations) {
-		result.RequiresRestart = true
-		return result
+	return layersDiff(oldConfig.Layers, newConfig.Layers)
+}
+
+func outputsRequireRestart(old, new models.OutputSettings) bool {
+	if old.Resolution != new.Resolution ||
+		old.FPS != new.FPS ||
+		old.VideoBitrate != new.VideoBitrate ||
+		old.AudioBitrate != new.AudioBitrate {
+		return true
 	}
-	for i := range oldConfig.Output.Destinations {
-		if oldConfig.Output.Destinations[i] != newConfig.Output.Destinations[i] {
-			result.RequiresRestart = true
-			return result
+
+	if len(old.Destinations) != len(new.Destinations) {
+		return true
+	}
+	for i := range old.Destinations {
+		if old.Destinations[i] != new.Destinations[i] {
+			return true
 		}
 	}
 
-	// Check layers
+	return false
+}
+
+func layersDiff(old, new []models.Layer) DiffResult {
+	var result DiffResult
+
 	oldLayers := make(map[int]models.Layer)
-	for _, l := range oldConfig.Layers {
+	for _, l := range old {
 		oldLayers[l.ID] = l
 	}
 
 	newLayers := make(map[int]models.Layer)
-	for _, l := range newConfig.Layers {
+	for _, l := range new {
 		newLayers[l.ID] = l
 	}
 
