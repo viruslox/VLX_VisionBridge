@@ -4,7 +4,49 @@ import (
 	"context"
 	"os/exec"
 	"testing"
+	"time"
+
+	"github.com/user/go-live-orchestrator/internal/models"
 )
+
+func TestProcessManager_Start_AlreadyRunning(t *testing.T) {
+	pm := NewProcessManager(nil)
+	pm.isRunning = true
+
+	err := pm.Start(context.Background(), &models.Config{})
+	if err == nil {
+		t.Errorf("Expected error when starting already running process manager")
+	} else if err.Error() != "process already running" {
+		t.Errorf("Expected 'process already running' error, got: %v", err)
+	}
+}
+
+func TestProcessManager_Start_Success(t *testing.T) {
+	pm := NewProcessManager(nil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	config := &models.Config{}
+
+	err := pm.Start(ctx, config)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	pm.mu.Lock()
+	isRunning := pm.isRunning
+	pm.mu.Unlock()
+
+	if !isRunning {
+		t.Errorf("Expected isRunning to be true")
+	}
+
+	// Wait briefly to allow goroutine to start
+	time.Sleep(10 * time.Millisecond)
+
+	pm.Stop()
+}
 
 func TestProcessManager_Stop_NotRunning(t *testing.T) {
 	pm := NewProcessManager(nil)
