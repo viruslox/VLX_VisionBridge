@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"syscall"
 
@@ -14,6 +15,14 @@ import (
 )
 
 func main() {
+	if os.Geteuid() == 0 {
+		log.Fatalf("Error: Go-Live Orchestrator should not be run as root.")
+	}
+
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		log.Fatalf("Error: ffmpeg is not installed or not found in PATH.")
+	}
+
 	log.Println("Starting Go-Live Orchestrator...")
 
 	// 1. Setup Database

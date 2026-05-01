@@ -54,8 +54,8 @@
 
 ## Phase 7: Build & Setup
 
-- [ ] Create build script that creates execuatable and configuration files templates
-- [ ] Configuration file(s) template must offer all available options (each one briefly explained).
-- [ ] Normal user have to be able of build, install, execute the application. (no root user allowed).
-- [ ] Installer asks user for installation path (that will contains executable(s) and config
-- [ ] build script and executable to inform the user if any pre-requisite/3rd part is missing.
+- [x] Create build script that creates execuatable and configuration files templates
+- [x] Configuration file(s) template must offer all available options (each one briefly explained).
+- [x] Normal user have to be able of build, install, execute the application. (no root user allowed).
+- [x] Installer asks user for installation path (that will contains executable(s) and config
+- [x] build script and executable to inform the user if any pre-requisite/3rd part is missing.
