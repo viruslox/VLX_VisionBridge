@@ -13,13 +13,18 @@ type Layer struct {
 	Active    bool   `yaml:"active"`
 	InputType string `yaml:"input_type"` // e.g., folder, loop, srt
 	InputPath string `yaml:"input_path"`
-	Media     string `yaml:"media"`      // Video+Audio, Video Only, Audio Only
+	Media     string `yaml:"media"` // Video+Audio, Video Only, Audio Only
 	Scale     string `yaml:"scale"`
 	Crop      string `yaml:"crop"`
 	Position  string `yaml:"position"`
 }
 
+type DatabaseConfig struct {
+	DSN string `yaml:"dsn"`
+}
+
 type Config struct {
-	Output OutputSettings `yaml:"output"`
-	Layers []Layer        `yaml:"layers"`
+	Database DatabaseConfig `yaml:"database"`
+	Output   OutputSettings `yaml:"output"`
+	Layers   []Layer        `yaml:"layers"`
 }

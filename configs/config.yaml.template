@@ -1,5 +1,9 @@
 # Configuration for Go-Live Orchestrator
 
+# Database settings
+database:
+  dsn: "" # PostgreSQL DSN, e.g., "postgres://user:password@localhost:5432/live_db?sslmode=verify-full"
+
 # Global output settings for the stream
 output:
   resolution: "1920x1080" # Target output resolution
