@@ -30,6 +30,10 @@
 - [x] Develop the logic to convert "Layer 0-9" structs into an FFmpeg `filter_complex` string.
 - [x] Implement coordinate calculation (handling 'center', 'top-left', and 5% padding).
 - [x] Handle input types: `folder` (image sequence), `loop` (video), `SRT`.
+- [x] Fix input indexing mismatch (`[inputIdx:v]`).
+- [x] Fix broken filter chaining (tracking `prevOutPad`).
+- [x] Add base canvas creation logic.
+- [x] Move `Layer` and `Config` models to `internal/models/`.
 
 ## Phase 4: Output & Multi-Streaming
 
