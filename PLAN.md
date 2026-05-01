@@ -57,4 +57,5 @@
 - [ ] Create build script that creates execuatable and configuration files templates
 - [ ] Configuration file(s) template must offer all available options (each one briefly explained).
 - [ ] Normal user have to be able of build, install, execute the application. (no root user allowed).
+- [ ] Installer asks user for installation path (that will contains executable(s) and config
 - [ ] build script and executable to inform the user if any pre-requisite/3rd part is missing.
