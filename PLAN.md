@@ -42,9 +42,9 @@
 
 ## Phase 5: Monitoring & Stability
 
-- [ ] Implement automatic process recovery (if FFmpeg crashes, Go restarts it).
-- [ ] Logging of stream events to PostgreSQL.
-- [ ] Graceful shutdown handling.
+- [x] Implement automatic process recovery (if FFmpeg crashes, Go restarts it).
+- [x] Logging of stream events to PostgreSQL.
+- [x] Graceful shutdown handling.
 
 ## Phase 6: Testing & Optimization
 
