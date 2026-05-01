@@ -147,37 +147,56 @@ func (w *Watcher) Start(ctx context.Context) error {
 		defer w.wg.Done()
 		defer watcher.Close()
 
+		var timer *time.Timer
+		var timerC <-chan time.Time
+
 		for {
 			select {
 			case <-watchCtx.Done():
+				if timer != nil {
+					timer.Stop()
+				}
 				return
 			case event, ok := <-watcher.Events:
 				if !ok {
+					if timer != nil {
+						timer.Stop()
+					}
 					return
 				}
 				if event.Op&fsnotify.Write == fsnotify.Write {
-					// Add a small delay to ensure file is completely written
-					time.Sleep(100 * time.Millisecond)
-
-					newCfg, err := LoadConfig(w.path)
-					if err != nil {
-						log.Printf("Error reloading config: %v", err)
-						continue
+					// Add a small delay to ensure file is completely written, debounced
+					if timer != nil {
+						timer.Stop()
 					}
+					timer = time.NewTimer(100 * time.Millisecond)
+					timerC = timer.C
+				}
+			case <-timerC:
+				timer = nil
+				timerC = nil
 
-					w.mu.Lock()
-					diff := DiffConfigs(w.current, newCfg)
-					w.current = newCfg
-					w.mu.Unlock()
+				newCfg, err := LoadConfig(w.path)
+				if err != nil {
+					log.Printf("Error reloading config: %v", err)
+					continue
+				}
 
-					if diff.RequiresRestart || diff.RequiresFilterUpdate {
-						if w.onChange != nil {
-							w.onChange(newCfg, diff)
-						}
+				w.mu.Lock()
+				diff := DiffConfigs(w.current, newCfg)
+				w.current = newCfg
+				w.mu.Unlock()
+
+				if diff.RequiresRestart || diff.RequiresFilterUpdate {
+					if w.onChange != nil {
+						w.onChange(newCfg, diff)
 					}
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
+					if timer != nil {
+						timer.Stop()
+					}
 					return
 				}
 				log.Printf("Watcher error: %v", err)
