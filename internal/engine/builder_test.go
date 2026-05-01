@@ -10,7 +10,14 @@ import (
 func TestBuildFFmpegArgs(t *testing.T) {
 	cfg := &models.Config{
 		Output: models.OutputSettings{
-			Resolution: "1920x1080",
+			Resolution:   "1920x1080",
+			FPS:          60,
+			VideoBitrate: "6000k",
+			AudioBitrate: "160k",
+			Destinations: []string{
+				"rtmp://live.twitch.tv/app/live_xyz",
+				"rtmp://a.rtmp.youtube.com/live2/xyz",
+			},
 		},
 		Layers: []models.Layer{
 			{
@@ -111,5 +118,25 @@ func TestBuildFFmpegArgs(t *testing.T) {
 	// 3. Verify final map
 	if !strings.Contains(argsStr, "-map [out3]") {
 		t.Errorf("Missing final map to last active layer: %s", argsStr)
+	}
+
+	// 4. Verify global settings
+	if !strings.Contains(argsStr, "-s 1920x1080") {
+		t.Errorf("Missing Resolution setting: %s", argsStr)
+	}
+	if !strings.Contains(argsStr, "-r 60") {
+		t.Errorf("Missing FPS setting: %s", argsStr)
+	}
+	if !strings.Contains(argsStr, "-c:v libx264 -b:v 6000k -maxrate 6000k -bufsize 6000k") {
+		t.Errorf("Missing VideoBitrate setting: %s", argsStr)
+	}
+	if !strings.Contains(argsStr, "-c:a aac -b:a 160k") {
+		t.Errorf("Missing AudioBitrate setting: %s", argsStr)
+	}
+
+	// 5. Verify tee muxer
+	expectedTee := "-f tee [f=flv]rtmp://live.twitch.tv/app/live_xyz|[f=flv]rtmp://a.rtmp.youtube.com/live2/xyz"
+	if !strings.Contains(argsStr, expectedTee) {
+		t.Errorf("Missing or incorrect tee muxer setting: expected %s in %s", expectedTee, argsStr)
 	}
 }

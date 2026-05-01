@@ -42,9 +42,23 @@ func DiffConfigs(oldConfig, newConfig *models.Config) DiffResult {
 	var result DiffResult
 
 	// Check if output settings changed (requires restart)
-	if oldConfig.Output != newConfig.Output {
+	if oldConfig.Output.Resolution != newConfig.Output.Resolution ||
+		oldConfig.Output.FPS != newConfig.Output.FPS ||
+		oldConfig.Output.VideoBitrate != newConfig.Output.VideoBitrate ||
+		oldConfig.Output.AudioBitrate != newConfig.Output.AudioBitrate {
 		result.RequiresRestart = true
 		return result
+	}
+
+	if len(oldConfig.Output.Destinations) != len(newConfig.Output.Destinations) {
+		result.RequiresRestart = true
+		return result
+	}
+	for i := range oldConfig.Output.Destinations {
+		if oldConfig.Output.Destinations[i] != newConfig.Output.Destinations[i] {
+			result.RequiresRestart = true
+			return result
+		}
 	}
 
 	// Check layers

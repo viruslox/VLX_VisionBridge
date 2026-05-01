@@ -146,5 +146,30 @@ func BuildFFmpegArgs(cfg *models.Config) ([]string, error) {
 	args = append(args, "-filter_complex", filterComplex.String())
 	args = append(args, "-map", currentBasePad)
 
+	// Add global output settings
+	if cfg.Output.Resolution != "" {
+		args = append(args, "-s", cfg.Output.Resolution)
+	}
+	if cfg.Output.FPS > 0 {
+		args = append(args, "-r", strconv.Itoa(cfg.Output.FPS))
+	}
+	if cfg.Output.VideoBitrate != "" {
+		args = append(args, "-c:v", "libx264", "-b:v", cfg.Output.VideoBitrate, "-maxrate", cfg.Output.VideoBitrate, "-bufsize", cfg.Output.VideoBitrate)
+	}
+	if cfg.Output.AudioBitrate != "" {
+		args = append(args, "-c:a", "aac", "-b:a", cfg.Output.AudioBitrate)
+	}
+
+	// Implement the tee muxer logic to output to multiple destinations
+	if len(cfg.Output.Destinations) > 0 {
+		var teeDestinations []string
+		for _, dest := range cfg.Output.Destinations {
+			teeDestinations = append(teeDestinations, fmt.Sprintf("[f=flv]%s", dest))
+		}
+
+		teeMap := strings.Join(teeDestinations, "|")
+		args = append(args, "-f", "tee", teeMap)
+	}
+
 	return args, nil
 }

@@ -1,10 +1,11 @@
 package models
 
 type OutputSettings struct {
-	Resolution   string `yaml:"resolution"`
-	FPS          int    `yaml:"fps"`
-	VideoBitrate string `yaml:"video_bitrate"`
-	AudioBitrate string `yaml:"audio_bitrate"`
+	Resolution   string   `yaml:"resolution"`
+	FPS          int      `yaml:"fps"`
+	VideoBitrate string   `yaml:"video_bitrate"`
+	AudioBitrate string   `yaml:"audio_bitrate"`
+	Destinations []string `yaml:"destinations"`
 }
 
 type Layer struct {
