@@ -166,8 +166,9 @@ func buildFilterComplex(cfg *models.Config, padX, padY int) ([]string, string, s
 		case "bottom-right":
 			overlayX, overlayY = fmt.Sprintf("W-w-%d", padX), fmt.Sprintf("H-h-%d", padY)
 		default:
-			if x, y, found := strings.Cut(layer.Position, ":"); found && !strings.Contains(y, ":") {
-				overlayX, overlayY = x, y
+			parts := strings.Split(layer.Position, ":")
+			if len(parts) == 2 {
+				overlayX, overlayY = parts[0], parts[1]
 			}
 		}
 		outPad := fmt.Sprintf("[out%d]", i)

@@ -1,0 +1,16 @@
+--- internal/engine/builder.go
++++ internal/engine/builder.go
+@@ -165,9 +165,10 @@
+		case "bottom-right":
+			overlayX, overlayY = fmt.Sprintf("W-w-%d", padX), fmt.Sprintf("H-h-%d", padY)
+		default:
+-			parts := strings.Split(layer.Position, ":")
+-			if len(parts) == 2 {
+-				overlayX, overlayY = parts[0], parts[1]
++			if x, y, found := strings.Cut(layer.Position, ":"); found {
++				if !strings.Contains(y, ":") {
++					overlayX, overlayY = x, y
++				}
+			}
+		}
+		outPad := fmt.Sprintf("[out%d]", i)
