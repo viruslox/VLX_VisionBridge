@@ -79,16 +79,10 @@ func main() {
 		log.Printf("Configuration changed. Restart required: %v, Filter update required: %v", diff.RequiresRestart, diff.RequiresFilterUpdate)
 		if diff.RequiresRestart {
 			log.Println("Restarting FFmpeg process due to configuration change...")
-			pm.Stop()
-			if err := pm.Start(ctx, newCfg); err != nil {
-				log.Printf("Failed to restart process manager: %v", err)
-			}
+			pm.UpdateConfig(newCfg)
 		} else if diff.RequiresFilterUpdate {
 			log.Println("Filter update required. Currently requiring full restart until live-update is implemented.")
-			pm.Stop()
-			if err := pm.Start(ctx, newCfg); err != nil {
-				log.Printf("Failed to restart process manager: %v", err)
-			}
+			pm.UpdateConfig(newCfg)
 		}
 	}
 
