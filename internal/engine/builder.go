@@ -45,14 +45,19 @@ func BuildFFmpegArgs(cfg *models.Config) ([]string, error) {
 	padX := outW * 5 / 100
 	padY := outH * 5 / 100
 
-	activeLayerCount := 0
+	if len(cfg.Layers) == 0 {
+		return []string{}, nil
+	}
+
+	hasActiveLayer := false
 	for _, layer := range cfg.Layers {
 		if layer.Active {
-			activeLayerCount++
+			hasActiveLayer = true
+			break
 		}
 	}
 
-	if activeLayerCount == 0 {
+	if !hasActiveLayer {
 		return []string{}, nil
 	}
 
