@@ -8,6 +8,22 @@ import (
 	"github.com/user/go-live-orchestrator/internal/models"
 )
 
+// isSafeFilterValue validates that a filter option only contains expected characters
+// to prevent FFmpeg filter injection attacks.
+func isSafeFilterValue(val string) bool {
+	for _, c := range val {
+		if (c >= '0' && c <= '9') ||
+			(c >= 'a' && c <= 'z') ||
+			(c >= 'A' && c <= 'Z') ||
+			c == ':' || c == '%' || c == '-' || c == '_' ||
+			c == '/' || c == '*' || c == '+' || c == '.' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
 // BuildFFmpegArgs generates the FFmpeg arguments based on the provided configuration.
 func BuildFFmpegArgs(cfg *models.Config) ([]string, error) {
 	if cfg == nil {
@@ -52,7 +68,7 @@ func BuildFFmpegArgs(cfg *models.Config) ([]string, error) {
 
 func handleLayerScaling(layer models.Layer) string {
 	scaleFilter := ""
-	if layer.Scale != "" && layer.Scale != "100%" {
+	if layer.Scale != "" && layer.Scale != "100%" && isSafeFilterValue(layer.Scale) {
 		if strings.HasSuffix(layer.Scale, "%") {
 			pctStr := strings.TrimSuffix(layer.Scale, "%")
 			pct, err := strconv.Atoi(pctStr)
@@ -69,7 +85,7 @@ func handleLayerScaling(layer models.Layer) string {
 	}
 
 	cropFilter := ""
-	if layer.Crop != "" && layer.Crop != "none" {
+	if layer.Crop != "" && layer.Crop != "none" && isSafeFilterValue(layer.Crop) {
 		cropFilter = fmt.Sprintf(",crop=%s", layer.Crop)
 	}
 	return scaleFilter + cropFilter
