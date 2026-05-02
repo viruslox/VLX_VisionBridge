@@ -22,14 +22,17 @@ type ProcessManager struct {
 	ctx       context.Context
 	cancel    context.CancelFunc
 	mu        sync.Mutex
+	cond      *sync.Cond
 	isRunning bool
 }
 
 // NewProcessManager creates a new ProcessManager.
 func NewProcessManager(dbConn *sql.DB) *ProcessManager {
-	return &ProcessManager{
+	pm := &ProcessManager{
 		db: dbConn,
 	}
+	pm.cond = sync.NewCond(&pm.mu)
+	return pm
 }
 
 // Start starts the FFmpeg process and monitors it.
@@ -74,6 +77,24 @@ func (pm *ProcessManager) Stop() {
 	if pm.cancel != nil {
 		pm.cancel()
 	}
+	if pm.cond != nil {
+		pm.cond.Broadcast()
+	}
+	pm.mu.Unlock()
+}
+
+// UpdateConfig updates the configuration and signals the monitor loop.
+func (pm *ProcessManager) UpdateConfig(config *models.Config) {
+	pm.mu.Lock()
+	pm.config = config
+
+	if pm.cmd != nil && pm.cmd.Process != nil {
+		log.Println("Signaling FFmpeg process to stop gracefully for config update...")
+		_ = pm.cmd.Process.Signal(syscall.SIGTERM)
+	}
+	if pm.cond != nil {
+		pm.cond.Broadcast()
+	}
 	pm.mu.Unlock()
 }
 
@@ -111,7 +132,15 @@ func (pm *ProcessManager) monitor() {
 
 		if len(args) == 0 {
 			log.Println("No active layers, not starting FFmpeg.")
-			time.Sleep(5 * time.Second) // wait before checking again, perhaps wait on a condition variable in the future
+
+			pm.mu.Lock()
+			// We must check the condition inside the lock to avoid lost wakeups.
+			// Re-evaluating len(args) here would require rebuilding args, which we don't want to do inside the lock.
+			// Instead, we just wait until we are signaled by UpdateConfig or Stop.
+			if pm.isRunning && pm.ctx.Err() == nil {
+				pm.cond.Wait()
+			}
+			pm.mu.Unlock()
 			continue
 		}
 
