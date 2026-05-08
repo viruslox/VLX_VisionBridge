@@ -26,6 +26,18 @@ func isSafeFilterValue(val string) bool {
 	return true
 }
 
+// sanitizeInputPath prevents FFmpeg argument injection by prefixing local paths
+// that start with a dash ("-") with "./".
+func sanitizeInputPath(path string) string {
+	if path == "" {
+		return path
+	}
+	if !strings.Contains(path, "://") && strings.HasPrefix(path, "-") {
+		return "./" + path
+	}
+	return path
+}
+
 // BuildFFmpegArgs generates the FFmpeg arguments based on the provided configuration.
 func BuildFFmpegArgs(cfg *models.Config) ([]string, error) {
 	if cfg == nil {
@@ -141,15 +153,16 @@ func buildFilterComplex(cfg *models.Config, padX, padY int) ([]string, string, s
 			continue
 		}
 
+		safePath := sanitizeInputPath(layer.InputPath)
 		switch layer.InputType {
 		case "folder":
-			args = append(args, "-f", "image2", "-loop", "1", "-i", layer.InputPath)
+			args = append(args, "-f", "image2", "-loop", "1", "-i", safePath)
 		case "loop":
-			args = append(args, "-stream_loop", "-1", "-i", layer.InputPath)
+			args = append(args, "-stream_loop", "-1", "-i", safePath)
 		case "srt":
-			args = append(args, "-fflags", "nobuffer", "-flags", "low_delay", "-i", layer.InputPath)
+			args = append(args, "-fflags", "nobuffer", "-flags", "low_delay", "-i", safePath)
 		default:
-			args = append(args, "-i", layer.InputPath)
+			args = append(args, "-i", safePath)
 		}
 
 		inputPad := "[" + strconv.Itoa(inputIdx) + ":v]"
