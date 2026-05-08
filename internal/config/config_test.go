@@ -190,3 +190,103 @@ func BenchmarkLayersDiff(b *testing.B) {
 		layersDiff(oldLayers, newLayers)
 	}
 }
+
+func TestLayersDiff(t *testing.T) {
+	tests := []struct {
+		name                     string
+		old                      []models.Layer
+		new                      []models.Layer
+		wantRequiresRestart      bool
+		wantRequiresFilterUpdate bool
+	}{
+		{
+			name:                     "No changes",
+			old:                      []models.Layer{{ID: 1, InputType: "loop", InputPath: "test.mp4", Media: "video", Active: true, Scale: "100%", Crop: "none", Position: "center"}},
+			new:                      []models.Layer{{ID: 1, InputType: "loop", InputPath: "test.mp4", Media: "video", Active: true, Scale: "100%", Crop: "none", Position: "center"}},
+			wantRequiresRestart:      false,
+			wantRequiresFilterUpdate: false,
+		},
+		{
+			name:                     "Layer added",
+			old:                      []models.Layer{},
+			new:                      []models.Layer{{ID: 1}},
+			wantRequiresRestart:      true,
+			wantRequiresFilterUpdate: false,
+		},
+		{
+			name:                     "Layer removed",
+			old:                      []models.Layer{{ID: 1}},
+			new:                      []models.Layer{},
+			wantRequiresRestart:      true,
+			wantRequiresFilterUpdate: false,
+		},
+		{
+			name:                     "InputType changed",
+			old:                      []models.Layer{{ID: 1, InputType: "loop"}},
+			new:                      []models.Layer{{ID: 1, InputType: "srt"}},
+			wantRequiresRestart:      true,
+			wantRequiresFilterUpdate: false,
+		},
+		{
+			name:                     "InputPath changed",
+			old:                      []models.Layer{{ID: 1, InputPath: "test1.mp4"}},
+			new:                      []models.Layer{{ID: 1, InputPath: "test2.mp4"}},
+			wantRequiresRestart:      true,
+			wantRequiresFilterUpdate: false,
+		},
+		{
+			name:                     "Media changed",
+			old:                      []models.Layer{{ID: 1, Media: "video"}},
+			new:                      []models.Layer{{ID: 1, Media: "audio"}},
+			wantRequiresRestart:      true,
+			wantRequiresFilterUpdate: false,
+		},
+		{
+			name:                     "Active changed",
+			old:                      []models.Layer{{ID: 1, Active: true}},
+			new:                      []models.Layer{{ID: 1, Active: false}},
+			wantRequiresRestart:      false,
+			wantRequiresFilterUpdate: true,
+		},
+		{
+			name:                     "Scale changed",
+			old:                      []models.Layer{{ID: 1, Scale: "100%"}},
+			new:                      []models.Layer{{ID: 1, Scale: "50%"}},
+			wantRequiresRestart:      false,
+			wantRequiresFilterUpdate: true,
+		},
+		{
+			name:                     "Crop changed",
+			old:                      []models.Layer{{ID: 1, Crop: "none"}},
+			new:                      []models.Layer{{ID: 1, Crop: "100:100:0:0"}},
+			wantRequiresRestart:      false,
+			wantRequiresFilterUpdate: true,
+		},
+		{
+			name:                     "Position changed",
+			old:                      []models.Layer{{ID: 1, Position: "center"}},
+			new:                      []models.Layer{{ID: 1, Position: "top-left"}},
+			wantRequiresRestart:      false,
+			wantRequiresFilterUpdate: true,
+		},
+		{
+			name:                     "Multiple changes including restart and filter update",
+			old:                      []models.Layer{{ID: 1, InputType: "loop", Active: true}},
+			new:                      []models.Layer{{ID: 1, InputType: "srt", Active: false}},
+			wantRequiresRestart:      true,
+			wantRequiresFilterUpdate: false, // Restart takes precedence in effect, but logic sets RequiresRestart=true and may leave RequiresFilterUpdate=false depending on if-else.
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := layersDiff(tt.old, tt.new)
+			if got.RequiresRestart != tt.wantRequiresRestart {
+				t.Errorf("RequiresRestart = %v, want %v", got.RequiresRestart, tt.wantRequiresRestart)
+			}
+			if got.RequiresFilterUpdate != tt.wantRequiresFilterUpdate {
+				t.Errorf("RequiresFilterUpdate = %v, want %v", got.RequiresFilterUpdate, tt.wantRequiresFilterUpdate)
+			}
+		})
+	}
+}
