@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"slices"
 	"sync"
 	"time"
 
@@ -54,16 +55,7 @@ func outputsRequireRestart(old, new models.OutputSettings) bool {
 		return true
 	}
 
-	if len(old.Destinations) != len(new.Destinations) {
-		return true
-	}
-	for i := range old.Destinations {
-		if old.Destinations[i] != new.Destinations[i] {
-			return true
-		}
-	}
-
-	return false
+	return !slices.Equal(old.Destinations, new.Destinations)
 }
 
 func layersDiff(old, new []models.Layer) DiffResult {
