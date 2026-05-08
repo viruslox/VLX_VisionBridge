@@ -1,8 +1,8 @@
-# Project Design: Go-Live Orchestrator
+# Project Design: VLX VisionBridge
 
 ## Project Overview
 
-Go-Live Orchestrator is a headless, high-performance Linux service written in Go. It aggregates multiple finite SRT/WebRTC/Media streams into a single composite live stream, broadcasted simultaneously to multiple CDNs (YouTube, Twitch, VK).
+VLX VisionBridge is a headless, high-performance Linux service written in Go. It aggregates multiple finite SRT/WebRTC/Media streams into a single composite live stream, broadcasted simultaneously to multiple CDNs (YouTube, Twitch, VK).
 
 The service is designed for professional 24/7 broadcasting environments where configuration must be dynamic and resource efficiency is paramount. We are basically building a sort of obs-studio for remote VMs.
 

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/user/go-live-orchestrator/internal/models"
+	"github.com/user/VLX_VisionBridge/internal/models"
 )
 
 func TestBuildFFmpegArgs_FilterInjection(t *testing.T) {

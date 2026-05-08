@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/user/go-live-orchestrator/internal/config"
-	"github.com/user/go-live-orchestrator/internal/models"
+	"github.com/user/VLX_VisionBridge/internal/config"
+	"github.com/user/VLX_VisionBridge/internal/models"
 )
 
 // MockProcessUpdater is a mock implementation of ProcessUpdater

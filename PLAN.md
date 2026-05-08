@@ -2,7 +2,7 @@
 
 ## Phase 1: Environment & Project Scaffolding
 
-- [x] Initialize Go module `github.com/user/go-live-orchestrator`.
+- [x] Initialize Go module `github.com/user/VLX_VisionBridge`.
 - [x] Setup Directory Structure:
 
     ```text

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/user/go-live-orchestrator/internal/models"
+	"github.com/user/VLX_VisionBridge/internal/models"
 )
 
 func TestLoadConfig(t *testing.T) {

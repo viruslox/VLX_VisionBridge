@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/user/go-live-orchestrator/internal/models"
+	"github.com/user/VLX_VisionBridge/internal/models"
 )
 
 var destReplacer = strings.NewReplacer("\\", "\\\\", "|", "\\|")
