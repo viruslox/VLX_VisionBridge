@@ -96,6 +96,8 @@ func handleLayerScaling(layer models.Layer) string {
 	return scaleFilter + cropFilter
 }
 
+var destReplacer = strings.NewReplacer("\\", "\\\\", "|", "\\|")
+
 func buildOutputArgs(cfg *models.Config) []string {
 	var args []string
 	if cfg.Output.Resolution != "" {
@@ -114,8 +116,7 @@ func buildOutputArgs(cfg *models.Config) []string {
 	if len(cfg.Output.Destinations) > 0 {
 		var teeDestinations []string
 		for _, dest := range cfg.Output.Destinations {
-			escaped := strings.ReplaceAll(dest, "\\", "\\\\")
-			escaped = strings.ReplaceAll(escaped, "|", "\\|")
+			escaped := destReplacer.Replace(dest)
 			teeDestinations = append(teeDestinations, fmt.Sprintf("[f=flv]%s", escaped))
 		}
 		teeMap := strings.Join(teeDestinations, "|")
