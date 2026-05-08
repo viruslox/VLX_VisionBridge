@@ -98,7 +98,6 @@ func handleLayerScaling(layer models.Layer) string {
 	return scaleFilter + cropFilter
 }
 
-var destReplacer = strings.NewReplacer("\\", "\\\\", "|", "\\|")
 
 func buildOutputArgs(cfg *models.Config) []string {
 	var args []string
@@ -130,7 +129,9 @@ func buildOutputArgs(cfg *models.Config) []string {
 func buildFilterComplex(cfg *models.Config, padX, padY int) ([]string, string, string) {
 	var args []string
 	var filterComplex strings.Builder
-	filterComplex.WriteString(fmt.Sprintf("color=s=%s:c=black [base];\n", cfg.Output.Resolution))
+	filterComplex.WriteString("color=s=")
+	filterComplex.WriteString(cfg.Output.Resolution)
+	filterComplex.WriteString(":c=black [base];\n")
 
 	inputIdx := 0
 	currentBasePad := "[base]"
@@ -151,35 +152,45 @@ func buildFilterComplex(cfg *models.Config, padX, padY int) ([]string, string, s
 			args = append(args, "-i", layer.InputPath)
 		}
 
-		inputPad := fmt.Sprintf("[%d:v]", inputIdx)
-		scaledPad := fmt.Sprintf("[v%d_scaled]", i)
+		inputPad := "[" + strconv.Itoa(inputIdx) + ":v]"
+		scaledPad := "[v" + strconv.Itoa(i) + "_scaled]"
 
 		scaleCropFilter := handleLayerScaling(layer)
-		if scaleCropFilter == "copy" {
-			filterComplex.WriteString(fmt.Sprintf("%s copy %s;\n", inputPad, scaledPad))
-		} else {
-			filterComplex.WriteString(fmt.Sprintf("%s %s %s;\n", inputPad, scaleCropFilter, scaledPad))
-		}
+
+		filterComplex.WriteString(inputPad)
+		filterComplex.WriteString(" ")
+		filterComplex.WriteString(scaleCropFilter)
+		filterComplex.WriteString(" ")
+		filterComplex.WriteString(scaledPad)
+		filterComplex.WriteString(";\n")
 
 		overlayX, overlayY := "0", "0"
 		switch layer.Position {
 		case "center":
 			overlayX, overlayY = "(W-w)/2", "(H-h)/2"
 		case "top-left":
-			overlayX, overlayY = fmt.Sprintf("%d", padX), fmt.Sprintf("%d", padY)
+			overlayX, overlayY = strconv.Itoa(padX), strconv.Itoa(padY)
 		case "top-right":
-			overlayX, overlayY = fmt.Sprintf("W-w-%d", padX), fmt.Sprintf("%d", padY)
+			overlayX, overlayY = "W-w-" + strconv.Itoa(padX), strconv.Itoa(padY)
 		case "bottom-left":
-			overlayX, overlayY = fmt.Sprintf("%d", padX), fmt.Sprintf("H-h-%d", padY)
+			overlayX, overlayY = strconv.Itoa(padX), "H-h-" + strconv.Itoa(padY)
 		case "bottom-right":
-			overlayX, overlayY = fmt.Sprintf("W-w-%d", padX), fmt.Sprintf("H-h-%d", padY)
+			overlayX, overlayY = "W-w-" + strconv.Itoa(padX), "H-h-" + strconv.Itoa(padY)
 		default:
 			if x, y, found := strings.Cut(layer.Position, ":"); found && !strings.Contains(y, ":") {
 				overlayX, overlayY = x, y
 			}
 		}
-		outPad := fmt.Sprintf("[out%d]", i)
-		filterComplex.WriteString(fmt.Sprintf("%s%s overlay=x=%s:y=%s %s;\n", currentBasePad, scaledPad, overlayX, overlayY, outPad))
+		outPad := "[out" + strconv.Itoa(i) + "]"
+		filterComplex.WriteString(currentBasePad)
+		filterComplex.WriteString(scaledPad)
+		filterComplex.WriteString(" overlay=x=")
+		filterComplex.WriteString(overlayX)
+		filterComplex.WriteString(":y=")
+		filterComplex.WriteString(overlayY)
+		filterComplex.WriteString(" ")
+		filterComplex.WriteString(outPad)
+		filterComplex.WriteString(";\n")
 		currentBasePad = outPad
 		inputIdx++
 	}
