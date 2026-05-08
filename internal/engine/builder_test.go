@@ -162,28 +162,52 @@ func TestBuildFFmpegArgs_TeeMuxerInjection(t *testing.T) {
 		},
 	}
 
+	_, err := BuildFFmpegArgs(cfg)
+	if err == nil {
+		t.Fatalf("Expected error when building args with injected tee muxer strings, but got nil")
+	}
+
+	expectedErrMsg := "invalid or unsafe output destination"
+	if !strings.Contains(err.Error(), expectedErrMsg) {
+		t.Errorf("Expected error to contain %q, but got: %v", expectedErrMsg, err)
+	}
+}
+
+func TestBuildFFmpegArgs_ValidDestinations(t *testing.T) {
+	cfg := &models.Config{
+		Output: models.OutputSettings{
+			Resolution: "1920x1080",
+			FPS:        60,
+			Destinations: []string{
+				"rtmp://live.twitch.tv/app/live_xyz",
+				"srt://example.com:1234",
+				"rtmps://live-api-s.facebook.com:443/rtmp/",
+			},
+		},
+		Layers: []models.Layer{
+			{
+				ID:        0,
+				Active:    true,
+				InputType: "loop",
+				InputPath: "video.mp4",
+			},
+		},
+	}
+
 	args, err := BuildFFmpegArgs(cfg)
 	if err != nil {
-		t.Fatalf("Failed to build args: %v", err)
+		t.Fatalf("Expected no error for valid destinations, got: %v", err)
 	}
 
 	argsStr := strings.Join(args, " ")
-
-	// Ensure the pipe character is properly escaped with a backslash
-	// Original: rtmp://localhost/app/stream|[f=mp4]/tmp/pwned.mp4
-	// Escaped: rtmp://localhost/app/stream\|[f=mp4]/tmp/pwned.mp4
-	expectedDest1 := "[f=flv]rtmp://localhost/app/stream\\|[f=mp4]/tmp/pwned.mp4"
-
-	// Ensure backslash is escaped
-	// Original: rtmp://localhost/app/stream2\[f=flv]inject
-	// Escaped: rtmp://localhost/app/stream2\\[f=flv]inject
-	expectedDest2 := "[f=flv]rtmp://localhost/app/stream2\\\\[f=flv]inject"
-
-	expectedTeeMap := expectedDest1 + "|" + expectedDest2
+	expectedDest1 := "[f=flv]rtmp://live.twitch.tv/app/live_xyz"
+	expectedDest2 := "[f=flv]srt://example.com:1234"
+	expectedDest3 := "[f=flv]rtmps://live-api-s.facebook.com:443/rtmp/"
+	expectedTeeMap := expectedDest1 + "|" + expectedDest2 + "|" + expectedDest3
 	expectedTeeArg := "-f tee " + expectedTeeMap
 
 	if !strings.Contains(argsStr, expectedTeeArg) {
-		t.Errorf("Tee muxer injection prevention failed. Expected: %s\nGot args: %s", expectedTeeArg, argsStr)
+		t.Errorf("Tee muxer argument incorrect for valid destinations.\nExpected: %s\nGot args: %s", expectedTeeArg, argsStr)
 	}
 }
 

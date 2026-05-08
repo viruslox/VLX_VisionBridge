@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -9,6 +10,29 @@ import (
 )
 
 var destReplacer = strings.NewReplacer("\\", "\\\\", "|", "\\|")
+
+// isValidDestination strictly validates the destination URL to prevent FFmpeg tee muxer injection.
+func isValidDestination(dest string) bool {
+	u, err := url.ParseRequestURI(dest)
+	if err != nil {
+		return false
+	}
+
+	scheme := strings.ToLower(u.Scheme)
+	if scheme != "rtmp" && scheme != "rtmps" && scheme != "srt" {
+		return false
+	}
+
+	if u.Host == "" {
+		return false
+	}
+
+	if strings.ContainsAny(dest, "|\\\"'[]") {
+		return false
+	}
+
+	return true
+}
 
 // isSafeFilterValue validates that a filter option only contains expected characters
 // to prevent FFmpeg filter injection attacks.
@@ -80,7 +104,12 @@ func BuildFFmpegArgs(cfg *models.Config) ([]string, error) {
 	args = append(args, argsFilter...)
 	args = append(args, "-filter_complex", filterComplex)
 	args = append(args, "-map", lastPad)
-	args = append(args, buildOutputArgs(cfg)...)
+
+	outArgs, err := buildOutputArgs(cfg)
+	if err != nil {
+		return nil, err
+	}
+	args = append(args, outArgs...)
 
 	return args, nil
 }
@@ -111,7 +140,7 @@ func handleLayerScaling(layer models.Layer) string {
 }
 
 
-func buildOutputArgs(cfg *models.Config) []string {
+func buildOutputArgs(cfg *models.Config) ([]string, error) {
 	var args []string
 	if cfg.Output.Resolution != "" {
 		args = append(args, "-s", cfg.Output.Resolution)
@@ -129,13 +158,16 @@ func buildOutputArgs(cfg *models.Config) []string {
 	if len(cfg.Output.Destinations) > 0 {
 		var teeDestinations []string
 		for _, dest := range cfg.Output.Destinations {
+			if !isValidDestination(dest) {
+				return nil, fmt.Errorf("invalid or unsafe output destination: %s", dest)
+			}
 			escaped := destReplacer.Replace(dest)
 			teeDestinations = append(teeDestinations, fmt.Sprintf("[f=flv]%s", escaped))
 		}
 		teeMap := strings.Join(teeDestinations, "|")
 		args = append(args, "-f", "tee", teeMap)
 	}
-	return args
+	return args, nil
 }
 
 func buildFilterComplex(cfg *models.Config, padX, padY int) ([]string, string, string) {
