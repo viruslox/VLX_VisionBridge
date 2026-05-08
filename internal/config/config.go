@@ -66,26 +66,21 @@ func layersDiff(old, new []models.Layer) DiffResult {
 		oldMap[oldL.ID] = oldL
 	}
 
-	newMap := make(map[int]struct{}, len(new))
 	for _, newL := range new {
-		newMap[newL.ID] = struct{}{}
-
 		if oldL, found := oldMap[newL.ID]; found {
 			if oldL.InputType != newL.InputType || oldL.InputPath != newL.InputPath || oldL.Media != newL.Media {
 				result.RequiresRestart = true
 			} else if oldL.Active != newL.Active || oldL.Scale != newL.Scale || oldL.Crop != newL.Crop || oldL.Position != newL.Position {
 				result.RequiresFilterUpdate = true
 			}
+			delete(oldMap, newL.ID)
 		} else {
 			result.RequiresRestart = true
 		}
 	}
 
-	for _, oldL := range old {
-		if _, found := newMap[oldL.ID]; !found {
-			result.RequiresRestart = true
-			break
-		}
+	if len(oldMap) > 0 {
+		result.RequiresRestart = true
 	}
 
 	return result
