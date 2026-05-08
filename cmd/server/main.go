@@ -10,10 +10,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/user/go-live-orchestrator/internal/config"
-	"github.com/user/go-live-orchestrator/internal/db"
-	"github.com/user/go-live-orchestrator/internal/engine"
-	"github.com/user/go-live-orchestrator/internal/models"
+	"github.com/user/VLX_VisionBridge/internal/config"
+	"github.com/user/VLX_VisionBridge/internal/db"
+	"github.com/user/VLX_VisionBridge/internal/engine"
+	"github.com/user/VLX_VisionBridge/internal/models"
 )
 
 // ProcessUpdater defines the interface for updating configuration.
@@ -24,7 +24,7 @@ type ProcessUpdater interface {
 // CheckEUID checks if the process is running as root.
 func CheckEUID(euid int) error {
 	if euid == 0 {
-		return fmt.Errorf("Error: Go-Live Orchestrator should not be run as root.")
+		return fmt.Errorf("Error: VLX VisionBridge should not be run as root.")
 	}
 	return nil
 }
@@ -74,7 +74,7 @@ func main() {
 		log.Fatalf("%v", err)
 	}
 
-	log.Println("Starting Go-Live Orchestrator...")
+	log.Println("Starting VLX VisionBridge...")
 
 	// 1. Setup Configuration
 	configPath := ResolveConfigPath(os.Getenv("CONFIG_PATH"))

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/user/go-live-orchestrator/internal/models"
+	"github.com/user/VLX_VisionBridge/internal/models"
 
 	"github.com/fsnotify/fsnotify"
 	"gopkg.in/yaml.v3"

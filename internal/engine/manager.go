@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/user/go-live-orchestrator/internal/db"
-	"github.com/user/go-live-orchestrator/internal/models"
+	"github.com/user/VLX_VisionBridge/internal/db"
+	"github.com/user/VLX_VisionBridge/internal/models"
 )
 
 // ProcessManager manages the FFmpeg process.

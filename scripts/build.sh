@@ -17,13 +17,13 @@ if ! command -v ffmpeg &> /dev/null; then
 fi
 
 echo "Building executable..."
-go build -o ./go-live-orchestrator cmd/server/main.go
+go build -o ./VLX_VisionBridge cmd/server/main.go
 echo "Build successful."
 
 echo "Generating config template..."
 mkdir -p configs
 cat << 'CONFIG_EOF' > configs/config.yaml.template
-# Configuration for Go-Live Orchestrator
+# Configuration for VLX VisionBridge
 
 # Global output settings for the stream
 output:

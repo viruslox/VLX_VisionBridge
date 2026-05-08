@@ -1,4 +1,4 @@
-module github.com/user/go-live-orchestrator
+module github.com/user/VLX_VisionBridge
 
 go 1.24.3
 
