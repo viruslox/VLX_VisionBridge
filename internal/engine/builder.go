@@ -98,6 +98,8 @@ func handleLayerScaling(layer models.Layer) string {
 	return scaleFilter + cropFilter
 }
 
+var destReplacer = strings.NewReplacer("\\", "\\\\", "|", "\\|")
+
 func buildOutputArgs(cfg *models.Config) []string {
 	var args []string
 	if cfg.Output.Resolution != "" {
