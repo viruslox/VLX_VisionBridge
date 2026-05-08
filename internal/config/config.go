@@ -61,34 +61,30 @@ func outputsRequireRestart(old, new models.OutputSettings) bool {
 func layersDiff(old, new []models.Layer) DiffResult {
 	var result DiffResult
 
+	oldMap := make(map[int]models.Layer, len(old))
+	for _, oldL := range old {
+		oldMap[oldL.ID] = oldL
+	}
+
+	newMap := make(map[int]struct{}, len(new))
 	for _, newL := range new {
-		var found bool
-		for _, oldL := range old {
-			if oldL.ID == newL.ID {
-				found = true
-				if oldL.InputType != newL.InputType || oldL.InputPath != newL.InputPath || oldL.Media != newL.Media {
-					result.RequiresRestart = true
-				} else if oldL.Active != newL.Active || oldL.Scale != newL.Scale || oldL.Crop != newL.Crop || oldL.Position != newL.Position {
-					result.RequiresFilterUpdate = true
-				}
-				break
+		newMap[newL.ID] = struct{}{}
+
+		if oldL, found := oldMap[newL.ID]; found {
+			if oldL.InputType != newL.InputType || oldL.InputPath != newL.InputPath || oldL.Media != newL.Media {
+				result.RequiresRestart = true
+			} else if oldL.Active != newL.Active || oldL.Scale != newL.Scale || oldL.Crop != newL.Crop || oldL.Position != newL.Position {
+				result.RequiresFilterUpdate = true
 			}
-		}
-		if !found {
+		} else {
 			result.RequiresRestart = true
 		}
 	}
 
 	for _, oldL := range old {
-		var found bool
-		for _, newL := range new {
-			if newL.ID == oldL.ID {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if _, found := newMap[oldL.ID]; !found {
 			result.RequiresRestart = true
+			break
 		}
 	}
 
