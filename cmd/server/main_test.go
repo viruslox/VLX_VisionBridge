@@ -1,0 +1,105 @@
+package main
+
+import (
+	"errors"
+	"testing"
+
+	"github.com/user/go-live-orchestrator/internal/config"
+	"github.com/user/go-live-orchestrator/internal/models"
+)
+
+// MockProcessUpdater is a mock implementation of ProcessUpdater
+type MockProcessUpdater struct {
+	updateConfigCalled bool
+	lastConfig         *models.Config
+}
+
+func (m *MockProcessUpdater) UpdateConfig(config *models.Config) {
+	m.updateConfigCalled = true
+	m.lastConfig = config
+}
+
+func TestCheckEUID(t *testing.T) {
+	if err := CheckEUID(0); err == nil {
+		t.Errorf("Expected error for euid=0 (root), got nil")
+	}
+
+	if err := CheckEUID(1000); err != nil {
+		t.Errorf("Expected no error for euid!=0, got %v", err)
+	}
+}
+
+func TestCheckFFmpeg(t *testing.T) {
+	mockLookPathFound := func(file string) (string, error) {
+		return "/usr/bin/ffmpeg", nil
+	}
+
+	if err := CheckFFmpeg(mockLookPathFound); err != nil {
+		t.Errorf("Expected no error when ffmpeg is found, got %v", err)
+	}
+
+	mockLookPathNotFound := func(file string) (string, error) {
+		return "", errors.New("not found")
+	}
+
+	if err := CheckFFmpeg(mockLookPathNotFound); err == nil {
+		t.Errorf("Expected error when ffmpeg is not found, got nil")
+	}
+}
+
+func TestResolveConfigPath(t *testing.T) {
+	if path := ResolveConfigPath("/custom/config.yaml"); path != "/custom/config.yaml" {
+		t.Errorf("Expected /custom/config.yaml, got %s", path)
+	}
+
+	if path := ResolveConfigPath(""); path != "configs/config.yaml" {
+		t.Errorf("Expected configs/config.yaml, got %s", path)
+	}
+}
+
+func TestResolveDSN(t *testing.T) {
+	envDSN := "postgres://env:pass@localhost:5432/db"
+	configDSN := "postgres://config:pass@localhost:5432/db"
+
+	if dsn := ResolveDSN(envDSN, configDSN); dsn != envDSN {
+		t.Errorf("Expected %s, got %s", envDSN, dsn)
+	}
+
+	if dsn := ResolveDSN("", configDSN); dsn != configDSN {
+		t.Errorf("Expected %s, got %s", configDSN, dsn)
+	}
+}
+
+func TestHandleConfigChange(t *testing.T) {
+	mockPM := &MockProcessUpdater{}
+	newCfg := &models.Config{}
+
+	// Test case: RequiresRestart = true
+	diffRestart := config.DiffResult{RequiresRestart: true, RequiresFilterUpdate: false}
+	HandleConfigChange(mockPM, newCfg, diffRestart)
+	if !mockPM.updateConfigCalled || mockPM.lastConfig != newCfg {
+		t.Errorf("Expected UpdateConfig to be called with newCfg for RequiresRestart")
+	}
+
+	// Reset mock
+	mockPM.updateConfigCalled = false
+	mockPM.lastConfig = nil
+
+	// Test case: RequiresFilterUpdate = true
+	diffFilter := config.DiffResult{RequiresRestart: false, RequiresFilterUpdate: true}
+	HandleConfigChange(mockPM, newCfg, diffFilter)
+	if !mockPM.updateConfigCalled || mockPM.lastConfig != newCfg {
+		t.Errorf("Expected UpdateConfig to be called with newCfg for RequiresFilterUpdate")
+	}
+
+	// Reset mock
+	mockPM.updateConfigCalled = false
+	mockPM.lastConfig = nil
+
+	// Test case: No changes required
+	diffNone := config.DiffResult{RequiresRestart: false, RequiresFilterUpdate: false}
+	HandleConfigChange(mockPM, newCfg, diffNone)
+	if mockPM.updateConfigCalled {
+		t.Errorf("Expected UpdateConfig NOT to be called when no changes required")
+	}
+}
