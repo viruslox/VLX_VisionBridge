@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"os"
 	"os/exec"
@@ -15,22 +16,68 @@ import (
 	"github.com/user/go-live-orchestrator/internal/models"
 )
 
+// ProcessUpdater defines the interface for updating configuration.
+type ProcessUpdater interface {
+	UpdateConfig(config *models.Config)
+}
+
+// CheckEUID checks if the process is running as root.
+func CheckEUID(euid int) error {
+	if euid == 0 {
+		return fmt.Errorf("Error: Go-Live Orchestrator should not be run as root.")
+	}
+	return nil
+}
+
+// CheckFFmpeg checks if ffmpeg is available in the system PATH.
+func CheckFFmpeg(lookPath func(string) (string, error)) error {
+	if _, err := lookPath("ffmpeg"); err != nil {
+		return fmt.Errorf("Error: ffmpeg is not installed or not found in PATH.")
+	}
+	return nil
+}
+
+// ResolveConfigPath determines the path to the configuration file.
+func ResolveConfigPath(envPath string) string {
+	if envPath != "" {
+		return envPath
+	}
+	return "configs/config.yaml"
+}
+
+// ResolveDSN determines the database DSN to use.
+func ResolveDSN(envDSN string, configDSN string) string {
+	if envDSN != "" {
+		return envDSN
+	}
+	return configDSN
+}
+
+// HandleConfigChange processes configuration changes.
+func HandleConfigChange(pm ProcessUpdater, newCfg *models.Config, diff config.DiffResult) {
+	log.Printf("Configuration changed. Restart required: %v, Filter update required: %v", diff.RequiresRestart, diff.RequiresFilterUpdate)
+	if diff.RequiresRestart {
+		log.Println("Restarting FFmpeg process due to configuration change...")
+		pm.UpdateConfig(newCfg)
+	} else if diff.RequiresFilterUpdate {
+		log.Println("Filter update required. Currently requiring full restart until live-update is implemented.")
+		pm.UpdateConfig(newCfg)
+	}
+}
+
 func main() {
-	if os.Geteuid() == 0 {
-		log.Fatalf("Error: Go-Live Orchestrator should not be run as root.")
+	if err := CheckEUID(os.Geteuid()); err != nil {
+		log.Fatalf("%v", err)
 	}
 
-	if _, err := exec.LookPath("ffmpeg"); err != nil {
-		log.Fatalf("Error: ffmpeg is not installed or not found in PATH.")
+	if err := CheckFFmpeg(exec.LookPath); err != nil {
+		log.Fatalf("%v", err)
 	}
 
 	log.Println("Starting Go-Live Orchestrator...")
 
 	// 1. Setup Configuration
-	configPath := "configs/config.yaml"
-	if os.Getenv("CONFIG_PATH") != "" {
-		configPath = os.Getenv("CONFIG_PATH")
-	}
+	configPath := ResolveConfigPath(os.Getenv("CONFIG_PATH"))
 
 	// Load initial config
 	initialConfig, err := config.LoadConfig(configPath)
@@ -40,10 +87,7 @@ func main() {
 
 	// 2. Setup Database
 	var dbConn *sql.DB
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		dsn = initialConfig.Database.DSN
-	}
+	dsn := ResolveDSN(os.Getenv("DATABASE_URL"), initialConfig.Database.DSN)
 
 	if dsn != "" {
 		var err error
@@ -76,14 +120,7 @@ func main() {
 
 	// Define watcher callback
 	onChange := func(newCfg *models.Config, diff config.DiffResult) {
-		log.Printf("Configuration changed. Restart required: %v, Filter update required: %v", diff.RequiresRestart, diff.RequiresFilterUpdate)
-		if diff.RequiresRestart {
-			log.Println("Restarting FFmpeg process due to configuration change...")
-			pm.UpdateConfig(newCfg)
-		} else if diff.RequiresFilterUpdate {
-			log.Println("Filter update required. Currently requiring full restart until live-update is implemented.")
-			pm.UpdateConfig(newCfg)
-		}
+		HandleConfigChange(pm, newCfg, diff)
 	}
 
 	watcher := config.NewWatcher(configPath, onChange)
