@@ -50,6 +50,32 @@ layers:
 	}
 }
 
+func TestLoadConfig_FileNotFound(t *testing.T) {
+	_, err := LoadConfig("/path/to/non/existent/file.yaml")
+	if err == nil {
+		t.Errorf("Expected error for missing file, got nil")
+	}
+}
+
+func TestLoadConfig_InvalidYAML(t *testing.T) {
+	invalidYaml := `
+output:
+  resolution: "1920x1080"
+	invalid_indentation
+`
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "invalid_config.yaml")
+	err := os.WriteFile(configFile, []byte(invalidYaml), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write temp config file: %v", err)
+	}
+
+	_, err = LoadConfig(configFile)
+	if err == nil {
+		t.Errorf("Expected error for invalid YAML, got nil")
+	}
+}
+
 func TestDiffConfigs(t *testing.T) {
 	oldCfg := &models.Config{
 		Output: models.OutputSettings{Resolution: "1920x1080", FPS: 30},
