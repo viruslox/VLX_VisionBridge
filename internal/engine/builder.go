@@ -8,6 +8,8 @@ import (
 	"github.com/user/go-live-orchestrator/internal/models"
 )
 
+var destReplacer = strings.NewReplacer("\\", "\\\\", "|", "\\|")
+
 // isSafeFilterValue validates that a filter option only contains expected characters
 // to prevent FFmpeg filter injection attacks.
 func isSafeFilterValue(val string) bool {
@@ -114,8 +116,7 @@ func buildOutputArgs(cfg *models.Config) []string {
 	if len(cfg.Output.Destinations) > 0 {
 		var teeDestinations []string
 		for _, dest := range cfg.Output.Destinations {
-			escaped := strings.ReplaceAll(dest, "\\", "\\\\")
-			escaped = strings.ReplaceAll(escaped, "|", "\\|")
+			escaped := destReplacer.Replace(dest)
 			teeDestinations = append(teeDestinations, fmt.Sprintf("[f=flv]%s", escaped))
 		}
 		teeMap := strings.Join(teeDestinations, "|")
