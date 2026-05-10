@@ -225,7 +225,9 @@ func buildFilterComplex(cfg *models.Config, padX, padY int) ([]string, string, s
 			overlayX, overlayY = "W-w-" + strconv.Itoa(padX), "H-h-" + strconv.Itoa(padY)
 		default:
 			if x, y, found := strings.Cut(layer.Position, ":"); found && !strings.Contains(y, ":") {
-				overlayX, overlayY = x, y
+				if isSafeFilterValue(x) && isSafeFilterValue(y) {
+					overlayX, overlayY = x, y
+				}
 			}
 		}
 		outPad := "[out" + strconv.Itoa(i) + "]"
