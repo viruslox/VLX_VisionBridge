@@ -11,6 +11,8 @@ import (
 
 var destReplacer = strings.NewReplacer("\\", "\\\\", "|", "\\|")
 
+const paddingPercentage = 5
+
 // isValidDestination strictly validates the destination URL to prevent FFmpeg tee muxer injection.
 func isValidDestination(dest string) bool {
 	u, err := url.ParseRequestURI(dest)
@@ -79,9 +81,9 @@ func BuildFFmpegArgs(cfg *models.Config) ([]string, error) {
 		return nil, fmt.Errorf("invalid resolution values: %s", cfg.Output.Resolution)
 	}
 
-	// Calculate 5% padding
-	padX := outW * 5 / 100
-	padY := outH * 5 / 100
+	// Calculate padding based on percentage
+	padX := outW * paddingPercentage / 100
+	padY := outH * paddingPercentage / 100
 
 	if len(cfg.Layers) == 0 {
 		return []string{}, nil
