@@ -68,9 +68,11 @@ func layersDiff(old, new []models.Layer) DiffResult {
 
 	for _, newL := range new {
 		if oldL, found := oldMap[newL.ID]; found {
-			if oldL.InputType != newL.InputType || oldL.InputPath != newL.InputPath || oldL.Media != newL.Media {
+			res := compareLayer(oldL, newL)
+			if res.RequiresRestart {
 				result.RequiresRestart = true
-			} else if oldL.Active != newL.Active || oldL.Scale != newL.Scale || oldL.Crop != newL.Crop || oldL.Position != newL.Position {
+			}
+			if res.RequiresFilterUpdate {
 				result.RequiresFilterUpdate = true
 			}
 			delete(oldMap, newL.ID)
@@ -84,6 +86,18 @@ func layersDiff(old, new []models.Layer) DiffResult {
 	}
 
 	return result
+}
+
+func compareLayer(oldL, newL models.Layer) DiffResult {
+	if oldL.InputType != newL.InputType || oldL.InputPath != newL.InputPath || oldL.Media != newL.Media {
+		return DiffResult{RequiresRestart: true}
+	}
+
+	if oldL.Active != newL.Active || oldL.Scale != newL.Scale || oldL.Crop != newL.Crop || oldL.Position != newL.Position {
+		return DiffResult{RequiresFilterUpdate: true}
+	}
+
+	return DiffResult{}
 }
 
 // Watcher handles watching the config file for changes
