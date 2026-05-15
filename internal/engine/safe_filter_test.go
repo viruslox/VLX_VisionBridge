@@ -25,6 +25,17 @@ func TestIsSafeFilterValue(t *testing.T) {
 		{"Unsafe char at end", "100,", false},
 		{"Unicode character", "scaleπ", false},
 		{"Non-ASCII control character", "scale\n", false},
+		{"Boundary before A (@)", "scale@", false},
+		{"Boundary before a (`)", "scale`", false},
+		{"Boundary after z ({)", "scale{", false},
+		{"Isolated allowed char (:)", ":", true},
+		{"Isolated allowed char (%)", "%", true},
+		{"Isolated allowed char (-)", "-", true},
+		{"Isolated allowed char (_)", "_", true},
+		{"Isolated allowed char (/)", "/", true},
+		{"Isolated allowed char (*)", "*", true},
+		{"Isolated allowed char (+)", "+", true},
+		{"Isolated allowed char (.)", ".", true},
 	}
 
 	for _, tt := range tests {
