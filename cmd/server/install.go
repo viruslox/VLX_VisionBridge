@@ -14,11 +14,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func getEligibleUsers() []string {
-	data, err := os.ReadFile("/etc/passwd")
-	if err != nil {
-		return nil
-	}
+func parseEligibleUsers(data []byte) []string {
 	var users []string
 	lines := strings.Split(string(data), "\n")
 	for _, line := range lines {
@@ -32,6 +28,14 @@ func getEligibleUsers() []string {
 		}
 	}
 	return users
+}
+
+func getEligibleUsers() []string {
+	data, err := os.ReadFile("/etc/passwd")
+	if err != nil {
+		return nil
+	}
+	return parseEligibleUsers(data)
 }
 
 func addMissingKeys(dest, tmpl *yaml.Node) {
