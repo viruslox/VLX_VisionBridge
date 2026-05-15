@@ -163,8 +163,8 @@ func Install() {
 	}
 	fmt.Println("Updated visionbridge.settings")
 
-	fmt.Println("Changing ownership of", installBase, "to", selectedUser)
-	if err := exec.Command("chown", "-R", selectedUser+":"+selectedUser, installBase).Run(); err != nil {
+	fmt.Println("Changing ownership of", etcDir, "to", selectedUser)
+	if err := exec.Command("chown", "-R", selectedUser+":"+selectedUser, etcDir).Run(); err != nil {
 		log.Fatalf("Failed to chown: %v", err)
 	}
 
