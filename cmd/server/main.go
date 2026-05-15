@@ -42,7 +42,10 @@ func ResolveConfigPath(envPath string) string {
 	if envPath != "" {
 		return envPath
 	}
-	return "configs/config.yaml"
+	if _, err := os.Stat("configs/config.yaml"); err == nil {
+		return "configs/config.yaml"
+	}
+	return "/opt/VLX_VisionBridge/etc/config.yaml"
 }
 
 // ResolveDSN determines the database DSN to use.
@@ -66,6 +69,14 @@ func HandleConfigChange(pm ProcessUpdater, newCfg *models.Config, diff config.Di
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "install" {
+		if os.Geteuid() != 0 {
+			log.Fatalf("Error: 'install' must be run as root.")
+		}
+		Install()
+		os.Exit(0)
+	}
+
 	if err := CheckEUID(os.Geteuid()); err != nil {
 		log.Fatalf("%v", err)
 	}

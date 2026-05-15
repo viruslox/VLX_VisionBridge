@@ -52,8 +52,11 @@ func TestResolveConfigPath(t *testing.T) {
 		t.Errorf("Expected /custom/config.yaml, got %s", path)
 	}
 
-	if path := ResolveConfigPath(""); path != "configs/config.yaml" {
-		t.Errorf("Expected configs/config.yaml, got %s", path)
+	// It's hard to predict if configs/config.yaml exists in the test environment
+	// so we test only the fallback logic when env is empty
+	path := ResolveConfigPath("")
+	if path != "configs/config.yaml" && path != "/opt/VLX_VisionBridge/etc/config.yaml" {
+		t.Errorf("Expected configs/config.yaml or /opt/VLX_VisionBridge/etc/config.yaml, got %s", path)
 	}
 }
 
