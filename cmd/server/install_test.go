@@ -80,7 +80,7 @@ func TestCopyTemplate(t *testing.T) {
 	t.Run("Merge with existing file", func(t *testing.T) {
 		destPath := filepath.Join(tempDir, "existing_config.yaml")
 		existingContent := []byte("a: 10\n")
-		err := os.WriteFile(destPath, existingContent, 0644)
+		err := os.WriteFile(destPath, existingContent, 0600)
 		if err != nil {
 			t.Fatalf("Failed to write existing file: %v", err)
 		}
@@ -105,7 +105,7 @@ func TestCopyTemplate(t *testing.T) {
 	t.Run("Invalid YAML template", func(t *testing.T) {
 		destPath := filepath.Join(tempDir, "invalid_tmpl.yaml")
 		existingContent := []byte("a: 10\n")
-		os.WriteFile(destPath, existingContent, 0644)
+		os.WriteFile(destPath, existingContent, 0600)
 
 		tmplContent := []byte("invalid:\n  - yaml\n- content")
 		err := copyTemplate(tmplContent, destPath)
@@ -117,7 +117,7 @@ func TestCopyTemplate(t *testing.T) {
 	t.Run("Invalid existing YAML", func(t *testing.T) {
 		destPath := filepath.Join(tempDir, "invalid_dest.yaml")
 		existingContent := []byte("invalid:\n  - yaml\n- content")
-		os.WriteFile(destPath, existingContent, 0644)
+		os.WriteFile(destPath, existingContent, 0600)
 
 		tmplContent := []byte("a: 1\n")
 		err := copyTemplate(tmplContent, destPath)
@@ -149,69 +149,69 @@ func TestAddMissingKeys(t *testing.T) {
 		expected string
 	}{
 		{
-			name: "Add missing top-level key",
-			dest: "a: 1\n",
-			tmpl: "a: 1\nb: 2\n",
+			name:     "Add missing top-level key",
+			dest:     "a: 1\n",
+			tmpl:     "a: 1\nb: 2\n",
 			expected: "a: 1\nb: 2\n",
 		},
 		{
-			name: "Add missing nested key",
-			dest: "a:\n  x: 1\n",
-			tmpl: "a:\n  x: 1\n  y: 2\n",
+			name:     "Add missing nested key",
+			dest:     "a:\n  x: 1\n",
+			tmpl:     "a:\n  x: 1\n  y: 2\n",
 			expected: "a:\n    x: 1\n    y: 2\n",
 		},
 		{
-			name: "Preserve existing values",
-			dest: "a: 10\n",
-			tmpl: "a: 1\nb: 2\n",
+			name:     "Preserve existing values",
+			dest:     "a: 10\n",
+			tmpl:     "a: 1\nb: 2\n",
 			expected: "a: 10\nb: 2\n",
 		},
 		{
-			name: "Preserve existing nested values",
-			dest: "a:\n  x: 10\n",
-			tmpl: "a:\n  x: 1\n  y: 2\n",
+			name:     "Preserve existing nested values",
+			dest:     "a:\n  x: 10\n",
+			tmpl:     "a:\n  x: 1\n  y: 2\n",
 			expected: "a:\n    x: 10\n    y: 2\n",
 		},
 		{
-			name: "No changes needed",
-			dest: "a: 1\nb: 2\n",
-			tmpl: "a: 1\nb: 2\n",
+			name:     "No changes needed",
+			dest:     "a: 1\nb: 2\n",
+			tmpl:     "a: 1\nb: 2\n",
 			expected: "a: 1\nb: 2\n",
 		},
 		{
-			name: "Dest is sequence, tmpl is mapping",
-			dest: "- 1\n- 2\n",
-			tmpl: "a: 1\n",
+			name:     "Dest is sequence, tmpl is mapping",
+			dest:     "- 1\n- 2\n",
+			tmpl:     "a: 1\n",
 			expected: "- 1\n- 2\n",
 		},
 		{
-			name: "Dest is mapping, tmpl is sequence",
-			dest: "a: 1\n",
-			tmpl: "- 1\n- 2\n",
+			name:     "Dest is mapping, tmpl is sequence",
+			dest:     "a: 1\n",
+			tmpl:     "- 1\n- 2\n",
 			expected: "a: 1\n",
 		},
 		{
-			name: "Key exists but dest is scalar and tmpl is mapping",
-			dest: "a: 10\n",
-			tmpl: "a:\n  x: 1\n",
+			name:     "Key exists but dest is scalar and tmpl is mapping",
+			dest:     "a: 10\n",
+			tmpl:     "a:\n  x: 1\n",
 			expected: "a: 10\n",
 		},
 		{
-			name: "Key exists but dest is mapping and tmpl is scalar",
-			dest: "a:\n  x: 1\n",
-			tmpl: "a: 10\n",
+			name:     "Key exists but dest is mapping and tmpl is scalar",
+			dest:     "a:\n  x: 1\n",
+			tmpl:     "a: 10\n",
 			expected: "a:\n    x: 1\n",
 		},
 		{
-			name: "Empty dest mapping",
-			dest: "{}\n",
-			tmpl: "a: 1\n",
+			name:     "Empty dest mapping",
+			dest:     "{}\n",
+			tmpl:     "a: 1\n",
 			expected: "{a: 1}\n",
 		},
 		{
-			name: "Empty tmpl mapping",
-			dest: "a: 1\n",
-			tmpl: "{}\n",
+			name:     "Empty tmpl mapping",
+			dest:     "a: 1\n",
+			tmpl:     "{}\n",
 			expected: "a: 1\n",
 		},
 	}
