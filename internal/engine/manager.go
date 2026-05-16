@@ -98,6 +98,15 @@ func (pm *ProcessManager) UpdateConfig(config *models.Config) {
 	pm.mu.Unlock()
 }
 
+type monitorAction int
+
+const (
+	monitorActionStop monitorAction = iota
+	monitorActionContinue
+	monitorActionSleepConstant
+	monitorActionSleepExponential
+)
+
 // monitor runs the FFmpeg process and handles automatic recovery.
 func (pm *ProcessManager) monitor() {
 	backoff := 1 * time.Second
@@ -105,84 +114,98 @@ func (pm *ProcessManager) monitor() {
 	var lastBuildErr string
 
 	for {
-		pm.mu.Lock()
-		ctx := pm.ctx
-		cfg := pm.config
-		isRunning := pm.isRunning
-		pm.mu.Unlock()
+		action := pm.executeSingleRun(&lastBuildErr)
 
-		if !isRunning {
-			log.Println("Process manager shutting down gracefully")
+		switch action {
+		case monitorActionStop:
 			return
-		}
-
-		if ctx.Err() != nil {
-			log.Println("Process manager shutting down gracefully (context canceled)")
-			return
-		}
-
-		args, err := BuildFFmpegArgs(cfg)
-		if err != nil {
-			errMsg := fmt.Sprintf("Build args failed: %v", err)
-			log.Printf("Failed to build FFmpeg args: %v", err)
-			if pm.db != nil && lastBuildErr != errMsg {
-				_ = db.LogStreamEvent(pm.db, "error", errMsg)
-				lastBuildErr = errMsg
-			}
+		case monitorActionContinue:
+			continue
+		case monitorActionSleepConstant:
 			time.Sleep(backoff)
 			continue
-		}
-		// Reset the error cache when the build is successful so a future identical error can be logged again
-		lastBuildErr = ""
-
-		if len(args) == 0 {
-			log.Println("No active layers, not starting FFmpeg.")
-
-			pm.mu.Lock()
-			// We must check the condition inside the lock to avoid lost wakeups.
-			// Re-evaluating len(args) here would require rebuilding args, which we don't want to do inside the lock.
-			// Instead, we just wait until we are signaled by UpdateConfig or Stop.
-			if pm.isRunning && pm.ctx.Err() == nil {
-				pm.cond.Wait()
-			}
-			pm.mu.Unlock()
-			continue
-		}
-
-		started, runErr := pm.runProcess(ctx, args)
-		if !started {
-			log.Printf("Failed to start FFmpeg: %v", runErr)
+		case monitorActionSleepExponential:
+			log.Printf("Restarting FFmpeg in %v...", backoff)
 			time.Sleep(backoff)
-			continue
-		}
 
-		if ctx.Err() != nil {
-			// Context cancelled, normal shutdown
-			if pm.db != nil {
-				_ = db.LogStreamEvent(pm.db, "stop", "FFmpeg process stopped gracefully")
+			// Exponential backoff
+			backoff *= 2
+			if backoff > maxBackoff {
+				backoff = maxBackoff
 			}
-			return
-		}
-
-		// Unexpected exit
-		errMsg := "FFmpeg exited unexpectedly"
-		if runErr != nil {
-			errMsg = fmt.Sprintf("FFmpeg crashed: %v", runErr)
-		}
-		log.Println(errMsg)
-		if pm.db != nil {
-			_ = db.LogStreamEvent(pm.db, "crash", errMsg)
-		}
-
-		log.Printf("Restarting FFmpeg in %v...", backoff)
-		time.Sleep(backoff)
-
-		// Exponential backoff
-		backoff *= 2
-		if backoff > maxBackoff {
-			backoff = maxBackoff
 		}
 	}
+}
+
+func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) monitorAction {
+	pm.mu.Lock()
+	ctx := pm.ctx
+	cfg := pm.config
+	isRunning := pm.isRunning
+	pm.mu.Unlock()
+
+	if !isRunning {
+		log.Println("Process manager shutting down gracefully")
+		return monitorActionStop
+	}
+
+	if ctx.Err() != nil {
+		log.Println("Process manager shutting down gracefully (context canceled)")
+		return monitorActionStop
+	}
+
+	args, err := BuildFFmpegArgs(cfg)
+	if err != nil {
+		errMsg := fmt.Sprintf("Build args failed: %v", err)
+		log.Printf("Failed to build FFmpeg args: %v", err)
+		if pm.db != nil && *lastBuildErr != errMsg {
+			_ = db.LogStreamEvent(pm.db, "error", errMsg)
+			*lastBuildErr = errMsg
+		}
+		return monitorActionSleepConstant
+	}
+	// Reset the error cache when the build is successful so a future identical error can be logged again
+	*lastBuildErr = ""
+
+	if len(args) == 0 {
+		log.Println("No active layers, not starting FFmpeg.")
+
+		pm.mu.Lock()
+		// We must check the condition inside the lock to avoid lost wakeups.
+		// Re-evaluating len(args) here would require rebuilding args, which we don't want to do inside the lock.
+		// Instead, we just wait until we are signaled by UpdateConfig or Stop.
+		if pm.isRunning && pm.ctx.Err() == nil {
+			pm.cond.Wait()
+		}
+		pm.mu.Unlock()
+		return monitorActionContinue
+	}
+
+	started, runErr := pm.runProcess(ctx, args)
+	if !started {
+		log.Printf("Failed to start FFmpeg: %v", runErr)
+		return monitorActionSleepConstant
+	}
+
+	if ctx.Err() != nil {
+		// Context cancelled, normal shutdown
+		if pm.db != nil {
+			_ = db.LogStreamEvent(pm.db, "stop", "FFmpeg process stopped gracefully")
+		}
+		return monitorActionStop
+	}
+
+	// Unexpected exit
+	errMsg := "FFmpeg exited unexpectedly"
+	if runErr != nil {
+		errMsg = fmt.Sprintf("FFmpeg crashed: %v", runErr)
+	}
+	log.Println(errMsg)
+	if pm.db != nil {
+		_ = db.LogStreamEvent(pm.db, "crash", errMsg)
+	}
+
+	return monitorActionSleepExponential
 }
 
 func (pm *ProcessManager) runProcess(ctx context.Context, args []string) (bool, error) {
