@@ -68,6 +68,27 @@ func HandleConfigChange(pm ProcessUpdater, newCfg *models.Config, diff config.Di
 	}
 }
 
+// SetupDatabase initializes the database connection and ensures tables are set up.
+func SetupDatabase(dsn string) *sql.DB {
+	if dsn == "" {
+		log.Println("Warning: No database DSN provided. Logging to DB will be disabled.")
+		return nil
+	}
+
+	dbConn, err := db.InitDB(dsn)
+	if err != nil {
+		log.Printf("Warning: Failed to connect to database: %v. Logging to DB will be disabled.", err)
+		return nil
+	}
+
+	if err := db.SetupTables(dbConn); err != nil {
+		dbConn.Close()
+		log.Fatalf("Failed to setup database tables: %v", err)
+	}
+
+	return dbConn
+}
+
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "install" {
 		if os.Geteuid() != 0 {
@@ -97,23 +118,10 @@ func main() {
 	}
 
 	// 2. Setup Database
-	var dbConn *sql.DB
 	dsn := ResolveDSN(os.Getenv("DATABASE_URL"), initialConfig.Database.DSN)
-
-	if dsn != "" {
-		var err error
-		dbConn, err = db.InitDB(dsn)
-		if err != nil {
-			log.Printf("Warning: Failed to connect to database: %v. Logging to DB will be disabled.", err)
-			dbConn = nil
-		} else {
-			defer dbConn.Close()
-			if err := db.SetupTables(dbConn); err != nil {
-				log.Fatalf("Failed to setup database tables: %v", err)
-			}
-		}
-	} else {
-		log.Println("Warning: No database DSN provided. Logging to DB will be disabled.")
+	dbConn := SetupDatabase(dsn)
+	if dbConn != nil {
+		defer dbConn.Close()
 	}
 
 	// 3. Setup Context for Graceful Shutdown
