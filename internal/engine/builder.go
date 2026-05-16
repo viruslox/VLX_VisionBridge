@@ -164,7 +164,7 @@ func buildOutputArgs(cfg *models.Config) ([]string, error) {
 				return nil, fmt.Errorf("invalid or unsafe output destination: %s", dest)
 			}
 			escaped := destReplacer.Replace(dest)
-			teeDestinations = append(teeDestinations, fmt.Sprintf("[f=flv]%s", escaped))
+			teeDestinations = append(teeDestinations, "[f=flv]"+escaped)
 		}
 		teeMap := strings.Join(teeDestinations, "|")
 		args = append(args, "-f", "tee", teeMap)
