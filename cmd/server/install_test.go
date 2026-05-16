@@ -178,6 +178,42 @@ func TestAddMissingKeys(t *testing.T) {
 			tmpl: "a: 1\nb: 2\n",
 			expected: "a: 1\nb: 2\n",
 		},
+		{
+			name: "Dest is sequence, tmpl is mapping",
+			dest: "- 1\n- 2\n",
+			tmpl: "a: 1\n",
+			expected: "- 1\n- 2\n",
+		},
+		{
+			name: "Dest is mapping, tmpl is sequence",
+			dest: "a: 1\n",
+			tmpl: "- 1\n- 2\n",
+			expected: "a: 1\n",
+		},
+		{
+			name: "Key exists but dest is scalar and tmpl is mapping",
+			dest: "a: 10\n",
+			tmpl: "a:\n  x: 1\n",
+			expected: "a: 10\n",
+		},
+		{
+			name: "Key exists but dest is mapping and tmpl is scalar",
+			dest: "a:\n  x: 1\n",
+			tmpl: "a: 10\n",
+			expected: "a:\n    x: 1\n",
+		},
+		{
+			name: "Empty dest mapping",
+			dest: "{}\n",
+			tmpl: "a: 1\n",
+			expected: "{a: 1}\n",
+		},
+		{
+			name: "Empty tmpl mapping",
+			dest: "a: 1\n",
+			tmpl: "{}\n",
+			expected: "a: 1\n",
+		},
 	}
 
 	for _, tt := range tests {
