@@ -125,6 +125,20 @@ func TestCopyTemplate(t *testing.T) {
 			t.Errorf("Expected error for invalid existing YAML, got nil")
 		}
 	})
+
+	t.Run("ReadFile error", func(t *testing.T) {
+		destPath := filepath.Join(tempDir, "is_a_dir")
+		err := os.Mkdir(destPath, 0755)
+		if err != nil {
+			t.Fatalf("Failed to create dir: %v", err)
+		}
+
+		tmplContent := []byte("a: 1\n")
+		err = copyTemplate(tmplContent, destPath)
+		if err == nil {
+			t.Errorf("Expected error when reading a directory, got nil")
+		}
+	})
 }
 
 func TestAddMissingKeys(t *testing.T) {
