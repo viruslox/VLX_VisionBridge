@@ -172,6 +172,43 @@ func buildOutputArgs(cfg *models.Config) ([]string, error) {
 	return args, nil
 }
 
+func buildInputArgs(layer models.Layer) []string {
+	safePath := sanitizeInputPath(layer.InputPath)
+	switch layer.InputType {
+	case "folder":
+		return []string{"-f", "image2", "-loop", "1", "-i", safePath}
+	case "loop":
+		return []string{"-stream_loop", "-1", "-i", safePath}
+	case "srt":
+		return []string{"-fflags", "nobuffer", "-flags", "low_delay", "-i", safePath}
+	default:
+		return []string{"-i", safePath}
+	}
+}
+
+func getOverlayPosition(layer models.Layer, padX, padY int) (string, string) {
+	overlayX, overlayY := "0", "0"
+	switch layer.Position {
+	case "center":
+		overlayX, overlayY = "(W-w)/2", "(H-h)/2"
+	case "top-left":
+		overlayX, overlayY = strconv.Itoa(padX), strconv.Itoa(padY)
+	case "top-right":
+		overlayX, overlayY = "W-w-" + strconv.Itoa(padX), strconv.Itoa(padY)
+	case "bottom-left":
+		overlayX, overlayY = strconv.Itoa(padX), "H-h-" + strconv.Itoa(padY)
+	case "bottom-right":
+		overlayX, overlayY = "W-w-" + strconv.Itoa(padX), "H-h-" + strconv.Itoa(padY)
+	default:
+		if x, y, found := strings.Cut(layer.Position, ":"); found && !strings.Contains(y, ":") {
+			if isSafeFilterValue(x) && isSafeFilterValue(y) {
+				overlayX, overlayY = x, y
+			}
+		}
+	}
+	return overlayX, overlayY
+}
+
 func buildFilterComplex(cfg *models.Config, padX, padY int) ([]string, string, string) {
 	var args []string
 	var filterComplex strings.Builder
@@ -187,17 +224,7 @@ func buildFilterComplex(cfg *models.Config, padX, padY int) ([]string, string, s
 			continue
 		}
 
-		safePath := sanitizeInputPath(layer.InputPath)
-		switch layer.InputType {
-		case "folder":
-			args = append(args, "-f", "image2", "-loop", "1", "-i", safePath)
-		case "loop":
-			args = append(args, "-stream_loop", "-1", "-i", safePath)
-		case "srt":
-			args = append(args, "-fflags", "nobuffer", "-flags", "low_delay", "-i", safePath)
-		default:
-			args = append(args, "-i", safePath)
-		}
+		args = append(args, buildInputArgs(layer)...)
 
 		inputPad := "[" + strconv.Itoa(inputIdx) + ":v]"
 		scaledPad := "[v" + strconv.Itoa(i) + "_scaled]"
@@ -211,25 +238,8 @@ func buildFilterComplex(cfg *models.Config, padX, padY int) ([]string, string, s
 		filterComplex.WriteString(scaledPad)
 		filterComplex.WriteString(";\n")
 
-		overlayX, overlayY := "0", "0"
-		switch layer.Position {
-		case "center":
-			overlayX, overlayY = "(W-w)/2", "(H-h)/2"
-		case "top-left":
-			overlayX, overlayY = strconv.Itoa(padX), strconv.Itoa(padY)
-		case "top-right":
-			overlayX, overlayY = "W-w-" + strconv.Itoa(padX), strconv.Itoa(padY)
-		case "bottom-left":
-			overlayX, overlayY = strconv.Itoa(padX), "H-h-" + strconv.Itoa(padY)
-		case "bottom-right":
-			overlayX, overlayY = "W-w-" + strconv.Itoa(padX), "H-h-" + strconv.Itoa(padY)
-		default:
-			if x, y, found := strings.Cut(layer.Position, ":"); found && !strings.Contains(y, ":") {
-				if isSafeFilterValue(x) && isSafeFilterValue(y) {
-					overlayX, overlayY = x, y
-				}
-			}
-		}
+		overlayX, overlayY := getOverlayPosition(layer, padX, padY)
+
 		outPad := "[out" + strconv.Itoa(i) + "]"
 		filterComplex.WriteString(currentBasePad)
 		filterComplex.WriteString(scaledPad)
