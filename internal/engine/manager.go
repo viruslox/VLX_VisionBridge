@@ -102,6 +102,7 @@ func (pm *ProcessManager) UpdateConfig(config *models.Config) {
 func (pm *ProcessManager) monitor() {
 	backoff := 1 * time.Second
 	maxBackoff := 30 * time.Second
+	var lastBuildErr string
 
 	for {
 		pm.mu.Lock()
@@ -122,13 +123,17 @@ func (pm *ProcessManager) monitor() {
 
 		args, err := BuildFFmpegArgs(cfg)
 		if err != nil {
+			errMsg := fmt.Sprintf("Build args failed: %v", err)
 			log.Printf("Failed to build FFmpeg args: %v", err)
-			if pm.db != nil {
-				_ = db.LogStreamEvent(pm.db, "error", fmt.Sprintf("Build args failed: %v", err))
+			if pm.db != nil && lastBuildErr != errMsg {
+				_ = db.LogStreamEvent(pm.db, "error", errMsg)
+				lastBuildErr = errMsg
 			}
 			time.Sleep(backoff)
 			continue
 		}
+		// Reset the error cache when the build is successful so a future identical error can be logged again
+		lastBuildErr = ""
 
 		if len(args) == 0 {
 			log.Println("No active layers, not starting FFmpeg.")
