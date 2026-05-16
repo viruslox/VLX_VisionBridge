@@ -226,8 +226,9 @@ func buildFilterComplex(cfg *models.Config, padX, padY int) ([]string, string, s
 
 		args = append(args, buildInputArgs(layer)...)
 
-		inputPad := "[" + strconv.Itoa(inputIdx) + ":v]"
-		scaledPad := "[v" + strconv.Itoa(i) + "_scaled]"
+		var buf [24]byte
+		inputPad := string(append(strconv.AppendInt(append(buf[:0], '['), int64(inputIdx), 10), ":v]"...))
+		scaledPad := string(append(strconv.AppendInt(append(buf[:0], "[v"...), int64(i), 10), "_scaled]"...))
 
 		scaleCropFilter := handleLayerScaling(layer)
 
@@ -240,7 +241,7 @@ func buildFilterComplex(cfg *models.Config, padX, padY int) ([]string, string, s
 
 		overlayX, overlayY := getOverlayPosition(layer, padX, padY)
 
-		outPad := "[out" + strconv.Itoa(i) + "]"
+		outPad := string(append(strconv.AppendInt(append(buf[:0], "[out"...), int64(i), 10), ']'))
 		filterComplex.WriteString(currentBasePad)
 		filterComplex.WriteString(scaledPad)
 		filterComplex.WriteString(" overlay=x=")
