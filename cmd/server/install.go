@@ -91,20 +91,16 @@ func copyTemplate(templateContent []byte, destPath string) error {
 	return os.WriteFile(destPath, out, 0644)
 }
 
-func Install() {
-	fmt.Println("Starting installation of VLX_VisionBridge...")
-
-	installBase := "/opt/VLX_VisionBridge"
-	binDir := filepath.Join(installBase, "bin")
-	etcDir := filepath.Join(installBase, "etc")
-
+func setupDirectories(binDir, etcDir string) {
 	if err := os.MkdirAll(binDir, 0755); err != nil {
 		log.Fatalf("Failed to create bin dir: %v", err)
 	}
 	if err := os.MkdirAll(etcDir, 0755); err != nil {
 		log.Fatalf("Failed to create etc dir: %v", err)
 	}
+}
 
+func copyExecutable(binDir string) {
 	exePath, err := os.Executable()
 	if err != nil {
 		log.Fatalf("Failed to get executable path: %v", err)
@@ -119,14 +115,17 @@ func Install() {
 		log.Fatalf("Failed to write executable: %v", err)
 	}
 	fmt.Println("Copied executable to", destExe)
+}
 
+func setupConfig(etcDir string) {
 	configPath := filepath.Join(etcDir, "config.yaml")
 	if err := copyTemplate(assets.ConfigTemplate, configPath); err != nil {
 		log.Fatalf("Failed to handle config.yaml: %v", err)
 	}
 	fmt.Println("Configured settings template at", configPath)
+}
 
-	users := getEligibleUsers()
+func promptUser(users []string) string {
 	fmt.Println("\nSelect user to run VLX_VisionBridge:")
 	fmt.Println("1) Create dedicated user (VisionBridge) [default]")
 	for i, u := range users {
@@ -149,7 +148,10 @@ func Install() {
 	}
 
 	fmt.Println("Selected user:", selectedUser)
+	return selectedUser
+}
 
+func setupUserAndSettings(etcDir, selectedUser string) {
 	if selectedUser == "VisionBridge" {
 		cmd := exec.Command("id", "-u", "VisionBridge")
 		if err := cmd.Run(); err != nil {
@@ -171,6 +173,25 @@ func Install() {
 	if err := exec.Command("chown", "-R", selectedUser+":"+selectedUser, etcDir).Run(); err != nil {
 		log.Fatalf("Failed to chown: %v", err)
 	}
+}
+
+func Install() {
+	fmt.Println("Starting installation of VLX_VisionBridge...")
+
+	installBase := "/opt/VLX_VisionBridge"
+	binDir := filepath.Join(installBase, "bin")
+	etcDir := filepath.Join(installBase, "etc")
+
+	setupDirectories(binDir, etcDir)
+
+	copyExecutable(binDir)
+
+	setupConfig(etcDir)
+
+	users := getEligibleUsers()
+	selectedUser := promptUser(users)
+
+	setupUserAndSettings(etcDir, selectedUser)
 
 	fmt.Println("Installation complete.")
 }
