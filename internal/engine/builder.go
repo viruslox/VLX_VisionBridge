@@ -58,7 +58,7 @@ func sanitizeInputPath(path string) string {
 	if path == "" {
 		return path
 	}
-	if !strings.Contains(path, "://") && strings.HasPrefix(path, "-") {
+	if strings.HasPrefix(path, "-") {
 		return "./" + path
 	}
 	return path
