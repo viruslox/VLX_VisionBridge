@@ -64,7 +64,7 @@ func addMissingKeys(dest, tmpl *yaml.Node) {
 
 func copyTemplate(templateContent []byte, destPath string) error {
 	if _, err := os.Stat(destPath); os.IsNotExist(err) {
-		return os.WriteFile(destPath, templateContent, 0644)
+		return os.WriteFile(destPath, templateContent, 0600)
 	}
 
 	existingContent, err := os.ReadFile(destPath)
@@ -90,7 +90,7 @@ func copyTemplate(templateContent []byte, destPath string) error {
 		return err
 	}
 
-	return os.WriteFile(destPath, out, 0644)
+	return os.WriteFile(destPath, out, 0600)
 }
 
 func setupDirectories(binDir, etcDir string) {
@@ -166,7 +166,7 @@ func setupUserAndSettings(etcDir, selectedUser string) {
 
 	settingsPath := filepath.Join(etcDir, "visionbridge.settings")
 	settingsContent := fmt.Sprintf("USER=%s\n", selectedUser)
-	if err := os.WriteFile(settingsPath, []byte(settingsContent), 0644); err != nil {
+	if err := os.WriteFile(settingsPath, []byte(settingsContent), 0600); err != nil {
 		log.Fatalf("Failed to write visionbridge.settings: %v", err)
 	}
 	fmt.Println("Updated visionbridge.settings")
