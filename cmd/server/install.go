@@ -40,20 +40,22 @@ func getEligibleUsers() []string {
 
 func addMissingKeys(dest, tmpl *yaml.Node) {
 	if tmpl.Kind == yaml.MappingNode && dest.Kind == yaml.MappingNode {
+		destMap := make(map[string]int, len(dest.Content)/2)
+		for j := 0; j < len(dest.Content); j += 2 {
+			destMap[dest.Content[j].Value] = j
+		}
+
 		for i := 0; i < len(tmpl.Content); i += 2 {
 			tmplKey := tmpl.Content[i]
 			tmplVal := tmpl.Content[i+1]
-			found := false
-			for j := 0; j < len(dest.Content); j += 2 {
-				if dest.Content[j].Value == tmplKey.Value {
-					found = true
-					if tmplVal.Kind == yaml.MappingNode && dest.Content[j+1].Kind == yaml.MappingNode {
-						addMissingKeys(dest.Content[j+1], tmplVal)
-					}
-					break
+
+			if j, found := destMap[tmplKey.Value]; found {
+
+				if tmplVal.Kind == yaml.MappingNode && dest.Content[j+1].Kind == yaml.MappingNode {
+					addMissingKeys(dest.Content[j+1], tmplVal)
+
 				}
-			}
-			if !found {
+			} else {
 				dest.Content = append(dest.Content, tmplKey, tmplVal)
 			}
 		}
