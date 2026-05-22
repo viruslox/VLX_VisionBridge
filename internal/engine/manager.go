@@ -7,12 +7,35 @@ import (
 	"log"
 	"os/exec"
 	"sync"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/user/VLX_VisionBridge/internal/db"
 	"github.com/user/VLX_VisionBridge/internal/models"
 )
+
+type tailBuffer struct {
+	buf []byte
+	mu  sync.Mutex
+}
+
+func (t *tailBuffer) Write(p []byte) (int, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	const maxLen = 4096
+	t.buf = append(t.buf, p...)
+	if len(t.buf) > maxLen {
+		t.buf = t.buf[len(t.buf)-maxLen:]
+	}
+	return len(p), nil
+}
+
+func (t *tailBuffer) String() string {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return string(t.buf)
+}
 
 // ProcessManager manages the FFmpeg process.
 type ProcessManager struct {
@@ -181,7 +204,7 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) monitorAction {
 		return monitorActionContinue
 	}
 
-	started, runErr := pm.runProcess(ctx, args)
+	started, runErr, stderrStr := pm.runProcess(ctx, args)
 	if !started {
 		log.Printf("Failed to start FFmpeg: %v", runErr)
 		return monitorActionSleepConstant
@@ -198,7 +221,18 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) monitorAction {
 	// Unexpected exit
 	errMsg := "FFmpeg exited unexpectedly"
 	if runErr != nil {
-		errMsg = fmt.Sprintf("FFmpeg crashed: %v", runErr)
+		reason := ""
+		if stderrStr != "" {
+			lines := strings.Split(strings.TrimSpace(stderrStr), "\n")
+			if len(lines) > 0 {
+				reason = lines[len(lines)-1]
+			}
+		}
+		if reason != "" {
+			errMsg = fmt.Sprintf("FFmpeg crashed: %v, reason: %s", runErr, reason)
+		} else {
+			errMsg = fmt.Sprintf("FFmpeg crashed: %v", runErr)
+		}
 	}
 	log.Println(errMsg)
 	if pm.db != nil {
@@ -208,9 +242,12 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) monitorAction {
 	return monitorActionSleepExponential
 }
 
-func (pm *ProcessManager) runProcess(ctx context.Context, args []string) (bool, error) {
+func (pm *ProcessManager) runProcess(ctx context.Context, args []string) (bool, error, string) {
 	// Create command without context to allow graceful SIGTERM before context kill
 	cmd := exec.Command("ffmpeg", args...)
+
+	tb := &tailBuffer{}
+	cmd.Stderr = tb
 
 	pm.mu.Lock()
 	pm.cmd = cmd
@@ -230,13 +267,14 @@ func (pm *ProcessManager) runProcess(ctx context.Context, args []string) (bool, 
 	// Start the process asynchronously to allow monitoring for context cancellation
 	err := cmd.Start()
 	if err != nil {
-		return false, err
+		return false, err, tb.String()
 	}
 
-	return true, pm.waitForProcess(ctx, cmd)
+	errWait, stderrStr := pm.waitForProcess(ctx, cmd)
+	return true, errWait, stderrStr
 }
 
-func (pm *ProcessManager) waitForProcess(ctx context.Context, cmd *exec.Cmd) error {
+func (pm *ProcessManager) waitForProcess(ctx context.Context, cmd *exec.Cmd) (error, string) {
 	done := make(chan error, 1)
 	go func() {
 		done <- cmd.Wait()
@@ -260,5 +298,10 @@ func (pm *ProcessManager) waitForProcess(ctx context.Context, cmd *exec.Cmd) err
 		// Process exited on its own
 	}
 
-	return runErr
+	stderrStr := ""
+	if tb, ok := cmd.Stderr.(*tailBuffer); ok {
+		stderrStr = tb.String()
+	}
+
+	return runErr, stderrStr
 }
