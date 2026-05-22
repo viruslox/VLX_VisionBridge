@@ -144,10 +144,22 @@ func promptUser(users []string) string {
 	choice := strings.TrimSpace(scanner.Text())
 
 	selectedUser := "VisionBridge"
-	if choice != "" && choice != "1" {
+	if choice != "" && choice != "1" && choice != "VisionBridge" {
 		idx, err := strconv.Atoi(choice)
 		if err == nil && idx >= 2 && idx <= len(users)+1 {
 			selectedUser = users[idx-2]
+		} else if err != nil {
+			found := false
+			for _, u := range users {
+				if choice == u {
+					selectedUser = u
+					found = true
+					break
+				}
+			}
+			if !found {
+				fmt.Println("Invalid choice, defaulting to VisionBridge.")
+			}
 		} else {
 			fmt.Println("Invalid choice, defaulting to VisionBridge.")
 		}
