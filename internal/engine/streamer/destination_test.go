@@ -1,4 +1,4 @@
-package engine
+package streamer
 
 import "testing"
 
@@ -37,8 +37,8 @@ func TestIsValidDestination(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isValidDestination(tt.dest); got != tt.expected {
-				t.Errorf("isValidDestination(%q) = %v, want %v", tt.dest, got, tt.expected)
+			if got := IsValidDestination(tt.dest); got != tt.expected {
+				t.Errorf("IsValidDestination(%q) = %v, want %v", tt.dest, got, tt.expected)
 			}
 		})
 	}
