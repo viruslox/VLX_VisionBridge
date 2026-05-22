@@ -59,7 +59,7 @@ func TestCopyTemplate(t *testing.T) {
 	tempDir := t.TempDir()
 
 	t.Run("Create new file", func(t *testing.T) {
-		destPath := filepath.Join(tempDir, "new_config.yaml")
+		destPath := filepath.Join(tempDir, "new_visionbridge.settings")
 		tmplContent := []byte("a: 1\nb: 2\n")
 
 		err := copyTemplate(tmplContent, destPath)
@@ -78,7 +78,7 @@ func TestCopyTemplate(t *testing.T) {
 	})
 
 	t.Run("Merge with existing file", func(t *testing.T) {
-		destPath := filepath.Join(tempDir, "existing_config.yaml")
+		destPath := filepath.Join(tempDir, "existing_visionbridge.settings")
 		existingContent := []byte("a: 10\n")
 		err := os.WriteFile(destPath, existingContent, 0600)
 		if err != nil {
