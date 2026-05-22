@@ -61,8 +61,8 @@ func TestResolveConfigPath(t *testing.T) {
 }
 
 func TestResolveDSN(t *testing.T) {
-	envDSN := "postgres://env:pass@localhost:5432/db"
-	configDSN := "postgres://config:pass@localhost:5432/db"
+	envDSN := "/opt/VLX_VisionBridge/var/env.db"
+	configDSN := "/opt/VLX_VisionBridge/var/config.db"
 
 	if dsn := ResolveDSN(envDSN, configDSN); dsn != envDSN {
 		t.Errorf("Expected %s, got %s", envDSN, dsn)
