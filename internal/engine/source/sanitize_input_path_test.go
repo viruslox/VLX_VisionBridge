@@ -1,4 +1,4 @@
-package engine
+package source
 
 import "testing"
 
@@ -22,8 +22,8 @@ func TestSanitizeInputPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := sanitizeInputPath(tt.input); got != tt.expected {
-				t.Errorf("sanitizeInputPath(%q) = %q, want %q", tt.input, got, tt.expected)
+			if got := SanitizeInputPath(tt.input); got != tt.expected {
+				t.Errorf("SanitizeInputPath(%q) = %q, want %q", tt.input, got, tt.expected)
 			}
 		})
 	}

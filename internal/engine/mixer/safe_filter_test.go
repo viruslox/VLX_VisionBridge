@@ -1,4 +1,4 @@
-package engine
+package mixer
 
 import "testing"
 
@@ -40,8 +40,8 @@ func TestIsSafeFilterValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isSafeFilterValue(tt.input); got != tt.expected {
-				t.Errorf("isSafeFilterValue(%q) = %v, want %v", tt.input, got, tt.expected)
+			if got := IsSafeFilterValue(tt.input); got != tt.expected {
+				t.Errorf("IsSafeFilterValue(%q) = %v, want %v", tt.input, got, tt.expected)
 			}
 		})
 	}
