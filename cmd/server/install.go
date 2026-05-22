@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/user/VLX_VisionBridge/internal/assets"
+	"github.com/user/VLX_VisionBridge/internal/db"
 	"gopkg.in/yaml.v3"
 )
 
@@ -93,12 +94,15 @@ func copyTemplate(templateContent []byte, destPath string) error {
 	return os.WriteFile(destPath, out, 0600)
 }
 
-func setupDirectories(binDir, etcDir string) {
+func setupDirectories(binDir, etcDir, varDir string) {
 	if err := os.MkdirAll(binDir, 0755); err != nil {
 		log.Fatalf("Failed to create bin dir: %v", err)
 	}
 	if err := os.MkdirAll(etcDir, 0755); err != nil {
 		log.Fatalf("Failed to create etc dir: %v", err)
+	}
+	if err := os.MkdirAll(varDir, 0755); err != nil {
+		log.Fatalf("Failed to create var dir: %v", err)
 	}
 }
 
@@ -153,7 +157,7 @@ func promptUser(users []string) string {
 	return selectedUser
 }
 
-func setupUserAndSettings(etcDir, selectedUser string) {
+func setupUserAndSettings(etcDir, varDir, selectedUser string) {
 	if selectedUser == "VisionBridge" {
 		cmd := exec.Command("id", "-u", "VisionBridge")
 		if err := cmd.Run(); err != nil {
@@ -191,6 +195,22 @@ func setupUserAndSettings(etcDir, selectedUser string) {
 				valNode := &yaml.Node{Kind: yaml.ScalarNode, Value: selectedUser}
 				mapping.Content = append(mapping.Content, keyNode, valNode)
 			}
+
+			// Update database DSN
+			for i := 0; i < len(mapping.Content); i += 2 {
+				if mapping.Content[i].Value == "database" {
+					dbMapping := mapping.Content[i+1]
+					if dbMapping.Kind == yaml.MappingNode {
+						for j := 0; j < len(dbMapping.Content); j += 2 {
+							if dbMapping.Content[j].Value == "dsn" {
+								dbMapping.Content[j+1].Value = "/opt/VLX_VisionBridge/var/visionbridge.db"
+								break
+							}
+						}
+					}
+					break
+				}
+			}
 		}
 	}
 
@@ -204,9 +224,12 @@ func setupUserAndSettings(etcDir, selectedUser string) {
 	}
 	fmt.Println("Updated visionbridge.settings")
 
-	fmt.Println("Changing ownership of", etcDir, "to", selectedUser)
+	fmt.Println("Changing ownership of", etcDir, "and", varDir, "to", selectedUser)
 	if err := exec.Command("chown", "-R", selectedUser+":"+selectedUser, etcDir).Run(); err != nil {
-		log.Fatalf("Failed to chown: %v", err)
+		log.Fatalf("Failed to chown %s: %v", etcDir, err)
+	}
+	if err := exec.Command("chown", "-R", selectedUser+":"+selectedUser, varDir).Run(); err != nil {
+		log.Fatalf("Failed to chown %s: %v", varDir, err)
 	}
 }
 
@@ -216,17 +239,28 @@ func Install() {
 	installBase := "/opt/VLX_VisionBridge"
 	binDir := filepath.Join(installBase, "bin")
 	etcDir := filepath.Join(installBase, "etc")
+	varDir := filepath.Join(installBase, "var")
 
-	setupDirectories(binDir, etcDir)
+	setupDirectories(binDir, etcDir, varDir)
 
 	copyExecutable(binDir)
 
 	setupConfig(etcDir)
 
+	dbPath := filepath.Join(varDir, "visionbridge.db")
+	dbConn, err := db.InitDB(dbPath)
+	if err != nil {
+		log.Fatalf("Failed to initialize database at %s: %v", dbPath, err)
+	}
+	if err := db.SetupTables(dbConn); err != nil {
+		log.Fatalf("Failed to setup database tables: %v", err)
+	}
+	dbConn.Close()
+
 	users := getEligibleUsers()
 	selectedUser := promptUser(users)
 
-	setupUserAndSettings(etcDir, selectedUser)
+	setupUserAndSettings(etcDir, varDir, selectedUser)
 
 	fmt.Println("Installation complete.")
 }

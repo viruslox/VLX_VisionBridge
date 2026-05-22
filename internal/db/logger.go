@@ -10,10 +10,10 @@ import (
 func SetupTables(db *sql.DB) error {
 	query := `
 	CREATE TABLE IF NOT EXISTS stream_logs (
-		id SERIAL PRIMARY KEY,
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		event_type VARCHAR(50) NOT NULL,
 		message TEXT,
-		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 	`
 	_, err := db.Exec(query)

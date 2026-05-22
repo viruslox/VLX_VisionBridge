@@ -9,7 +9,7 @@ import (
 func TestConfig_UnmarshalYAML(t *testing.T) {
 	yamlData := []byte(`
 database:
-  dsn: "postgres://user:pass@localhost:5432/db?sslmode=disable"
+  dsn: "/opt/VLX_VisionBridge/var/visionbridge.db"
 output:
   resolution: "1920x1080"
   fps: 60
@@ -44,8 +44,8 @@ layers:
 	}
 
 	// Verify Database Config
-	if cfg.Database.DSN != "postgres://user:pass@localhost:5432/db?sslmode=disable" {
-		t.Errorf("Expected DSN to be 'postgres://user:pass@localhost:5432/db?sslmode=disable', got '%s'", cfg.Database.DSN)
+	if cfg.Database.DSN != "/opt/VLX_VisionBridge/var/visionbridge.db" {
+		t.Errorf("Expected DSN to be '/opt/VLX_VisionBridge/var/visionbridge.db', got '%s'", cfg.Database.DSN)
 	}
 
 	// Verify Output Settings

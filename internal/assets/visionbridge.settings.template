@@ -2,7 +2,7 @@
 
 # Database settings
 database:
-  dsn: "" # PostgreSQL DSN, e.g., "postgres://user:password@localhost:5432/live_db?sslmode=verify-full"
+  dsn: "/opt/VLX_VisionBridge/var/visionbridge.db" # SQLite database path
 
 # Global output settings for the stream
 output:

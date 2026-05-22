@@ -4,12 +4,12 @@ import (
 	"database/sql"
 	"fmt"
 
-	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 )
 
-var driverName = "postgres"
+var driverName = "sqlite3"
 
-// InitDB initializes a PostgreSQL connection pool.
+// InitDB initializes a SQLite connection pool.
 func InitDB(dsn string) (*sql.DB, error) {
 	db, err := sql.Open(driverName, dsn)
 	if err != nil {
