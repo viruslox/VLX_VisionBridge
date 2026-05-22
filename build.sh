@@ -14,4 +14,3 @@ fi
 echo "Building executable..."
 go build -o ./VLX_VisionBridge cmd/server/*.go
 echo "Build successful."
-echo "You can now run 'sudo ./VLX_VisionBridge install' to install."

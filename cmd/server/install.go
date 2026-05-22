@@ -157,7 +157,7 @@ func promptUser(users []string) string {
 	return selectedUser
 }
 
-func setupUserAndSettings(etcDir, varDir, selectedUser string) {
+func setupUserAndSettings(installBase, etcDir, varDir, selectedUser string) {
 	if selectedUser == "VisionBridge" {
 		cmd := exec.Command("id", "-u", "VisionBridge")
 		if err := cmd.Run(); err != nil {
@@ -182,17 +182,26 @@ func setupUserAndSettings(etcDir, varDir, selectedUser string) {
 	if destNode.Kind == yaml.DocumentNode && len(destNode.Content) > 0 {
 		mapping := destNode.Content[0]
 		if mapping.Kind == yaml.MappingNode {
-			found := false
+			foundUser := false
+			foundDir := false
 			for i := 0; i < len(mapping.Content); i += 2 {
 				if mapping.Content[i].Value == "visionbridge_USER" {
 					mapping.Content[i+1].Value = selectedUser
-					found = true
-					break
+					foundUser = true
+				}
+				if mapping.Content[i].Value == "visionbridge_DIR" {
+					mapping.Content[i+1].Value = "/opt/VLX_VisionBridge"
+					foundDir = true
 				}
 			}
-			if !found {
+			if !foundUser {
 				keyNode := &yaml.Node{Kind: yaml.ScalarNode, Value: "visionbridge_USER"}
 				valNode := &yaml.Node{Kind: yaml.ScalarNode, Value: selectedUser}
+				mapping.Content = append(mapping.Content, keyNode, valNode)
+			}
+			if !foundDir {
+				keyNode := &yaml.Node{Kind: yaml.ScalarNode, Value: "visionbridge_DIR"}
+				valNode := &yaml.Node{Kind: yaml.ScalarNode, Value: "/opt/VLX_VisionBridge"}
 				mapping.Content = append(mapping.Content, keyNode, valNode)
 			}
 
@@ -224,12 +233,9 @@ func setupUserAndSettings(etcDir, varDir, selectedUser string) {
 	}
 	fmt.Println("Updated visionbridge.settings")
 
-	fmt.Println("Changing ownership of", etcDir, "and", varDir, "to", selectedUser)
-	if err := exec.Command("chown", "-R", selectedUser+":"+selectedUser, etcDir).Run(); err != nil {
-		log.Fatalf("Failed to chown %s: %v", etcDir, err)
-	}
-	if err := exec.Command("chown", "-R", selectedUser+":"+selectedUser, varDir).Run(); err != nil {
-		log.Fatalf("Failed to chown %s: %v", varDir, err)
+	fmt.Println("Changing ownership of", installBase, "to", selectedUser)
+	if err := exec.Command("chown", "-R", selectedUser+":"+selectedUser, installBase).Run(); err != nil {
+		log.Fatalf("Failed to chown %s: %v", installBase, err)
 	}
 }
 
@@ -260,7 +266,7 @@ func Install() {
 	users := getEligibleUsers()
 	selectedUser := promptUser(users)
 
-	setupUserAndSettings(etcDir, varDir, selectedUser)
+	setupUserAndSettings(installBase, etcDir, varDir, selectedUser)
 
 	fmt.Println("Installation complete.")
 }
