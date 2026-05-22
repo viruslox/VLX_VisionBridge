@@ -28,7 +28,7 @@ layers:
     position: "center"
 `
 	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.yaml")
+	configFile := filepath.Join(tmpDir, "visionbridge.settings")
 	err := os.WriteFile(configFile, []byte(yamlContent), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write temp config file: %v", err)
@@ -64,7 +64,7 @@ output:
 	invalid_indentation
 `
 	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "invalid_config.yaml")
+	configFile := filepath.Join(tmpDir, "invalid_visionbridge.settings")
 	err := os.WriteFile(configFile, []byte(invalidYaml), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write temp config file: %v", err)
@@ -158,7 +158,7 @@ layers:
 `
 
 	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.yaml")
+	configFile := filepath.Join(tmpDir, "visionbridge.settings")
 	err := os.WriteFile(configFile, []byte(yamlContent1), 0644)
 	if err != nil {
 		t.Fatalf("Failed to write temp config file: %v", err)

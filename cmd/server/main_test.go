@@ -48,15 +48,15 @@ func TestCheckFFmpeg(t *testing.T) {
 }
 
 func TestResolveConfigPath(t *testing.T) {
-	if path := ResolveConfigPath("/custom/config.yaml"); path != "/custom/config.yaml" {
-		t.Errorf("Expected /custom/config.yaml, got %s", path)
+	if path := ResolveConfigPath("/custom/visionbridge.settings"); path != "/custom/visionbridge.settings" {
+		t.Errorf("Expected /custom/visionbridge.settings, got %s", path)
 	}
 
-	// It's hard to predict if configs/config.yaml exists in the test environment
+	// It's hard to predict if configs/visionbridge.settings exists in the test environment
 	// so we test only the fallback logic when env is empty
 	path := ResolveConfigPath("")
-	if path != "configs/config.yaml" && path != "/opt/VLX_VisionBridge/etc/config.yaml" {
-		t.Errorf("Expected configs/config.yaml or /opt/VLX_VisionBridge/etc/config.yaml, got %s", path)
+	if path != "configs/visionbridge.settings" && path != "/opt/VLX_VisionBridge/etc/visionbridge.settings" {
+		t.Errorf("Expected configs/visionbridge.settings or /opt/VLX_VisionBridge/etc/visionbridge.settings, got %s", path)
 	}
 }
 

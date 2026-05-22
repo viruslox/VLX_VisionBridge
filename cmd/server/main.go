@@ -42,10 +42,10 @@ func ResolveConfigPath(envPath string) string {
 	if envPath != "" {
 		return envPath
 	}
-	if _, err := os.Stat("configs/config.yaml"); err == nil {
-		return "configs/config.yaml"
+	if _, err := os.Stat("configs/visionbridge.settings"); err == nil {
+		return "configs/visionbridge.settings"
 	}
-	return "/opt/VLX_VisionBridge/etc/config.yaml"
+	return "/opt/VLX_VisionBridge/etc/visionbridge.settings"
 }
 
 // ResolveDSN determines the database DSN to use.

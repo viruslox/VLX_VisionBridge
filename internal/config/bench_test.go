@@ -23,7 +23,7 @@ layers:
     input_path: "/path1"
 `
 	tmpDir := b.TempDir()
-	configFile := filepath.Join(tmpDir, "config.yaml")
+	configFile := filepath.Join(tmpDir, "visionbridge.settings")
 	err := os.WriteFile(configFile, []byte(yamlContent1), 0644)
 	if err != nil {
 		b.Fatalf("Failed to write temp config file: %v", err)

@@ -120,9 +120,9 @@ func copyExecutable(binDir string) {
 }
 
 func setupConfig(etcDir string) {
-	configPath := filepath.Join(etcDir, "config.yaml")
-	if err := copyTemplate(assets.ConfigTemplate, configPath); err != nil {
-		log.Fatalf("Failed to handle config.yaml: %v", err)
+	configPath := filepath.Join(etcDir, "visionbridge.settings")
+	if err := copyTemplate(assets.SettingsTemplate, configPath); err != nil {
+		log.Fatalf("Failed to handle visionbridge.settings: %v", err)
 	}
 	fmt.Println("Configured settings template at", configPath)
 }
@@ -165,8 +165,41 @@ func setupUserAndSettings(etcDir, selectedUser string) {
 	}
 
 	settingsPath := filepath.Join(etcDir, "visionbridge.settings")
-	settingsContent := fmt.Sprintf("USER=%s\n", selectedUser)
-	if err := os.WriteFile(settingsPath, []byte(settingsContent), 0600); err != nil {
+	existingContent, err := os.ReadFile(settingsPath)
+	if err != nil {
+		log.Fatalf("Failed to read visionbridge.settings: %v", err)
+	}
+
+	var destNode yaml.Node
+	if err := yaml.Unmarshal(existingContent, &destNode); err != nil {
+		log.Fatalf("Failed to unmarshal visionbridge.settings: %v", err)
+	}
+
+	if destNode.Kind == yaml.DocumentNode && len(destNode.Content) > 0 {
+		mapping := destNode.Content[0]
+		if mapping.Kind == yaml.MappingNode {
+			found := false
+			for i := 0; i < len(mapping.Content); i += 2 {
+				if mapping.Content[i].Value == "visionbridge_USER" {
+					mapping.Content[i+1].Value = selectedUser
+					found = true
+					break
+				}
+			}
+			if !found {
+				keyNode := &yaml.Node{Kind: yaml.ScalarNode, Value: "visionbridge_USER"}
+				valNode := &yaml.Node{Kind: yaml.ScalarNode, Value: selectedUser}
+				mapping.Content = append(mapping.Content, keyNode, valNode)
+			}
+		}
+	}
+
+	out, err := yaml.Marshal(&destNode)
+	if err != nil {
+		log.Fatalf("Failed to marshal visionbridge.settings: %v", err)
+	}
+
+	if err := os.WriteFile(settingsPath, out, 0600); err != nil {
 		log.Fatalf("Failed to write visionbridge.settings: %v", err)
 	}
 	fmt.Println("Updated visionbridge.settings")
