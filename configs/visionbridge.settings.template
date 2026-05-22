@@ -1,3 +1,7 @@
+# VLX VisionBridge User Profile
+visionbridge_USER: "visionbridge"
+visionbridge_DIR: "/opt/VLX_VisionBridge"
+
 database:
   dsn: ""
 output:
