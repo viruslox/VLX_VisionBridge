@@ -11,7 +11,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-zeromq/zmq4"
 	"github.com/user/VLX_VisionBridge/internal/db"
+	"github.com/user/VLX_VisionBridge/internal/engine/source"
 	"github.com/user/VLX_VisionBridge/internal/models"
 )
 
@@ -104,6 +106,60 @@ func (pm *ProcessManager) Stop() {
 		pm.cond.Broadcast()
 	}
 	pm.mu.Unlock()
+}
+
+// UpdateFilter updates the filter parameters dynamically via ZMQ.
+func (pm *ProcessManager) UpdateFilter(config *models.Config) {
+	pm.mu.Lock()
+	pm.config = config
+	pm.mu.Unlock()
+
+	req := zmq4.NewReq(context.Background())
+	defer req.Close()
+	err := req.Dial("tcp://127.0.0.1:5555")
+	if err != nil {
+		log.Printf("ZMQ dial error: %v", err)
+		return
+	}
+
+	for _, layer := range config.Layers {
+		if !layer.Active {
+			continue
+		}
+
+		res := source.BuildInputArgs(layer)
+		media := layer.Media
+		if media == "" {
+			media = "Video+Audio"
+		}
+
+		if (media == "Video" || media == "Video+Audio") && res.HasVideo {
+			sendZMQCommand(req, fmt.Sprintf("overlay@layer%d x %d", layer.ID, layer.X))
+			sendZMQCommand(req, fmt.Sprintf("overlay@layer%d y %d", layer.ID, layer.Y))
+		}
+
+		if (media == "Audio" || media == "Video+Audio") && res.HasAudio {
+			vol := 1.0
+			if layer.Volume != nil {
+				vol = float64(*layer.Volume) / 100.0
+			}
+			sendZMQCommand(req, fmt.Sprintf("volume@layer%d volume %f", layer.ID, vol))
+		}
+	}
+}
+
+func sendZMQCommand(req zmq4.Socket, cmd string) {
+	err := req.Send(zmq4.NewMsgString(cmd))
+	if err != nil {
+		log.Printf("ZMQ send error for '%s': %v", cmd, err)
+		return
+	}
+	reply, err := req.Recv()
+	if err != nil {
+		log.Printf("ZMQ recv error for '%s': %v", cmd, err)
+		return
+	}
+	log.Printf("ZMQ reply for '%s': %s", cmd, string(reply.Frames[0]))
 }
 
 // UpdateConfig updates the configuration and signals the monitor loop.
@@ -262,7 +318,11 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) monitorAction {
 					reason = lines[len(lines)-2] + " | " + reason
 				}
 				if len(lines) > 10 {
-					log.Printf("FFmpeg stderr tail:\n%s", strings.Join(lines[len(lines)-30:], "\n"))
+					startIdx := len(lines) - 30
+					if startIdx < 0 {
+						startIdx = 0
+					}
+					log.Printf("FFmpeg stderr tail:\n%s", strings.Join(lines[startIdx:], "\n"))
 				} else {
 					log.Printf("FFmpeg stderr tail:\n%s", stderrStr)
 				}

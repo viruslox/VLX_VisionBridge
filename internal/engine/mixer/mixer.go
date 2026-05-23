@@ -59,7 +59,9 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 
 			filterComplex.WriteString(currentBasePad)
 			filterComplex.WriteString(scaledPad)
-			filterComplex.WriteString(" overlay=x=")
+			filterComplex.WriteString(" overlay@layer")
+			filterComplex.WriteString(strconv.Itoa(layer.ID))
+			filterComplex.WriteString("=x=")
 			filterComplex.WriteString(strconv.Itoa(layer.X))
 			filterComplex.WriteString(":y=")
 			filterComplex.WriteString(strconv.Itoa(layer.Y))
@@ -74,14 +76,16 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 			var buf [24]byte
 			aOutPad := string(append(strconv.AppendInt(append(buf[:0], "[a"...), int64(i), 10), ']'))
 
-			volumeFilter := "anull"
+			volumeVal := 1.0
 			if layer.Volume != nil {
-				volumeFilter = fmt.Sprintf("volume=%.2f", float64(*layer.Volume)/100.0)
+				volumeVal = float64(*layer.Volume) / 100.0
 			}
 
 			filterComplex.WriteString(layerAudioPad)
-			filterComplex.WriteString(" ")
-			filterComplex.WriteString(volumeFilter)
+			filterComplex.WriteString(" volume@layer")
+			filterComplex.WriteString(strconv.Itoa(layer.ID))
+			filterComplex.WriteString("=")
+			filterComplex.WriteString(fmt.Sprintf("%.2f", volumeVal))
 			filterComplex.WriteString(" ")
 			filterComplex.WriteString(aOutPad)
 			filterComplex.WriteString(";\n")
@@ -108,5 +112,11 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 		finalAudioPad = "[a_out]"
 	}
 
-	return args, filterComplex.String(), currentBasePad, finalAudioPad
+	finalVideoPad := "[v_out]"
+	filterComplex.WriteString(currentBasePad)
+	filterComplex.WriteString(" zmq=b=tcp\\\\://127.0.0.1\\\\:5555 ")
+	filterComplex.WriteString(finalVideoPad)
+	filterComplex.WriteString(";\n")
+
+	return args, filterComplex.String(), finalVideoPad, finalAudioPad
 }
