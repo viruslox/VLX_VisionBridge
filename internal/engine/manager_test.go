@@ -13,7 +13,7 @@ func TestProcessManager_Start_AlreadyRunning(t *testing.T) {
 	pm := NewProcessManager(nil)
 	pm.isRunning = true
 
-	err := pm.Start(context.Background(), &models.Config{})
+	err := pm.Start(context.Background(), &models.Config{Input: models.InputSettings{Resolution: "1920x1080"}})
 	if err == nil {
 		t.Errorf("Expected error when starting already running process manager")
 	} else if err.Error() != "process already running" {
@@ -27,7 +27,9 @@ func TestProcessManager_Start_Success(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	config := &models.Config{}
+	config := &models.Config{
+		Input: models.InputSettings{Resolution: "1920x1080"},
+	}
 
 	err := pm.Start(ctx, config)
 	if err != nil {
@@ -110,6 +112,7 @@ func TestProcessManager_UpdateConfig(t *testing.T) {
 
 	// Test update config when no process is running
 	config := &models.Config{
+		Input: models.InputSettings{Resolution: "1920x1080"},
 		Output: models.OutputSettings{
 			Resolution: "1920x1080",
 		},
@@ -145,6 +148,7 @@ func TestProcessManager_UpdateConfig(t *testing.T) {
 	pm.mu.Unlock()
 
 	newConfig := &models.Config{
+		Input: models.InputSettings{Resolution: "1920x1080"},
 		Output: models.OutputSettings{
 			Resolution: "1280x720",
 		},

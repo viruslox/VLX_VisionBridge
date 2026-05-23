@@ -9,6 +9,7 @@ import (
 
 func TestBuildFFmpegArgs_InputPathInjection(t *testing.T) {
 	cfg := &models.Config{
+		Input: models.InputSettings{Resolution: "1920x1080"},
 		Output: models.OutputSettings{
 			Resolution: "1920x1080",
 			FPS:        60,

@@ -17,6 +17,8 @@ output:
   fps: 60
   video_bitrate: "6000k"
   audio_bitrate: "160k"
+input:
+  resolution: "1920x1080"
 layers:
   - id: 1
     active: true
@@ -78,6 +80,7 @@ output:
 
 func TestDiffConfigs(t *testing.T) {
 	oldCfg := &models.Config{
+		Input:  models.InputSettings{Resolution: "1920x1080"},
 		Output: models.OutputSettings{Resolution: "1920x1080", FPS: 30},
 		Layers: []models.Layer{
 			{ID: 1, Active: true, InputType: "loop", InputPath: "test.mp4", Size: 1920},
@@ -87,6 +90,7 @@ func TestDiffConfigs(t *testing.T) {
 
 	// Test case 1: No change
 	newCfg1 := &models.Config{
+		Input:  models.InputSettings{Resolution: "1920x1080"},
 		Output: models.OutputSettings{Resolution: "1920x1080", FPS: 30},
 		Layers: []models.Layer{
 			{ID: 1, Active: true, InputType: "loop", InputPath: "test.mp4", Size: 1920},
@@ -100,6 +104,7 @@ func TestDiffConfigs(t *testing.T) {
 
 	// Test case 2: Output change -> requires restart
 	newCfg2 := &models.Config{
+		Input:  models.InputSettings{Resolution: "1920x1080"},
 		Output: models.OutputSettings{Resolution: "1280x720", FPS: 30},
 		Layers: oldCfg.Layers,
 	}
@@ -110,6 +115,7 @@ func TestDiffConfigs(t *testing.T) {
 
 	// Test case 3: Filter update (change active state)
 	newCfg3 := &models.Config{
+		Input:  oldCfg.Input,
 		Output: oldCfg.Output,
 		Layers: []models.Layer{
 			{ID: 1, Active: false, InputType: "loop", InputPath: "test.mp4", Size: 1920},
@@ -123,6 +129,7 @@ func TestDiffConfigs(t *testing.T) {
 
 	// Test case 4: Input path change -> requires restart
 	newCfg4 := &models.Config{
+		Input:  oldCfg.Input,
 		Output: oldCfg.Output,
 		Layers: []models.Layer{
 			{ID: 1, Active: true, InputType: "loop", InputPath: "new.mp4", Size: 1920},

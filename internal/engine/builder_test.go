@@ -19,6 +19,7 @@ func TestBuildFFmpegArgs(t *testing.T) {
 	os.WriteFile(imagesDir+"/test.png", []byte("mock image"), 0644)
 
 	cfg := &models.Config{
+		Input: models.InputSettings{Resolution: "1920x1080"},
 		Output: models.OutputSettings{
 			Resolution:   "1920x1080",
 			FPS:          60,
@@ -159,6 +160,7 @@ func TestBuildFFmpegArgs(t *testing.T) {
 
 func TestBuildFFmpegArgs_TeeMuxerInjection(t *testing.T) {
 	cfg := &models.Config{
+		Input: models.InputSettings{Resolution: "1920x1080"},
 		Output: models.OutputSettings{
 			Resolution: "1920x1080",
 			FPS:        60,
@@ -190,6 +192,7 @@ func TestBuildFFmpegArgs_TeeMuxerInjection(t *testing.T) {
 
 func TestBuildFFmpegArgs_ValidDestinations(t *testing.T) {
 	cfg := &models.Config{
+		Input: models.InputSettings{Resolution: "1920x1080"},
 		Output: models.OutputSettings{
 			Resolution: "1920x1080",
 			FPS:        60,
@@ -228,6 +231,7 @@ func TestBuildFFmpegArgs_ValidDestinations(t *testing.T) {
 
 func TestBuildFFmpegArgs_10SRT(t *testing.T) {
 	cfg := &models.Config{
+		Input: models.InputSettings{Resolution: "1920x1080"},
 		Output: models.OutputSettings{
 			Resolution: "1920x1080",
 			FPS:        60,
@@ -283,6 +287,7 @@ func TestBuildFFmpegArgs_10SRT(t *testing.T) {
 
 func TestBuildFFmpegArgs_InactiveSources(t *testing.T) {
 	cfg := &models.Config{
+		Input: models.InputSettings{Resolution: "1920x1080"},
 		Output: models.OutputSettings{
 			Resolution: "1920x1080",
 			FPS:        60,
