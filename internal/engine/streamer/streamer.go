@@ -42,11 +42,14 @@ func BuildOutputArgs(cfg *models.Config) ([]string, error) {
 	if cfg.Output.FPS > 0 {
 		args = append(args, "-r", strconv.Itoa(cfg.Output.FPS))
 	}
+	args = append(args, "-c:v", "libx264")
 	if cfg.Output.VideoBitrate != "" {
-		args = append(args, "-c:v", "libx264", "-b:v", cfg.Output.VideoBitrate, "-maxrate", cfg.Output.VideoBitrate, "-bufsize", cfg.Output.VideoBitrate)
+		args = append(args, "-b:v", cfg.Output.VideoBitrate, "-maxrate", cfg.Output.VideoBitrate, "-bufsize", cfg.Output.VideoBitrate)
 	}
+
+	args = append(args, "-c:a", "aac")
 	if cfg.Output.AudioBitrate != "" {
-		args = append(args, "-c:a", "aac", "-b:a", cfg.Output.AudioBitrate)
+		args = append(args, "-b:a", cfg.Output.AudioBitrate)
 	}
 
 	if len(cfg.Output.Destinations) > 0 {
