@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/user/VLX_VisionBridge/internal/assets"
+	"github.com/user/VLX_VisionBridge/configs"
 	"github.com/user/VLX_VisionBridge/internal/db"
 	"gopkg.in/yaml.v3"
 )
@@ -125,7 +125,7 @@ func copyExecutable(binDir string) {
 
 func setupConfig(etcDir string) {
 	configPath := filepath.Join(etcDir, "visionbridge.settings")
-	if err := copyTemplate(assets.SettingsTemplate, configPath); err != nil {
+	if err := copyTemplate(configs.SettingsTemplate, configPath); err != nil {
 		log.Fatalf("Failed to handle visionbridge.settings: %v", err)
 	}
 	fmt.Println("Configured settings template at", configPath)

@@ -1,4 +1,4 @@
-package assets
+package configs
 
 import _ "embed"
 
