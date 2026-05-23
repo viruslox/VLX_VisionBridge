@@ -1,4 +1,6 @@
-# Configuration for VLX VisionBridge
+# VLX VisionBridge User Profile
+visionbridge_USER: "visionbridge"
+visionbridge_DIR: "/opt/VLX_VisionBridge"
 
 # Database settings
 database:
