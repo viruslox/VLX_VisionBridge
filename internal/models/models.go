@@ -14,9 +14,9 @@ type Layer struct {
 	InputType string `yaml:"input_type"` // e.g., folder, loop, srt
 	InputPath string `yaml:"input_path"`
 	Media     string `yaml:"media"` // Video+Audio, Video Only, Audio Only
-	Scale     string `yaml:"scale"`
-	Crop      string `yaml:"crop"`
-	Position  string `yaml:"position"`
+	Size      int    `yaml:"size"`
+	X         int    `yaml:"x"`
+	Y         int    `yaml:"y"`
 	Volume    *int   `yaml:"volume"`
 }
 
