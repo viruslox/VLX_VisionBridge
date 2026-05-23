@@ -50,8 +50,10 @@ The service initializes by reading the configuration. It builds a "Filter Graph"
 Each of the 10 layers is treated as an independent object in the Go logic, mapping conceptually to OBS Studio's "Sources" within a "Scene" (Layout):
 
 - **State**: `Active` | `Inactive`
-- **Media**: `Video+Audio` | `Video Only` | `Audio Only`
+- **Input Type**: `local` (folder of media), `srt`, `rtmp`, `webrtc`, `rtsp`. For `local`, folder combinations are automatically parsed (video only, image + audio, image only, audio only).
+- **Media**: `Video+Audio` | `Video` | `Audio`
 - **Transform**: `Scale`, `Crop`, `Position` (with 5% default margin logic).
+- **Audio**: Configurable `Volume` per layer.
 
 ## 3. Database Schema (PostgreSQL)
 

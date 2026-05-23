@@ -48,10 +48,11 @@ func BuildFFmpegArgs(cfg *models.Config) ([]string, error) {
 	}
 
 	var args []string
-	argsFilter, filterComplex, lastPad := mixer.BuildFilterComplex(cfg, padX, padY)
+	argsFilter, filterComplex, lastVideoPad, finalAudioPad := mixer.BuildFilterComplex(cfg, padX, padY)
 	args = append(args, argsFilter...)
 	args = append(args, "-filter_complex", filterComplex)
-	args = append(args, "-map", lastPad)
+	args = append(args, "-map", lastVideoPad)
+	args = append(args, "-map", finalAudioPad)
 
 	outArgs, err := streamer.BuildOutputArgs(cfg)
 	if err != nil {
