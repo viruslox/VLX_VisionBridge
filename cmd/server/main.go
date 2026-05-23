@@ -19,6 +19,7 @@ import (
 // ProcessUpdater defines the interface for updating configuration.
 type ProcessUpdater interface {
 	UpdateConfig(config *models.Config)
+	UpdateFilter(config *models.Config)
 }
 
 // CheckEUID checks if the process is running as root.
@@ -63,8 +64,8 @@ func HandleConfigChange(pm ProcessUpdater, newCfg *models.Config, diff config.Di
 		log.Println("Restarting FFmpeg process due to configuration change...")
 		pm.UpdateConfig(newCfg)
 	} else if diff.RequiresFilterUpdate {
-		log.Println("Filter update required. Currently requiring full restart until live-update is implemented.")
-		pm.UpdateConfig(newCfg)
+		log.Println("Filter update required. Applying live-update via ZMQ...")
+		pm.UpdateFilter(newCfg)
 	}
 }
 

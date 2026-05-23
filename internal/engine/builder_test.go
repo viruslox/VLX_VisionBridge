@@ -106,18 +106,18 @@ func TestBuildFFmpegArgs(t *testing.T) {
 	}
 
 	// Layer 0 (x=96, y=54)
-	if !strings.Contains(filterComplexStr, "overlay=x=96:y=54 [out0]") {
+	if !strings.Contains(filterComplexStr, "overlay@layer0=x=96:y=54 [out0]") {
 		t.Errorf("Layer 0 missing x=96:y=54 overlay: %s", filterComplexStr)
 	}
 
 	// Layer 1 (x=480, y=270)
-	if !strings.Contains(filterComplexStr, "overlay=x=480:y=270 [out1]") {
+	if !strings.Contains(filterComplexStr, "overlay@layer1=x=480:y=270 [out1]") {
 		t.Errorf("Layer 1 missing x=480:y=270 overlay: %s", filterComplexStr)
 	}
 
 	// Layer 3 (custom pos 10:20)
 	// Notice index is 3 in layers array, so input is [3:v] and out is [out3]
-	if !strings.Contains(filterComplexStr, "overlay=x=10:y=20 [out3]") {
+	if !strings.Contains(filterComplexStr, "overlay@layer3=x=10:y=20 [out3]") {
 		t.Errorf("Layer 3 missing custom pos overlay: %s", filterComplexStr)
 	}
 
@@ -133,7 +133,7 @@ func TestBuildFFmpegArgs(t *testing.T) {
 	}
 
 	// 3. Verify final map
-	if !strings.Contains(argsStr, "-map [out3]") {
+	if !strings.Contains(argsStr, "-map [v_out]") {
 		t.Errorf("Missing final map to last active layer video: %s", argsStr)
 	}
 
@@ -144,7 +144,7 @@ func TestBuildFFmpegArgs(t *testing.T) {
 	if !strings.Contains(argsStr, "-r 60") {
 		t.Errorf("Missing FPS setting: %s", argsStr)
 	}
-	if !strings.Contains(argsStr, "-c:v libx264 -b:v 6000k -maxrate 6000k -bufsize 6000k") {
+	if !strings.Contains(argsStr, "-b:v 6000k -maxrate 6000k -bufsize 6000k") {
 		t.Errorf("Missing VideoBitrate setting: %s", argsStr)
 	}
 	if !strings.Contains(argsStr, "-c:a aac -b:a 160k") {

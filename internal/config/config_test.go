@@ -123,8 +123,8 @@ func TestDiffConfigs(t *testing.T) {
 		},
 	}
 	diff3 := DiffConfigs(oldCfg, newCfg3)
-	if diff3.RequiresRestart || !diff3.RequiresFilterUpdate {
-		t.Errorf("Expected requiresFilterUpdate=true and requiresRestart=false for active state change")
+	if !diff3.RequiresRestart || diff3.RequiresFilterUpdate {
+		t.Errorf("Expected requiresRestart=true and requiresFilterUpdate=false for active state change")
 	}
 
 	// Test case 4: Input path change -> requires restart
@@ -196,8 +196,8 @@ layers:
 
 	select {
 	case diff := <-ch:
-		if diff.RequiresRestart || !diff.RequiresFilterUpdate {
-			t.Errorf("Expected requiresFilterUpdate=true, got %v", diff)
+		if !diff.RequiresRestart || diff.RequiresFilterUpdate {
+			t.Errorf("Expected requiresRestart=true for active state change, got %v", diff)
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatalf("Timed out waiting for watcher callback")
@@ -278,15 +278,15 @@ func TestLayersDiff(t *testing.T) {
 			name:                     "Active changed",
 			old:                      []models.Layer{{ID: 1, Active: true}},
 			new:                      []models.Layer{{ID: 1, Active: false}},
-			wantRequiresRestart:      false,
-			wantRequiresFilterUpdate: true,
+			wantRequiresRestart:      true,
+			wantRequiresFilterUpdate: false,
 		},
 		{
 			name:                     "Size changed",
 			old:                      []models.Layer{{ID: 1, Size: 1920}},
 			new:                      []models.Layer{{ID: 1, Size: 960}},
-			wantRequiresRestart:      false,
-			wantRequiresFilterUpdate: true,
+			wantRequiresRestart:      true,
+			wantRequiresFilterUpdate: false,
 		},
 		{
 			name:                     "X changed",

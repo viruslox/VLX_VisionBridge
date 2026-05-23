@@ -19,6 +19,11 @@ func (m *MockProcessUpdater) UpdateConfig(config *models.Config) {
 	m.lastConfig = config
 }
 
+func (m *MockProcessUpdater) UpdateFilter(config *models.Config) {
+	m.updateConfigCalled = true
+	m.lastConfig = config
+}
+
 func TestCheckEUID(t *testing.T) {
 	if err := CheckEUID(0); err == nil {
 		t.Errorf("Expected error for euid=0 (root), got nil")
