@@ -18,6 +18,8 @@ output:
   destinations:
     - "rtmp://live.twitch.tv/app/live_xyz"
     - "rtmp://a.rtmp.youtube.com/live2/xyz"
+input:
+  resolution: "1920x1080"
 layers:
   - id: 1
     active: true
@@ -46,6 +48,11 @@ layers:
 	// Verify Database Config
 	if cfg.Database.DSN != "/opt/VLX_VisionBridge/var/visionbridge.db" {
 		t.Errorf("Expected DSN to be '/opt/VLX_VisionBridge/var/visionbridge.db', got '%s'", cfg.Database.DSN)
+	}
+
+	// Verify Input Settings
+	if cfg.Input.Resolution != "1920x1080" {
+		t.Errorf("Expected Input.Resolution to be '1920x1080', got '%s'", cfg.Input.Resolution)
 	}
 
 	// Verify Output Settings

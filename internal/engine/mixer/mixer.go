@@ -13,7 +13,7 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 	var args []string
 	var filterComplex strings.Builder
 	filterComplex.WriteString("color=s=")
-	filterComplex.WriteString(cfg.Output.Resolution)
+	filterComplex.WriteString(cfg.Input.Resolution)
 	filterComplex.WriteString(":c=black [base];\n")
 
 	inputIdx := 0

@@ -72,11 +72,15 @@ Go routines are used to:
 3. Update the DB with real-time health stats.
 4. Watch for file system changes.
 
-## 5. Output Specifications
+## 5. Specifications
 
-Configurable parameters per session:
+Configurable output parameters per session:
 
-- **Resolution**: (e.g., 1920x1080)
+- **Resolution**: Target output resolution (e.g., 1920x1080)
 - **FPS**: (e.g., 30, 60)
 - **Video Bitrate**: (e.g., 6000k)
 - **Audio Bitrate**: (e.g., 160k)
+
+Configurable input module parameters per session:
+
+- **Resolution**: Layer's canvas size (e.g., 1920x1080)

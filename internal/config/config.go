@@ -40,6 +40,10 @@ func DiffConfigs(oldConfig, newConfig *models.Config) DiffResult {
 		return DiffResult{RequiresRestart: true}
 	}
 
+	if oldConfig.Input.Resolution != newConfig.Input.Resolution {
+		return DiffResult{RequiresRestart: true}
+	}
+
 	if outputsRequireRestart(oldConfig.Output, newConfig.Output) {
 		return DiffResult{RequiresRestart: true}
 	}

@@ -8,6 +8,10 @@ type OutputSettings struct {
 	Destinations []string `yaml:"destinations"`
 }
 
+type InputSettings struct {
+	Resolution string `yaml:"resolution"`
+}
+
 type Layer struct {
 	ID        int    `yaml:"id"`
 	Active    bool   `yaml:"active"`
@@ -34,5 +38,6 @@ type DatabaseConfig struct {
 type Config struct {
 	Database DatabaseConfig `yaml:"database"`
 	Output   OutputSettings `yaml:"output"`
+	Input    InputSettings  `yaml:"input"`
 	Layers   []Layer        `yaml:"layers"`
 }
