@@ -52,7 +52,8 @@ func BuildOutputArgs(cfg *models.Config) ([]string, error) {
 	} else {
 		args = append(args, "-c:a", "aac")
 	}
-
+	
+	args = append(args, "-flags", "+global_header")
 	if len(cfg.Output.Destinations) > 0 {
 		var teeDestinations []string
 		for _, dest := range cfg.Output.Destinations {
