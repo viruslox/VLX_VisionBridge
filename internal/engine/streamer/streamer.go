@@ -42,7 +42,7 @@ func BuildOutputArgs(cfg *models.Config) ([]string, error) {
 	if cfg.Output.FPS > 0 {
 		args = append(args, "-r", strconv.Itoa(cfg.Output.FPS))
 	}
-	args = append(args, "-c:v", "libx264")
+	args = append(args, "-c:v", "libx264", "-pix_fmt", "yuv420p")
 	if cfg.Output.VideoBitrate != "" {
 		args = append(args, "-b:v", cfg.Output.VideoBitrate, "-maxrate", cfg.Output.VideoBitrate, "-bufsize", cfg.Output.VideoBitrate)
 	}
