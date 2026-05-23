@@ -41,20 +41,22 @@ func (t *tailBuffer) String() string {
 
 // ProcessManager manages the FFmpeg process.
 type ProcessManager struct {
-	cmd       *exec.Cmd
-	config    *models.Config
-	db        *sql.DB
-	ctx       context.Context
-	cancel    context.CancelFunc
-	mu        sync.Mutex
-	cond      *sync.Cond
-	isRunning bool
+	cmd         *exec.Cmd
+	config      *models.Config
+	db          *sql.DB
+	ctx         context.Context
+	cancel      context.CancelFunc
+	mu          sync.Mutex
+	cond        *sync.Cond
+	isRunning   bool
+	overlayCmds map[int]*exec.Cmd
 }
 
 // NewProcessManager creates a new ProcessManager.
 func NewProcessManager(dbConn *sql.DB) *ProcessManager {
 	pm := &ProcessManager{
-		db: dbConn,
+		db:          dbConn,
+		overlayCmds: make(map[int]*exec.Cmd),
 	}
 	pm.cond = sync.NewCond(&pm.mu)
 	return pm
@@ -105,7 +107,70 @@ func (pm *ProcessManager) Stop() {
 	if pm.cond != nil {
 		pm.cond.Broadcast()
 	}
+
+	// Stop all overlay processes
+	for id, overlayCmd := range pm.overlayCmds {
+		if overlayCmd != nil && overlayCmd.Process != nil {
+			log.Printf("Signaling overlay process for layer %d to stop gracefully...", id)
+			_ = overlayCmd.Process.Signal(syscall.SIGTERM)
+		}
+	}
+
 	pm.mu.Unlock()
+}
+
+func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	activeOverlays := make(map[int]bool)
+
+	for _, layer := range cfg.Layers {
+		if !layer.Active || layer.InputType != "overlay" {
+			continue
+		}
+
+		activeOverlays[layer.ID] = true
+
+		// Check if already running
+		if cmd, exists := pm.overlayCmds[layer.ID]; exists && cmd != nil && cmd.Process != nil {
+			// Basic check if process is still running could be added here,
+			// but os/exec.Cmd.ProcessState != nil means it exited.
+			if cmd.ProcessState == nil {
+				continue // Still running
+			}
+		}
+
+		log.Printf("Starting overlay browser for layer %d with URL: %s", layer.ID, layer.InputPath)
+		serverNum := fmt.Sprintf("--server-num=%d", 99+layer.ID)
+
+		cmd := exec.Command("xvfb-run", serverNum, "--server-args=-screen 0 1920x1080x24",
+			"chromium-browser", "--kiosk", "--disable-infobars", "--window-size=1920,1080",
+			"--no-sandbox", "--disable-dev-shm-usage", layer.InputPath)
+
+		err := cmd.Start()
+		if err != nil {
+			log.Printf("Failed to start overlay browser for layer %d: %v", layer.ID, err)
+			continue
+		}
+
+		go func() {
+			_ = cmd.Wait()
+		}()
+
+		pm.overlayCmds[layer.ID] = cmd
+	}
+
+	// Stop any overlay processes that are no longer active
+	for id, cmd := range pm.overlayCmds {
+		if !activeOverlays[id] {
+			if cmd != nil && cmd.Process != nil {
+				log.Printf("Stopping overlay browser for layer %d...", id)
+				_ = cmd.Process.Signal(syscall.SIGTERM)
+			}
+			delete(pm.overlayCmds, id)
+		}
+	}
 }
 
 // UpdateFilter updates the filter parameters dynamically via ZMQ.
@@ -263,6 +328,8 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) monitorAction {
 		log.Println("Process manager shutting down gracefully (context canceled)")
 		return monitorActionStop
 	}
+
+	pm.manageOverlays(cfg)
 
 	args, err := BuildFFmpegArgs(cfg)
 	if err != nil {
