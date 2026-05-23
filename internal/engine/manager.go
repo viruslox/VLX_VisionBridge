@@ -160,6 +160,37 @@ func (pm *ProcessManager) monitor() {
 	}
 }
 
+func identifyErrorModule(stderr string, cfg *models.Config) string {
+	if cfg == nil || stderr == "" {
+		return ""
+	}
+
+	for _, layer := range cfg.Layers {
+		if !layer.Active || layer.InputPath == "" {
+			continue
+		}
+		if strings.Contains(stderr, layer.InputPath) {
+			return fmt.Sprintf("[layer %d] [input]", layer.ID)
+		}
+	}
+
+	for _, dest := range cfg.Output.Destinations {
+		if dest == "" {
+			continue
+		}
+		if strings.Contains(stderr, dest) {
+			return "[output]"
+		}
+	}
+
+	lowerStderr := strings.ToLower(stderr)
+	if strings.Contains(lowerStderr, "filter") || strings.Contains(lowerStderr, "parsed_") || strings.Contains(lowerStderr, "overlay") || strings.Contains(lowerStderr, "scale=") {
+		return "[mixer]"
+	}
+
+	return ""
+}
+
 func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) monitorAction {
 	pm.mu.Lock()
 	ctx := pm.ctx
@@ -226,6 +257,10 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) monitorAction {
 			lines := strings.Split(strings.TrimSpace(stderrStr), "\n")
 			if len(lines) > 0 {
 				reason = lines[len(lines)-1]
+				modulePrefix := identifyErrorModule(stderrStr, cfg)
+				if modulePrefix != "" {
+					reason = modulePrefix + " " + reason
+				}
 			}
 		}
 		if reason != "" {
