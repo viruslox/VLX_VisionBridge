@@ -256,7 +256,16 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) monitorAction {
 		if stderrStr != "" {
 			lines := strings.Split(strings.TrimSpace(stderrStr), "\n")
 			if len(lines) > 0 {
+				// Find the last actual error line, "Conversion failed!" is often just the generic exit message
 				reason = lines[len(lines)-1]
+				if reason == "Conversion failed!" && len(lines) > 1 {
+					reason = lines[len(lines)-2] + " | " + reason
+				}
+				if len(lines) > 10 {
+					log.Printf("FFmpeg stderr tail:\n%s", strings.Join(lines[len(lines)-10:], "\n"))
+				} else {
+					log.Printf("FFmpeg stderr tail:\n%s", stderrStr)
+				}
 				modulePrefix := identifyErrorModule(stderrStr, cfg)
 				if modulePrefix != "" {
 					reason = modulePrefix + " " + reason
