@@ -47,9 +47,10 @@ func BuildOutputArgs(cfg *models.Config) ([]string, error) {
 		args = append(args, "-b:v", cfg.Output.VideoBitrate, "-maxrate", cfg.Output.VideoBitrate, "-bufsize", cfg.Output.VideoBitrate)
 	}
 
-	args = append(args, "-c:a", "aac")
 	if cfg.Output.AudioBitrate != "" {
-		args = append(args, "-b:a", cfg.Output.AudioBitrate)
+		args = append(args, "-c:a", "aac", "-b:a", cfg.Output.AudioBitrate)
+	} else {
+		args = append(args, "-c:a", "aac")
 	}
 
 	if len(cfg.Output.Destinations) > 0 {
