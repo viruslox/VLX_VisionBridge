@@ -262,7 +262,7 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) monitorAction {
 					reason = lines[len(lines)-2] + " | " + reason
 				}
 				if len(lines) > 10 {
-					log.Printf("FFmpeg stderr tail:\n%s", strings.Join(lines[len(lines)-10:], "\n"))
+					log.Printf("FFmpeg stderr tail:\n%s", strings.Join(lines[len(lines)-30:], "\n"))
 				} else {
 					log.Printf("FFmpeg stderr tail:\n%s", stderrStr)
 				}
