@@ -59,13 +59,13 @@ func BuildInputArgs(layer models.Layer) models.InputResult {
 		})
 
 		if hasVideo && !hasImage && !hasAudio && len(videos) > 0 {
-			args = append(args, "-stream_loop", "-1", "-i", videos[0])
+			args = append(args, "-re", "-stream_loop", "-1", "-i", videos[0])
 			return models.InputResult{Args: args, InputCount: 1, HasVideo: true, HasAudio: true}
 		} else if hasImage && hasAudio && !hasVideo && len(images) > 0 && len(audios) > 0 {
 			args = append(args, "-loop", "1", "-i", images[0], "-stream_loop", "-1", "-i", audios[0])
 			return models.InputResult{Args: args, InputCount: 2, HasVideo: true, HasAudio: true}
 		} else if hasImage && !hasVideo && !hasAudio && len(images) > 0 {
-			args = append(args, "-loop", "1", "-i", images[0])
+			args = append(args, "-re", "-loop", "1", "-i", images[0])
 			return models.InputResult{Args: args, InputCount: 1, HasVideo: true, HasAudio: false}
 		} else if hasAudio && !hasVideo && !hasImage && len(audios) > 0 {
 			args = append(args, "-stream_loop", "-1", "-i", audios[0])
