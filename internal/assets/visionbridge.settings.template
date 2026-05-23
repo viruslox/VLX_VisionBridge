@@ -26,6 +26,6 @@ layers:
     input_path: "/opt/VLX_VisionBridge/data/layer0" # Path to folder or address
     media: "Video+Audio"     # Which tracks to include: Video+Audio, Video, Audio
     volume: 100              # Volume percentage
-    scale: "1920:-1"         # Scaling options
-    crop: "1920:1080:0:0"    # Cropping options
-    position: "center"       # Position on canvas: center, top-left, bottom-right, etc
+    size: 1920               # Width in pixels
+    x: 0                     # X position on canvas
+    y: 0                     # Y position on canvas

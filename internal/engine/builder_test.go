@@ -35,8 +35,9 @@ func TestBuildFFmpegArgs(t *testing.T) {
 				Active:    true,
 				InputType: "local",
 				InputPath: imagesDir,
-				Scale:     "100%",
-				Position:  "top-left",
+				Size:      1920,
+				X:         96,
+				Y:         54,
 				Media:     "Video+Audio",
 			},
 			{
@@ -44,8 +45,9 @@ func TestBuildFFmpegArgs(t *testing.T) {
 				Active:    true,
 				InputType: "local",
 				InputPath: "video.mp4",
-				Scale:     "50%",
-				Position:  "center",
+				Size:      960,
+				X:         480,
+				Y:         270,
 				Media:     "Video+Audio",
 			},
 			{
@@ -53,15 +55,17 @@ func TestBuildFFmpegArgs(t *testing.T) {
 				Active:    false, // Should be ignored
 				InputType: "srt",
 				InputPath: "srt://example.com:1234",
-				Position:  "top-left",
+				X:         0,
+				Y:         0,
 			},
 			{
 				ID:        3,
 				Active:    true,
 				InputType: "srt",
 				InputPath: "srt://example.com:5678",
-				Scale:     "1280x720",
-				Position:  "10:20",
+				Size:      1280,
+				X:         10,
+				Y:         20,
 				Media:     "Video+Audio",
 			},
 		},
@@ -100,15 +104,14 @@ func TestBuildFFmpegArgs(t *testing.T) {
 		t.Fatalf("Missing -filter_complex flag")
 	}
 
-	// 5% padding of 1920x1080 = 96x54
-	// Layer 0 (top-left) -> padding applied
+	// Layer 0 (x=96, y=54)
 	if !strings.Contains(filterComplexStr, "overlay=x=96:y=54 [out0]") {
-		t.Errorf("Layer 0 missing top-left padding overlay: %s", filterComplexStr)
+		t.Errorf("Layer 0 missing x=96:y=54 overlay: %s", filterComplexStr)
 	}
 
-	// Layer 1 (center)
-	if !strings.Contains(filterComplexStr, "overlay=x=(W-w)/2:y=(H-h)/2 [out1]") {
-		t.Errorf("Layer 1 missing center overlay: %s", filterComplexStr)
+	// Layer 1 (x=480, y=270)
+	if !strings.Contains(filterComplexStr, "overlay=x=480:y=270 [out1]") {
+		t.Errorf("Layer 1 missing x=480:y=270 overlay: %s", filterComplexStr)
 	}
 
 	// Layer 3 (custom pos 10:20)
@@ -118,14 +121,14 @@ func TestBuildFFmpegArgs(t *testing.T) {
 	}
 
 	// Verify scaling logic
-	// Layer 1 scale 50%
-	if !strings.Contains(filterComplexStr, "scale=iw*50/100:ih*50/100 [v1_scaled]") {
-		t.Errorf("Layer 1 missing 50%% scale: %s", filterComplexStr)
+	// Layer 1 scale 960 (which represents previous 50% of 1920)
+	if !strings.Contains(filterComplexStr, "scale=960:-1 [v1_scaled]") {
+		t.Errorf("Layer 1 missing 960 scale: %s", filterComplexStr)
 	}
 
-	// Layer 3 absolute scale
-	if !strings.Contains(filterComplexStr, "scale=1280x720 [v3_scaled]") {
-		t.Errorf("Layer 3 missing absolute scale: %s", filterComplexStr)
+	// Layer 3 absolute scale size 1280
+	if !strings.Contains(filterComplexStr, "scale=1280:-1 [v3_scaled]") {
+		t.Errorf("Layer 3 missing 1280 scale: %s", filterComplexStr)
 	}
 
 	// 3. Verify final map
@@ -238,8 +241,9 @@ func TestBuildFFmpegArgs_10SRT(t *testing.T) {
 			Active:    true,
 			InputType: "srt",
 			InputPath: "srt://example.com:" + strconv.Itoa(10000+i),
-			Scale:     "192x108",
-			Position:  "top-left",
+			Size:      192,
+			X:         0,
+			Y:         0,
 		}
 	}
 
@@ -289,21 +293,25 @@ func TestBuildFFmpegArgs_InactiveSources(t *testing.T) {
 				Active:    true,
 				InputType: "loop",
 				InputPath: "active_video.mp4",
-				Position:  "top-left",
+				Size:      1920,
+				X:         0,
+				Y:         0,
 			},
 			{
 				ID:        1,
 				Active:    false,
 				InputType: "srt",
 				InputPath: "srt://example.com:9999",
-				Position:  "center",
+				X:         0,
+				Y:         0,
 			},
 			{
 				ID:        2,
 				Active:    false,
 				InputType: "local",
 				InputPath: "/inactive_images/",
-				Position:  "bottom-right",
+				X:         0,
+				Y:         0,
 			},
 		},
 	}

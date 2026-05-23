@@ -21,15 +21,11 @@ func BuildFFmpegArgs(cfg *models.Config) ([]string, error) {
 	if len(resParts) != 2 {
 		return nil, fmt.Errorf("invalid resolution format, expected WxH: %s", cfg.Output.Resolution)
 	}
-	outW, errW := strconv.Atoi(resParts[0])
-	outH, errH := strconv.Atoi(resParts[1])
+	_, errW := strconv.Atoi(resParts[0])
+	_, errH := strconv.Atoi(resParts[1])
 	if errW != nil || errH != nil {
 		return nil, fmt.Errorf("invalid resolution values: %s", cfg.Output.Resolution)
 	}
-
-	// Calculate padding based on percentage
-	padX := outW * mixer.PaddingPercentage / 100
-	padY := outH * mixer.PaddingPercentage / 100
 
 	if len(cfg.Layers) == 0 {
 		return []string{}, nil
@@ -48,7 +44,7 @@ func BuildFFmpegArgs(cfg *models.Config) ([]string, error) {
 	}
 
 	var args []string
-	argsFilter, filterComplex, lastVideoPad, finalAudioPad := mixer.BuildFilterComplex(cfg, padX, padY)
+	argsFilter, filterComplex, lastVideoPad, finalAudioPad := mixer.BuildFilterComplex(cfg)
 	args = append(args, argsFilter...)
 	args = append(args, "-filter_complex", filterComplex)
 	args = append(args, "-map", lastVideoPad)

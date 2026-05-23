@@ -23,9 +23,9 @@ layers:
     input_type: "folder"
     input_path: "/path/to/folder"
     media: "Video+Audio"
-    scale: "100%"
-    crop: "none"
-    position: "center"
+    size: 1920
+    x: 0
+    y: 0
 `
 	tmpDir := t.TempDir()
 	configFile := filepath.Join(tmpDir, "visionbridge.settings")
@@ -80,8 +80,8 @@ func TestDiffConfigs(t *testing.T) {
 	oldCfg := &models.Config{
 		Output: models.OutputSettings{Resolution: "1920x1080", FPS: 30},
 		Layers: []models.Layer{
-			{ID: 1, Active: true, InputType: "loop", InputPath: "test.mp4", Scale: "100%"},
-			{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Scale: "50%"},
+			{ID: 1, Active: true, InputType: "loop", InputPath: "test.mp4", Size: 1920},
+			{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
 		},
 	}
 
@@ -89,8 +89,8 @@ func TestDiffConfigs(t *testing.T) {
 	newCfg1 := &models.Config{
 		Output: models.OutputSettings{Resolution: "1920x1080", FPS: 30},
 		Layers: []models.Layer{
-			{ID: 1, Active: true, InputType: "loop", InputPath: "test.mp4", Scale: "100%"},
-			{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Scale: "50%"},
+			{ID: 1, Active: true, InputType: "loop", InputPath: "test.mp4", Size: 1920},
+			{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
 		},
 	}
 	diff1 := DiffConfigs(oldCfg, newCfg1)
@@ -112,8 +112,8 @@ func TestDiffConfigs(t *testing.T) {
 	newCfg3 := &models.Config{
 		Output: oldCfg.Output,
 		Layers: []models.Layer{
-			{ID: 1, Active: false, InputType: "loop", InputPath: "test.mp4", Scale: "100%"},
-			{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Scale: "50%"},
+			{ID: 1, Active: false, InputType: "loop", InputPath: "test.mp4", Size: 1920},
+			{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
 		},
 	}
 	diff3 := DiffConfigs(oldCfg, newCfg3)
@@ -125,8 +125,8 @@ func TestDiffConfigs(t *testing.T) {
 	newCfg4 := &models.Config{
 		Output: oldCfg.Output,
 		Layers: []models.Layer{
-			{ID: 1, Active: true, InputType: "loop", InputPath: "new.mp4", Scale: "100%"},
-			{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Scale: "50%"},
+			{ID: 1, Active: true, InputType: "loop", InputPath: "new.mp4", Size: 1920},
+			{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
 		},
 	}
 	diff4 := DiffConfigs(oldCfg, newCfg4)
@@ -199,16 +199,16 @@ layers:
 
 func BenchmarkLayersDiff(b *testing.B) {
 	oldLayers := []models.Layer{
-		{ID: 1, Active: true, InputType: "loop", InputPath: "test1.mp4", Scale: "100%"},
-		{ID: 2, Active: false, InputType: "srt", InputPath: "srt://1", Scale: "50%"},
-		{ID: 3, Active: true, InputType: "folder", InputPath: "fld1", Scale: "100%"},
-		{ID: 4, Active: true, InputType: "loop", InputPath: "test2.mp4", Scale: "100%"},
+		{ID: 1, Active: true, InputType: "loop", InputPath: "test1.mp4", Size: 1920},
+		{ID: 2, Active: false, InputType: "srt", InputPath: "srt://1", Size: 960},
+		{ID: 3, Active: true, InputType: "folder", InputPath: "fld1", Size: 1920},
+		{ID: 4, Active: true, InputType: "loop", InputPath: "test2.mp4", Size: 1920},
 	}
 	newLayers := []models.Layer{
-		{ID: 1, Active: true, InputType: "loop", InputPath: "test1.mp4", Scale: "100%"},
-		{ID: 2, Active: true, InputType: "srt", InputPath: "srt://1", Scale: "50%"},
-		{ID: 3, Active: true, InputType: "folder", InputPath: "fld1", Scale: "100%"},
-		{ID: 5, Active: true, InputType: "loop", InputPath: "test3.mp4", Scale: "100%"},
+		{ID: 1, Active: true, InputType: "loop", InputPath: "test1.mp4", Size: 1920},
+		{ID: 2, Active: true, InputType: "srt", InputPath: "srt://1", Size: 960},
+		{ID: 3, Active: true, InputType: "folder", InputPath: "fld1", Size: 1920},
+		{ID: 5, Active: true, InputType: "loop", InputPath: "test3.mp4", Size: 1920},
 	}
 
 	b.ResetTimer()
@@ -227,8 +227,8 @@ func TestLayersDiff(t *testing.T) {
 	}{
 		{
 			name:                     "No changes",
-			old:                      []models.Layer{{ID: 1, InputType: "loop", InputPath: "test.mp4", Media: "video", Active: true, Scale: "100%", Crop: "none", Position: "center"}},
-			new:                      []models.Layer{{ID: 1, InputType: "loop", InputPath: "test.mp4", Media: "video", Active: true, Scale: "100%", Crop: "none", Position: "center"}},
+			old:                      []models.Layer{{ID: 1, InputType: "loop", InputPath: "test.mp4", Media: "video", Active: true, Size: 1920, X: 0, Y: 0}},
+			new:                      []models.Layer{{ID: 1, InputType: "loop", InputPath: "test.mp4", Media: "video", Active: true, Size: 1920, X: 0, Y: 0}},
 			wantRequiresRestart:      false,
 			wantRequiresFilterUpdate: false,
 		},
@@ -275,23 +275,23 @@ func TestLayersDiff(t *testing.T) {
 			wantRequiresFilterUpdate: true,
 		},
 		{
-			name:                     "Scale changed",
-			old:                      []models.Layer{{ID: 1, Scale: "100%"}},
-			new:                      []models.Layer{{ID: 1, Scale: "50%"}},
+			name:                     "Size changed",
+			old:                      []models.Layer{{ID: 1, Size: 1920}},
+			new:                      []models.Layer{{ID: 1, Size: 960}},
 			wantRequiresRestart:      false,
 			wantRequiresFilterUpdate: true,
 		},
 		{
-			name:                     "Crop changed",
-			old:                      []models.Layer{{ID: 1, Crop: "none"}},
-			new:                      []models.Layer{{ID: 1, Crop: "100:100:0:0"}},
+			name:                     "X changed",
+			old:                      []models.Layer{{ID: 1, X: 0}},
+			new:                      []models.Layer{{ID: 1, X: 100}},
 			wantRequiresRestart:      false,
 			wantRequiresFilterUpdate: true,
 		},
 		{
-			name:                     "Position changed",
-			old:                      []models.Layer{{ID: 1, Position: "center"}},
-			new:                      []models.Layer{{ID: 1, Position: "top-left"}},
+			name:                     "Y changed",
+			old:                      []models.Layer{{ID: 1, Y: 0}},
+			new:                      []models.Layer{{ID: 1, Y: 100}},
 			wantRequiresRestart:      false,
 			wantRequiresFilterUpdate: true,
 		},

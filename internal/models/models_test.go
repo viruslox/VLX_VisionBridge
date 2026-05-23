@@ -24,17 +24,17 @@ layers:
     input_type: "srt"
     input_path: "srt://localhost:9000?mode=listener"
     media: "Video+Audio"
-    scale: "1920x1080"
-    crop: "0:0:0:0"
-    position: "0,0"
+    size: 1920
+    x: 0
+    y: 0
   - id: 2
     active: false
     input_type: "folder"
     input_path: "/var/media/loop"
     media: "Video Only"
-    scale: "640x360"
-    crop: "10:10:10:10"
-    position: "10,10"
+    size: 640
+    x: 10
+    y: 10
 `)
 
 	var cfg Config
@@ -93,14 +93,14 @@ layers:
 	if layer1.Media != "Video+Audio" {
 		t.Errorf("Expected Layer 1 Media to be 'Video+Audio', got '%s'", layer1.Media)
 	}
-	if layer1.Scale != "1920x1080" {
-		t.Errorf("Expected Layer 1 Scale to be '1920x1080', got '%s'", layer1.Scale)
+	if layer1.Size != 1920 {
+		t.Errorf("Expected Layer 1 Size to be 1920, got %d", layer1.Size)
 	}
-	if layer1.Crop != "0:0:0:0" {
-		t.Errorf("Expected Layer 1 Crop to be '0:0:0:0', got '%s'", layer1.Crop)
+	if layer1.X != 0 {
+		t.Errorf("Expected Layer 1 X to be 0, got %d", layer1.X)
 	}
-	if layer1.Position != "0,0" {
-		t.Errorf("Expected Layer 1 Position to be '0,0', got '%s'", layer1.Position)
+	if layer1.Y != 0 {
+		t.Errorf("Expected Layer 1 Y to be 0, got %d", layer1.Y)
 	}
 
 	// Layer 2
@@ -120,13 +120,13 @@ layers:
 	if layer2.Media != "Video Only" {
 		t.Errorf("Expected Layer 2 Media to be 'Video Only', got '%s'", layer2.Media)
 	}
-	if layer2.Scale != "640x360" {
-		t.Errorf("Expected Layer 2 Scale to be '640x360', got '%s'", layer2.Scale)
+	if layer2.Size != 640 {
+		t.Errorf("Expected Layer 2 Size to be 640, got %d", layer2.Size)
 	}
-	if layer2.Crop != "10:10:10:10" {
-		t.Errorf("Expected Layer 2 Crop to be '10:10:10:10', got '%s'", layer2.Crop)
+	if layer2.X != 10 {
+		t.Errorf("Expected Layer 2 X to be 10, got %d", layer2.X)
 	}
-	if layer2.Position != "10,10" {
-		t.Errorf("Expected Layer 2 Position to be '10,10', got '%s'", layer2.Position)
+	if layer2.Y != 10 {
+		t.Errorf("Expected Layer 2 Y to be 10, got %d", layer2.Y)
 	}
 }

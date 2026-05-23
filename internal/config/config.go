@@ -102,7 +102,7 @@ func compareLayer(oldL, newL models.Layer) DiffResult {
 		volNew = *newL.Volume
 	}
 
-	if oldL.Active != newL.Active || oldL.Scale != newL.Scale || oldL.Crop != newL.Crop || oldL.Position != newL.Position || volOld != volNew {
+	if oldL.Active != newL.Active || oldL.Size != newL.Size || oldL.X != newL.X || oldL.Y != newL.Y || volOld != volNew {
 		return DiffResult{RequiresFilterUpdate: true}
 	}
 
