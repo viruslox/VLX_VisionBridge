@@ -56,15 +56,15 @@ func BuildOutputArgs(cfg *models.Config) ([]string, error) {
 	if len(cfg.Output.Destinations) > 0 {
 		var teeDestinations []string
 		for _, dest := range cfg.Output.Destinations {
-			if !IsValidDestination(dest) {
-				return nil, fmt.Errorf("invalid or unsafe output destination: %s", dest)
-			}
-			escaped := destReplacer.Replace(dest)
-			format := "flv"
-			if strings.HasPrefix(strings.ToLower(dest), "srt://") {
-				format = "mpegts"
-			}
-			teeDestinations = append(teeDestinations, fmt.Sprintf("[f=%s]%s", format, escaped))
+		    if !IsValidDestination(dest) {
+		        return nil, fmt.Errorf("invalid or unsafe output destination: %s", dest)
+		    }
+		    escaped := destReplacer.Replace(dest)
+		    if strings.HasPrefix(strings.ToLower(dest), "srt://") {
+		        teeDestinations = append(teeDestinations, "[f=mpegts]"+escaped)
+		    } else {
+		        teeDestinations = append(teeDestinations, "[f=flv]"+escaped)
+		    }
 		}
 		teeMap := strings.Join(teeDestinations, "|")
 		args = append(args, "-f", "tee", "-use_fifo", "1", "-fifo_options", "drop_pkts_on_overflow=1:attempt_recovery=1:recovery_wait_time=1", teeMap)
