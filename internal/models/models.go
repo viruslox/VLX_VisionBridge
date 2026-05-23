@@ -17,6 +17,14 @@ type Layer struct {
 	Scale     string `yaml:"scale"`
 	Crop      string `yaml:"crop"`
 	Position  string `yaml:"position"`
+	Volume    *int   `yaml:"volume"`
+}
+
+type InputResult struct {
+	Args       []string
+	InputCount int
+	HasVideo   bool
+	HasAudio   bool
 }
 
 type DatabaseConfig struct {

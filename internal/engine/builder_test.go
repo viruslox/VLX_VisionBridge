@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -9,6 +10,14 @@ import (
 )
 
 func TestBuildFFmpegArgs(t *testing.T) {
+	tmpDir := t.TempDir()
+	imagesDir := tmpDir + "/images"
+	err := os.MkdirAll(imagesDir, 0755)
+	if err != nil {
+		t.Fatalf("Failed to create mock images dir: %v", err)
+	}
+	os.WriteFile(imagesDir+"/test.png", []byte("mock image"), 0644)
+
 	cfg := &models.Config{
 		Output: models.OutputSettings{
 			Resolution:   "1920x1080",
@@ -24,18 +33,20 @@ func TestBuildFFmpegArgs(t *testing.T) {
 			{
 				ID:        0,
 				Active:    true,
-				InputType: "folder",
-				InputPath: "/images/",
+				InputType: "local",
+				InputPath: imagesDir,
 				Scale:     "100%",
 				Position:  "top-left",
+				Media:     "Video+Audio",
 			},
 			{
 				ID:        1,
 				Active:    true,
-				InputType: "loop",
+				InputType: "local",
 				InputPath: "video.mp4",
 				Scale:     "50%",
 				Position:  "center",
+				Media:     "Video+Audio",
 			},
 			{
 				ID:        2,
@@ -51,6 +62,7 @@ func TestBuildFFmpegArgs(t *testing.T) {
 				InputPath: "srt://example.com:5678",
 				Scale:     "1280x720",
 				Position:  "10:20",
+				Media:     "Video+Audio",
 			},
 		},
 	}
@@ -63,11 +75,11 @@ func TestBuildFFmpegArgs(t *testing.T) {
 	argsStr := strings.Join(args, " ")
 
 	// 1. Verify inputs
-	if !strings.Contains(argsStr, "-f image2 -loop 1 -i /images/") {
-		t.Errorf("Missing folder input: %s", argsStr)
+	if !strings.Contains(argsStr, "-i "+imagesDir) {
+		t.Errorf("Missing fallback input for image dir: %s", argsStr)
 	}
-	if !strings.Contains(argsStr, "-stream_loop -1 -i video.mp4") {
-		t.Errorf("Missing loop input: %s", argsStr)
+	if !strings.Contains(argsStr, "-i video.mp4") {
+		t.Errorf("Missing fallback input: %s", argsStr)
 	}
 	if !strings.Contains(argsStr, "-i srt://example.com:5678") {
 		t.Errorf("Missing active srt input: %s", argsStr)
@@ -118,7 +130,7 @@ func TestBuildFFmpegArgs(t *testing.T) {
 
 	// 3. Verify final map
 	if !strings.Contains(argsStr, "-map [out3]") {
-		t.Errorf("Missing final map to last active layer: %s", argsStr)
+		t.Errorf("Missing final map to last active layer video: %s", argsStr)
 	}
 
 	// 4. Verify global settings
@@ -289,7 +301,7 @@ func TestBuildFFmpegArgs_InactiveSources(t *testing.T) {
 			{
 				ID:        2,
 				Active:    false,
-				InputType: "folder",
+				InputType: "local",
 				InputPath: "/inactive_images/",
 				Position:  "bottom-right",
 			},

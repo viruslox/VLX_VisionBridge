@@ -75,7 +75,7 @@ func getOverlayPosition(layer models.Layer, padX, padY int) (string, string) {
 	return overlayX, overlayY
 }
 
-func BuildFilterComplex(cfg *models.Config, padX, padY int) ([]string, string, string) {
+func BuildFilterComplex(cfg *models.Config, padX, padY int) ([]string, string, string, string) {
 	var args []string
 	var filterComplex strings.Builder
 	filterComplex.WriteString("color=s=")
@@ -84,41 +84,99 @@ func BuildFilterComplex(cfg *models.Config, padX, padY int) ([]string, string, s
 
 	inputIdx := 0
 	currentBasePad := "[base]"
+	var audioPads []string
 
 	for i, layer := range cfg.Layers {
 		if !layer.Active {
 			continue
 		}
 
-		args = append(args, source.BuildInputArgs(layer)...)
+		res := source.BuildInputArgs(layer)
+		args = append(args, res.Args...)
 
-		var buf [24]byte
-		inputPad := string(append(strconv.AppendInt(append(buf[:0], '['), int64(inputIdx), 10), ":v]"...))
-		scaledPad := string(append(strconv.AppendInt(append(buf[:0], "[v"...), int64(i), 10), "_scaled]"...))
+		media := layer.Media
+		if media == "" {
+			media = "Video+Audio"
+		}
 
-		scaleCropFilter := handleLayerScaling(layer)
+		layerVideoPad := ""
+		layerAudioPad := ""
 
-		filterComplex.WriteString(inputPad)
-		filterComplex.WriteString(" ")
-		filterComplex.WriteString(scaleCropFilter)
-		filterComplex.WriteString(" ")
-		filterComplex.WriteString(scaledPad)
-		filterComplex.WriteString(";\n")
+		if res.InputCount == 1 {
+			layerVideoPad = string(append(strconv.AppendInt([]byte("["), int64(inputIdx), 10), ":v]"...))
+			layerAudioPad = string(append(strconv.AppendInt([]byte("["), int64(inputIdx), 10), ":a]"...))
+		} else if res.InputCount == 2 {
+			layerVideoPad = string(append(strconv.AppendInt([]byte("["), int64(inputIdx), 10), ":v]"...))
+			layerAudioPad = string(append(strconv.AppendInt([]byte("["), int64(inputIdx+1), 10), ":a]"...))
+		}
 
-		overlayX, overlayY := getOverlayPosition(layer, padX, padY)
+		// Handle Video
+		if (media == "Video" || media == "Video+Audio") && res.HasVideo {
+			var buf [24]byte
+			scaledPad := string(append(strconv.AppendInt(append(buf[:0], "[v"...), int64(i), 10), "_scaled]"...))
+			outPad := string(append(strconv.AppendInt(append(buf[:0], "[out"...), int64(i), 10), ']'))
 
-		outPad := string(append(strconv.AppendInt(append(buf[:0], "[out"...), int64(i), 10), ']'))
-		filterComplex.WriteString(currentBasePad)
-		filterComplex.WriteString(scaledPad)
-		filterComplex.WriteString(" overlay=x=")
-		filterComplex.WriteString(overlayX)
-		filterComplex.WriteString(":y=")
-		filterComplex.WriteString(overlayY)
-		filterComplex.WriteString(" ")
-		filterComplex.WriteString(outPad)
-		filterComplex.WriteString(";\n")
-		currentBasePad = outPad
-		inputIdx++
+			scaleCropFilter := handleLayerScaling(layer)
+
+			filterComplex.WriteString(layerVideoPad)
+			filterComplex.WriteString(" ")
+			filterComplex.WriteString(scaleCropFilter)
+			filterComplex.WriteString(" ")
+			filterComplex.WriteString(scaledPad)
+			filterComplex.WriteString(";\n")
+
+			overlayX, overlayY := getOverlayPosition(layer, padX, padY)
+
+			filterComplex.WriteString(currentBasePad)
+			filterComplex.WriteString(scaledPad)
+			filterComplex.WriteString(" overlay=x=")
+			filterComplex.WriteString(overlayX)
+			filterComplex.WriteString(":y=")
+			filterComplex.WriteString(overlayY)
+			filterComplex.WriteString(" ")
+			filterComplex.WriteString(outPad)
+			filterComplex.WriteString(";\n")
+			currentBasePad = outPad
+		}
+
+		// Handle Audio
+		if (media == "Audio" || media == "Video+Audio") && res.HasAudio {
+			var buf [24]byte
+			aOutPad := string(append(strconv.AppendInt(append(buf[:0], "[a"...), int64(i), 10), ']'))
+
+			volumeFilter := "anull"
+			if layer.Volume != nil {
+				volumeFilter = fmt.Sprintf("volume=%.2f", float64(*layer.Volume)/100.0)
+			}
+
+			filterComplex.WriteString(layerAudioPad)
+			filterComplex.WriteString(" ")
+			filterComplex.WriteString(volumeFilter)
+			filterComplex.WriteString(" ")
+			filterComplex.WriteString(aOutPad)
+			filterComplex.WriteString(";\n")
+
+			audioPads = append(audioPads, aOutPad)
+		}
+
+		inputIdx += res.InputCount
 	}
-	return args, filterComplex.String(), currentBasePad
+
+	var finalAudioPad string
+	if len(audioPads) == 0 {
+		filterComplex.WriteString("anullsrc=r=44100:cl=stereo [a_out];\n")
+		finalAudioPad = "[a_out]"
+	} else if len(audioPads) == 1 {
+		finalAudioPad = audioPads[0]
+	} else {
+		for _, pad := range audioPads {
+			filterComplex.WriteString(pad)
+		}
+		filterComplex.WriteString(" amix=inputs=")
+		filterComplex.WriteString(strconv.Itoa(len(audioPads)))
+		filterComplex.WriteString(":duration=longest [a_out];\n")
+		finalAudioPad = "[a_out]"
+	}
+
+	return args, filterComplex.String(), currentBasePad, finalAudioPad
 }

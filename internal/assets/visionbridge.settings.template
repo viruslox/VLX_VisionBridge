@@ -14,12 +14,18 @@ output:
     - "rtmp://localhost/live/test"
 
 # Layers (0-9) configured as inputs and their layouts
+# For 'local' input_type, the input_path must be a folder. Content is accepted if:
+# - video (mp4 and webm)
+# - images and audio (png and mp3)
+# - images only (png)
+# - audio only (mp3)
 layers:
   - id: 0                    # Layer ID
     active: true             # Whether this layer is processed
-    input_type: "loop"       # Type: 'loop', 'folder', 'srt'
-    input_path: "./test.mp4" # Path to the file or SRT address
-    media: "Video+Audio"     # Which tracks to include: Video+Audio, Video Only, Audio Only
+    input_type: "local"      # Type: 'local', 'srt', 'rtmp', 'webrtc', 'rtsp'
+    input_path: "/opt/VLX_VisionBridge/data/layer0" # Path to folder or address
+    media: "Video+Audio"     # Which tracks to include: Video+Audio, Video, Audio
+    volume: 100              # Volume percentage
     scale: "1920:-1"         # Scaling options
     crop: "1920:1080:0:0"    # Cropping options
-    position: "center"       # Position on canvas: center, top-left
+    position: "center"       # Position on canvas: center, top-left, bottom-right, etc
