@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -41,6 +42,11 @@ func (t *tailBuffer) String() string {
 }
 
 // ProcessManager manages the FFmpeg process.
+type RetryTracker struct {
+	ConsecutiveCrashes int
+	LastCrash          time.Time
+}
+
 type ProcessManager struct {
 	cmd         *exec.Cmd
 	config      *models.Config
@@ -51,6 +57,7 @@ type ProcessManager struct {
 	cond        *sync.Cond
 	isRunning   bool
 	overlayCmds map[int]*exec.Cmd
+	retries     map[string]*RetryTracker
 }
 
 // NewProcessManager creates a new ProcessManager.
@@ -58,6 +65,7 @@ func NewProcessManager(dbConn *sql.DB) *ProcessManager {
 	pm := &ProcessManager{
 		db:          dbConn,
 		overlayCmds: make(map[int]*exec.Cmd),
+		retries:     make(map[string]*RetryTracker),
 	}
 	pm.cond = sync.NewCond(&pm.mu)
 	return pm
@@ -279,10 +287,8 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 			if err != nil {
 				log.Printf("Failed to start Chromium overlay browser: %v", err)
 			} else {
-				go func() {
-					_ = cmd.Wait()
-				}()
 				pm.overlayCmds[99] = cmd
+				go pm.monitorChromium(cmd)
 			}
 		}
 	}
@@ -296,6 +302,65 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 			}
 			delete(pm.overlayCmds, id)
 		}
+	}
+}
+
+func (pm *ProcessManager) monitorChromium(cmd *exec.Cmd) {
+	err := cmd.Wait()
+
+	pm.mu.Lock()
+	if !pm.isRunning || pm.ctx.Err() != nil {
+		pm.mu.Unlock()
+		return // Expected stop
+	}
+
+	// Make sure we're still tracking this specific cmd
+	if currentCmd, exists := pm.overlayCmds[99]; !exists || currentCmd != cmd {
+		pm.mu.Unlock()
+		return
+	}
+	delete(pm.overlayCmds, 99)
+	pm.mu.Unlock()
+
+	log.Printf("Chromium overlay browser exited unexpectedly: %v", err)
+	if pm.db != nil {
+		_ = db.LogStreamEvent(pm.db, "crash", fmt.Sprintf("Chromium browser crashed: %v", err))
+	}
+
+	module := "[chromium]"
+
+	pm.mu.Lock()
+	tracker, exists := pm.retries[module]
+	if !exists {
+		tracker = &RetryTracker{}
+		pm.retries[module] = tracker
+	}
+	if !tracker.LastCrash.IsZero() && time.Since(tracker.LastCrash) > 30*time.Second {
+		tracker.ConsecutiveCrashes = 0
+	}
+	tracker.ConsecutiveCrashes++
+	tracker.LastCrash = time.Now()
+	crashes := tracker.ConsecutiveCrashes
+	pm.mu.Unlock()
+
+	if crashes <= 5 {
+		log.Printf("Module %s crashed %d times (quick retry in 1s)...", module, crashes)
+		time.Sleep(1 * time.Second)
+	} else if crashes <= 7 {
+		log.Printf("Module %s crashed %d times (wait retry in 10s)...", module, crashes)
+		time.Sleep(10 * time.Second)
+	} else {
+		log.Printf("Module %s crashed %d times. Max retries exceeded, disabling it.", module, crashes)
+		pm.disableModule(module)
+	}
+
+	// Trigger a reconfiguration/restart of active overlays
+	pm.mu.Lock()
+	cfg := pm.config
+	pm.mu.Unlock()
+
+	if cfg != nil {
+		pm.manageOverlays(cfg)
 	}
 }
 
@@ -382,11 +447,46 @@ const (
 // monitor runs the FFmpeg process and handles automatic recovery.
 func (pm *ProcessManager) monitor() {
 	backoff := 1 * time.Second
-	maxBackoff := 30 * time.Second
 	var lastBuildErr string
 
 	for {
-		action := pm.executeSingleRun(&lastBuildErr)
+		action, finalModule, isMisconfig := pm.executeSingleRun(&lastBuildErr)
+
+		if isMisconfig && finalModule != "" {
+			log.Printf("Misconfiguration detected for module %s, disabling it.", finalModule)
+			pm.disableModule(finalModule)
+			continue // Immediately retry with the module disabled
+		}
+
+		if action == monitorActionSleepExponential && finalModule != "" {
+			pm.mu.Lock()
+			tracker, exists := pm.retries[finalModule]
+			if !exists {
+				tracker = &RetryTracker{}
+				pm.retries[finalModule] = tracker
+			}
+			if !tracker.LastCrash.IsZero() && time.Since(tracker.LastCrash) > 30*time.Second {
+				tracker.ConsecutiveCrashes = 0
+			}
+			tracker.ConsecutiveCrashes++
+			tracker.LastCrash = time.Now()
+			crashes := tracker.ConsecutiveCrashes
+			pm.mu.Unlock()
+
+			if crashes <= 5 {
+				log.Printf("Module %s crashed %d times (quick retry in 1s)...", finalModule, crashes)
+				time.Sleep(1 * time.Second)
+				continue
+			} else if crashes <= 7 {
+				log.Printf("Module %s crashed %d times (wait retry in 10s)...", finalModule, crashes)
+				time.Sleep(10 * time.Second)
+				continue
+			} else {
+				log.Printf("Module %s crashed %d times. Max retries exceeded, disabling it.", finalModule, crashes)
+				pm.disableModule(finalModule)
+				continue // Immediately retry with the module disabled
+			}
+		}
 
 		switch action {
 		case monitorActionStop:
@@ -397,15 +497,48 @@ func (pm *ProcessManager) monitor() {
 			time.Sleep(backoff)
 			continue
 		case monitorActionSleepExponential:
+			// Fallback if no specific module was identified
 			log.Printf("Restarting FFmpeg in %v...", backoff)
 			time.Sleep(backoff)
 
 			// Exponential backoff
 			backoff *= 2
+			maxBackoff := 30 * time.Second
 			if backoff > maxBackoff {
 				backoff = maxBackoff
 			}
 		}
+	}
+}
+
+func (pm *ProcessManager) disableModule(module string) {
+	if module == "" || pm.config == nil {
+		return
+	}
+
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	log.Printf("Disabling misconfigured/failing module: %s", module)
+
+	if module == "[chromium]" {
+		pm.config.Input.ChromiumSource.Active = false
+	} else if strings.HasPrefix(module, "[layer ") {
+		// Extract layer ID from "[layer <id>] [input]"
+		parts := strings.Split(module, "]")
+		if len(parts) > 0 {
+			idStr := strings.TrimPrefix(parts[0], "[layer ")
+			if id, err := strconv.Atoi(idStr); err == nil {
+				for i, layer := range pm.config.Input.FFmpegSource.Layers {
+					if layer.ID == id {
+						pm.config.Input.FFmpegSource.Layers[i].Active = false
+						break
+					}
+				}
+			}
+		}
+	} else if module == "[ffmpeg_source]" {
+		pm.config.Input.FFmpegSource.Active = false
 	}
 }
 
@@ -442,7 +575,7 @@ func identifyErrorModule(stderr string, cfg *models.Config) string {
 	return ""
 }
 
-func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) monitorAction {
+func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction, string, bool) {
 	pm.mu.Lock()
 	ctx := pm.ctx
 	cfg := pm.config
@@ -451,12 +584,12 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) monitorAction {
 
 	if !isRunning {
 		log.Println("Process manager shutting down gracefully")
-		return monitorActionStop
+		return monitorActionStop, "", false
 	}
 
 	if ctx.Err() != nil {
 		log.Println("Process manager shutting down gracefully (context canceled)")
-		return monitorActionStop
+		return monitorActionStop, "", false
 	}
 
 	pm.manageOverlays(cfg)
@@ -469,7 +602,7 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) monitorAction {
 			_ = db.LogStreamEvent(pm.db, "error", errMsg)
 			*lastBuildErr = errMsg
 		}
-		return monitorActionSleepConstant
+		return monitorActionSleepConstant, "", false
 	}
 	// Reset the error cache when the build is successful so a future identical error can be logged again
 	*lastBuildErr = ""
@@ -485,13 +618,13 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) monitorAction {
 			pm.cond.Wait()
 		}
 		pm.mu.Unlock()
-		return monitorActionContinue
+		return monitorActionContinue, "", false
 	}
 
 	started, runErr, stderrStr := pm.runProcess(ctx, args)
 	if !started {
 		log.Printf("Failed to start FFmpeg: %v", runErr)
-		return monitorActionSleepConstant
+		return monitorActionSleepConstant, "", false
 	}
 
 	if ctx.Err() != nil {
@@ -499,11 +632,14 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) monitorAction {
 		if pm.db != nil {
 			_ = db.LogStreamEvent(pm.db, "stop", "FFmpeg process stopped gracefully")
 		}
-		return monitorActionStop
+		return monitorActionStop, "", false
 	}
 
 	// Unexpected exit
 	errMsg := "FFmpeg exited unexpectedly"
+	var finalModule string
+	var isMisconfig bool
+
 	if runErr != nil {
 		reason := ""
 		if stderrStr != "" {
@@ -523,9 +659,16 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) monitorAction {
 				} else {
 					log.Printf("FFmpeg stderr tail:\n%s", stderrStr)
 				}
+
 				modulePrefix := identifyErrorModule(stderrStr, cfg)
+				finalModule = modulePrefix
 				if modulePrefix != "" {
 					reason = modulePrefix + " " + reason
+				}
+
+				lowerStderr := strings.ToLower(stderrStr)
+				if strings.Contains(lowerStderr, "no such file or directory") || strings.Contains(lowerStderr, "invalid argument") || strings.Contains(lowerStderr, "could not find codec parameters") || strings.Contains(lowerStderr, "not found") {
+					isMisconfig = true
 				}
 			}
 		}
@@ -540,7 +683,7 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) monitorAction {
 		_ = db.LogStreamEvent(pm.db, "crash", errMsg)
 	}
 
-	return monitorActionSleepExponential
+	return monitorActionSleepExponential, finalModule, isMisconfig
 }
 
 func (pm *ProcessManager) runProcess(ctx context.Context, args []string) (bool, error, string) {

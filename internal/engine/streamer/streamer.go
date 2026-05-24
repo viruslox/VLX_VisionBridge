@@ -62,9 +62,9 @@ func BuildOutputArgs(cfg *models.Config) ([]string, error) {
 		    }
 		    escaped := destReplacer.Replace(dest)
 		    if strings.HasPrefix(strings.ToLower(dest), "srt://") {
-		        teeDestinations = append(teeDestinations, "[f=mpegts]"+escaped)
+		        teeDestinations = append(teeDestinations, "[f=mpegts:onfail=ignore]"+escaped)
 		    } else {
-		        teeDestinations = append(teeDestinations, "[f=flv]"+escaped)
+		        teeDestinations = append(teeDestinations, "[f=flv:onfail=ignore]"+escaped)
 		    }
 		}
 		teeMap := strings.Join(teeDestinations, "|")

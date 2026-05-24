@@ -157,7 +157,7 @@ func TestBuildFFmpegArgs(t *testing.T) {
 	}
 
 	// 5. Verify tee muxer
-	expectedTee := "-f tee -use_fifo 1 -fifo_options drop_pkts_on_overflow=1:attempt_recovery=1:recovery_wait_time=1 [f=flv]rtmp://live.twitch.tv/app/live_xyz|[f=flv]rtmp://a.rtmp.youtube.com/live2/xyz"
+	expectedTee := "-f tee -use_fifo 1 -fifo_options drop_pkts_on_overflow=1:attempt_recovery=1:recovery_wait_time=1 [f=flv:onfail=ignore]rtmp://live.twitch.tv/app/live_xyz|[f=flv:onfail=ignore]rtmp://a.rtmp.youtube.com/live2/xyz"
 	if !strings.Contains(argsStr, expectedTee) {
 		t.Errorf("Missing or incorrect tee muxer setting: expected %s in %s", expectedTee, argsStr)
 	}
@@ -233,9 +233,9 @@ func TestBuildFFmpegArgs_ValidDestinations(t *testing.T) {
 	}
 
 	argsStr := strings.Join(args, " ")
-	expectedDest1 := "[f=flv]rtmp://live.twitch.tv/app/live_xyz"
-	expectedDest2 := "[f=mpegts]srt://example.com:1234"
-	expectedDest3 := "[f=flv]rtmps://live-api-s.facebook.com:443/rtmp/"
+	expectedDest1 := "[f=flv:onfail=ignore]rtmp://live.twitch.tv/app/live_xyz"
+	expectedDest2 := "[f=mpegts:onfail=ignore]srt://example.com:1234"
+	expectedDest3 := "[f=flv:onfail=ignore]rtmps://live-api-s.facebook.com:443/rtmp/"
 	expectedTeeMap := expectedDest1 + "|" + expectedDest2 + "|" + expectedDest3
 	expectedTeeArg := "-f tee -use_fifo 1 -fifo_options drop_pkts_on_overflow=1:attempt_recovery=1:recovery_wait_time=1 " + expectedTeeMap
 
