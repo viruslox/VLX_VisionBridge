@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"sync"
 	"strings"
@@ -130,6 +131,11 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 			continue
 		}
 
+		if layer.ID != 99 {
+			log.Printf("Warning: overlay layer must have ID 99, skipping layer %d", layer.ID)
+			continue
+		}
+
 		activeOverlays[layer.ID] = true
 
 		// Check if already running
@@ -141,12 +147,61 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 			}
 		}
 
-		log.Printf("Starting overlay browser for layer %d with URL: %s", layer.ID, layer.InputPath)
+		// Generate HTML file
+		htmlContent := `<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { margin: 0; padding: 0; overflow: hidden; background: transparent; }
+  iframe { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; border: none; }
+`
+		if layer.LowerActive && layer.LowerPath != "" {
+			htmlContent += `  #lower { z-index: 1; }` + "\n"
+		}
+		if layer.MiddleActive && layer.MiddlePath != "" {
+			htmlContent += `  #middle { z-index: 2; }` + "\n"
+		}
+		if layer.UpperActive && layer.UpperPath != "" {
+			htmlContent += `  #upper { z-index: 3; }` + "\n"
+		}
+		htmlContent += `</style>
+</head>
+<body>
+`
+		if layer.LowerActive && layer.LowerPath != "" {
+			htmlContent += fmt.Sprintf(`  <iframe id="lower" src="%s" allowtransparency="true"></iframe>`+"\n", layer.LowerPath)
+		}
+		if layer.MiddleActive && layer.MiddlePath != "" {
+			htmlContent += fmt.Sprintf(`  <iframe id="middle" src="%s" allowtransparency="true"></iframe>`+"\n", layer.MiddlePath)
+		}
+		if layer.UpperActive && layer.UpperPath != "" {
+			htmlContent += fmt.Sprintf(`  <iframe id="upper" src="%s" allowtransparency="true"></iframe>`+"\n", layer.UpperPath)
+		}
+		htmlContent += `</body>
+</html>`
+
+		htmlPath := "/opt/VLX_VisionBridge/var/overlay.html"
+		if err := os.MkdirAll("/opt/VLX_VisionBridge/var", 0755); err == nil {
+			if writeErr := os.WriteFile(htmlPath, []byte(htmlContent), 0644); writeErr != nil {
+				log.Printf("Failed to write overlay html: %v", writeErr)
+				htmlPath = layer.InputPath // fallback
+			}
+		} else {
+			htmlPath = layer.InputPath // fallback
+		}
+
+		log.Printf("Starting overlay browser for layer %d with generated HTML", layer.ID)
 		serverNum := fmt.Sprintf("--server-num=%d", 99+layer.ID)
+
+		// file:// URLs need 3 slashes if absolute path follows
+		fileURL := htmlPath
+		if strings.HasPrefix(htmlPath, "/") {
+			fileURL = "file://" + htmlPath
+		}
 
 		cmd := exec.Command("xvfb-run", serverNum, "--server-args=-screen 0 1920x1080x24",
 			"chromium-browser", "--kiosk", "--disable-infobars", "--window-size=1920,1080",
-			"--no-sandbox", "--disable-dev-shm-usage", layer.InputPath)
+			"--no-sandbox", "--disable-dev-shm-usage", fileURL)
 
 		err := cmd.Start()
 		if err != nil {

@@ -131,6 +131,32 @@ func setupConfig(etcDir string) {
 	fmt.Println("Configured settings template at", configPath)
 }
 
+func promptChromiumInstall() {
+	fmt.Print("\nDo you want to install Chromium for overlay support? (y/N): ")
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Scan()
+	choice := strings.TrimSpace(strings.ToLower(scanner.Text()))
+
+	if choice == "y" || choice == "yes" {
+		fmt.Println("Installing Chromium and Xvfb dependencies...")
+		// update apt first
+		if err := exec.Command("apt-get", "update").Run(); err != nil {
+			log.Printf("Warning: Failed to run apt-get update: %v", err)
+		}
+
+		cmd := exec.Command("apt-get", "install", "-y", "xvfb", "chromium-common", "chromium", "chromium-headless-shell", "chromium-driver", "chromium-lwn4chrome", "chromium-sandbox", "chromium-shell")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			log.Printf("Warning: Failed to install Chromium dependencies: %v", err)
+		} else {
+			fmt.Println("Chromium installation complete.")
+		}
+	} else {
+		fmt.Println("Skipping Chromium installation.")
+	}
+}
+
 func promptUser(users []string) string {
 	fmt.Println("\nSelect user to run VLX_VisionBridge:")
 	fmt.Println("1) Create dedicated user (VisionBridge) [default]")
@@ -279,6 +305,8 @@ func Install() {
 	selectedUser := promptUser(users)
 
 	setupUserAndSettings(installBase, etcDir, varDir, selectedUser)
+
+	promptChromiumInstall()
 
 	fmt.Println("Installation complete.")
 }
