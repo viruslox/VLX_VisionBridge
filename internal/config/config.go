@@ -48,7 +48,67 @@ func DiffConfigs(oldConfig, newConfig *models.Config) DiffResult {
 		return DiffResult{RequiresRestart: true}
 	}
 
-	return layersDiff(oldConfig.Layers, newConfig.Layers)
+	if oldConfig.Input.FFmpegSource.Active != newConfig.Input.FFmpegSource.Active {
+		return DiffResult{RequiresRestart: true}
+	}
+
+	if chromiumSourceDiff(oldConfig.Input.ChromiumSource, newConfig.Input.ChromiumSource) {
+		return DiffResult{RequiresRestart: true}
+	}
+
+	return layersDiff(oldConfig.Input.FFmpegSource.Layers, newConfig.Input.FFmpegSource.Layers)
+}
+
+func chromiumSourceDiff(old, new models.ChromiumSource) bool {
+	if old.Active != new.Active {
+		return true
+	}
+	if old.Z1Active != new.Z1Active || old.Z1Path != new.Z1Path ||
+		!ptrIntEqual(old.Z1Volume, new.Z1Volume) || !ptrIntEqual(old.Z1Width, new.Z1Width) ||
+		!ptrIntEqual(old.Z1X, new.Z1X) || !ptrIntEqual(old.Z1Y, new.Z1Y) {
+		return true
+	}
+	if old.Z2Active != new.Z2Active || old.Z2Path != new.Z2Path ||
+		!ptrIntEqual(old.Z2Volume, new.Z2Volume) || !ptrIntEqual(old.Z2Width, new.Z2Width) ||
+		!ptrIntEqual(old.Z2X, new.Z2X) || !ptrIntEqual(old.Z2Y, new.Z2Y) {
+		return true
+	}
+	if old.Z3Active != new.Z3Active || old.Z3Path != new.Z3Path ||
+		!ptrIntEqual(old.Z3Volume, new.Z3Volume) || !ptrIntEqual(old.Z3Width, new.Z3Width) ||
+		!ptrIntEqual(old.Z3X, new.Z3X) || !ptrIntEqual(old.Z3Y, new.Z3Y) {
+		return true
+	}
+	if old.Z4Active != new.Z4Active || old.Z4Path != new.Z4Path ||
+		!ptrIntEqual(old.Z4Volume, new.Z4Volume) || !ptrIntEqual(old.Z4Width, new.Z4Width) ||
+		!ptrIntEqual(old.Z4X, new.Z4X) || !ptrIntEqual(old.Z4Y, new.Z4Y) {
+		return true
+	}
+	if old.Z5Active != new.Z5Active || old.Z5Path != new.Z5Path ||
+		!ptrIntEqual(old.Z5Volume, new.Z5Volume) || !ptrIntEqual(old.Z5Width, new.Z5Width) ||
+		!ptrIntEqual(old.Z5X, new.Z5X) || !ptrIntEqual(old.Z5Y, new.Z5Y) {
+		return true
+	}
+	if old.Z6Active != new.Z6Active || old.Z6Path != new.Z6Path ||
+		!ptrIntEqual(old.Z6Volume, new.Z6Volume) || !ptrIntEqual(old.Z6Width, new.Z6Width) ||
+		!ptrIntEqual(old.Z6X, new.Z6X) || !ptrIntEqual(old.Z6Y, new.Z6Y) {
+		return true
+	}
+	if old.Z7Active != new.Z7Active || old.Z7Path != new.Z7Path ||
+		!ptrIntEqual(old.Z7Volume, new.Z7Volume) || !ptrIntEqual(old.Z7Width, new.Z7Width) ||
+		!ptrIntEqual(old.Z7X, new.Z7X) || !ptrIntEqual(old.Z7Y, new.Z7Y) {
+		return true
+	}
+	return false
+}
+
+func ptrIntEqual(a, b *int) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
 }
 
 func outputsRequireRestart(old, new models.OutputSettings) bool {

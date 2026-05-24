@@ -17,36 +17,66 @@ output:
 
 input:
   resolution: "1920x1080" # Layer's canvas size
+  chromium_source:
+    active: false
+    z1_active: true
+    z1_path: "https://example.com/lower"
+    z1_volume: 100
+    z1_width: 1920
+    z1_x: 0
+    z1_y: 0
+    z2_active: false
+    z2_path: "https://example.com/middle"
+    z2_volume: 100
+    z2_width: 1920
+    z2_x: 0
+    z2_y: 0
+    z3_active: false
+    z3_path: "https://example.com/upper"
+    z3_volume: 100
+    z3_width: 1920
+    z3_x: 0
+    z3_y: 0
+    z4_active: false
+    z4_path: ""
+    z4_volume: 100
+    z4_width: 1920
+    z4_x: 0
+    z4_y: 0
+    z5_active: false
+    z5_path: ""
+    z5_volume: 100
+    z5_width: 1920
+    z5_x: 0
+    z5_y: 0
+    z6_active: false
+    z6_path: ""
+    z6_volume: 100
+    z6_width: 1920
+    z6_x: 0
+    z6_y: 0
+    z7_active: false
+    z7_path: ""
+    z7_volume: 100
+    z7_width: 1920
+    z7_x: 0
+    z7_y: 0
 
-# Layers (0-9) configured as inputs and their layouts
-# For 'local' input_type, the input_path must be a folder. Content is accepted if:
-# - video (mp4 and webm)
-# - images and audio (png and mp3)
-# - images only (png)
-# - audio only (mp3)
-layers:
-  - id: 0                    # Layer ID
-    active: true             # Whether this layer is processed
-    input_type: "local"      # Type: 'local', 'srt', 'rtmp', 'webrtc', 'rtsp'
-    input_path: "/opt/VLX_VisionBridge/data/layer0" # Path to folder or address
-    media: "Video+Audio"     # Which tracks to include: Video+Audio, Video, Audio
-    volume: 100              # Volume percentage
-    size: 1920               # Width in pixels
-    x: 0                     # X position on canvas
-    y: 0                     # Y position on canvas
-  - id: 99                   # Special overlay layer ID (always on top)
-    active: false            # Whether the overlay is processed
-    input_type: "overlay"    # Type must be 'overlay'
-    lower_path: "https://example.com/lower" # Lowest z-index
-    lower_active: true
-    middle_path: "https://example.com/middle" # Middle z-index
-    middle_active: false
-    upper_path: "https://example.com/upper" # Highest z-index
-    upper_active: false
-    watermark_path: ""       # Watermark image path
-    watermark_active: false
-    media: "Video"
-    volume: 100
-    size: 1920
-    x: 0
-    y: 0
+  ffmpeg_source:
+    active: false
+    # Layers (0-9) configured as inputs and their layouts
+    # For 'local' input_type, the input_path must be a folder. Content is accepted if:
+    # - video (mp4 and webm)
+    # - images and audio (png and mp3)
+    # - images only (png)
+    # - audio only (mp3)
+    layers:
+      - id: 0                    # Layer ID
+        active: true             # Whether this layer is processed
+        input_type: "local"      # Type: 'local', 'srt', 'rtmp', 'webrtc', 'rtsp'
+        input_path: "/opt/VLX_VisionBridge/data/layer0" # Path to folder or address
+        media: "Video+Audio"     # Which tracks to include: Video+Audio, Video, Audio
+        volume: 100              # Volume percentage
+        size: 1920               # Width in pixels
+        x: 0                     # X position on canvas
+        y: 0                     # Y position on canvas

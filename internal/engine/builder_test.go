@@ -19,7 +19,52 @@ func TestBuildFFmpegArgs(t *testing.T) {
 	os.WriteFile(imagesDir+"/test.png", []byte("mock image"), 0644)
 
 	cfg := &models.Config{
-		Input: models.InputSettings{Resolution: "1920x1080"},
+		Input: models.InputSettings{
+			Resolution: "1920x1080",
+			FFmpegSource: models.FFmpegSource{
+				Active: true,
+				Layers: []models.Layer{
+					{
+						ID:        0,
+						Active:    true,
+						InputType: "local",
+						InputPath: imagesDir,
+						Size:      1920,
+						X:         96,
+						Y:         54,
+						Media:     "Video+Audio",
+					},
+					{
+						ID:        1,
+						Active:    true,
+						InputType: "local",
+						InputPath: "video.mp4",
+						Size:      960,
+						X:         480,
+						Y:         270,
+						Media:     "Video+Audio",
+					},
+					{
+						ID:        2,
+						Active:    false, // Should be ignored
+						InputType: "srt",
+						InputPath: "srt://example.com:1234",
+						X:         0,
+						Y:         0,
+					},
+					{
+						ID:        3,
+						Active:    true,
+						InputType: "srt",
+						InputPath: "srt://example.com:5678",
+						Size:      1280,
+						X:         10,
+						Y:         20,
+						Media:     "Video+Audio",
+					},
+				},
+			},
+		},
 		Output: models.OutputSettings{
 			Resolution:   "1920x1080",
 			FPS:          60,
@@ -28,46 +73,6 @@ func TestBuildFFmpegArgs(t *testing.T) {
 			Destinations: []string{
 				"rtmp://live.twitch.tv/app/live_xyz",
 				"rtmp://a.rtmp.youtube.com/live2/xyz",
-			},
-		},
-		Layers: []models.Layer{
-			{
-				ID:        0,
-				Active:    true,
-				InputType: "local",
-				InputPath: imagesDir,
-				Size:      1920,
-				X:         96,
-				Y:         54,
-				Media:     "Video+Audio",
-			},
-			{
-				ID:        1,
-				Active:    true,
-				InputType: "local",
-				InputPath: "video.mp4",
-				Size:      960,
-				X:         480,
-				Y:         270,
-				Media:     "Video+Audio",
-			},
-			{
-				ID:        2,
-				Active:    false, // Should be ignored
-				InputType: "srt",
-				InputPath: "srt://example.com:1234",
-				X:         0,
-				Y:         0,
-			},
-			{
-				ID:        3,
-				Active:    true,
-				InputType: "srt",
-				InputPath: "srt://example.com:5678",
-				Size:      1280,
-				X:         10,
-				Y:         20,
-				Media:     "Video+Audio",
 			},
 		},
 	}
@@ -160,21 +165,26 @@ func TestBuildFFmpegArgs(t *testing.T) {
 
 func TestBuildFFmpegArgs_TeeMuxerInjection(t *testing.T) {
 	cfg := &models.Config{
-		Input: models.InputSettings{Resolution: "1920x1080"},
+			Input: models.InputSettings{
+				Resolution: "1920x1080",
+				FFmpegSource: models.FFmpegSource{
+					Active: true,
+					Layers: []models.Layer{
+						{
+							ID:        0,
+							Active:    true,
+							InputType: "loop",
+							InputPath: "video.mp4",
+						},
+					},
+				},
+			},
 		Output: models.OutputSettings{
 			Resolution: "1920x1080",
 			FPS:        60,
 			Destinations: []string{
 				"rtmp://localhost/app/stream|[f=mp4]/tmp/pwned.mp4",
 				"rtmp://localhost/app/stream2\\[f=flv]inject",
-			},
-		},
-		Layers: []models.Layer{
-			{
-				ID:        0,
-				Active:    true,
-				InputType: "loop",
-				InputPath: "video.mp4",
 			},
 		},
 	}
@@ -192,7 +202,20 @@ func TestBuildFFmpegArgs_TeeMuxerInjection(t *testing.T) {
 
 func TestBuildFFmpegArgs_ValidDestinations(t *testing.T) {
 	cfg := &models.Config{
-		Input: models.InputSettings{Resolution: "1920x1080"},
+			Input: models.InputSettings{
+				Resolution: "1920x1080",
+				FFmpegSource: models.FFmpegSource{
+					Active: true,
+					Layers: []models.Layer{
+						{
+							ID:        0,
+							Active:    true,
+							InputType: "loop",
+							InputPath: "video.mp4",
+						},
+					},
+				},
+			},
 		Output: models.OutputSettings{
 			Resolution: "1920x1080",
 			FPS:        60,
@@ -200,14 +223,6 @@ func TestBuildFFmpegArgs_ValidDestinations(t *testing.T) {
 				"rtmp://live.twitch.tv/app/live_xyz",
 				"srt://example.com:1234",
 				"rtmps://live-api-s.facebook.com:443/rtmp/",
-			},
-		},
-		Layers: []models.Layer{
-			{
-				ID:        0,
-				Active:    true,
-				InputType: "loop",
-				InputPath: "video.mp4",
 			},
 		},
 	}
@@ -231,16 +246,21 @@ func TestBuildFFmpegArgs_ValidDestinations(t *testing.T) {
 
 func TestBuildFFmpegArgs_10SRT(t *testing.T) {
 	cfg := &models.Config{
-		Input: models.InputSettings{Resolution: "1920x1080"},
+		Input: models.InputSettings{
+			Resolution: "1920x1080",
+			FFmpegSource: models.FFmpegSource{
+				Active: true,
+				Layers: make([]models.Layer, 10),
+			},
+		},
 		Output: models.OutputSettings{
 			Resolution: "1920x1080",
 			FPS:        60,
 		},
-		Layers: make([]models.Layer, 10),
 	}
 
 	for i := 0; i < 10; i++ {
-		cfg.Layers[i] = models.Layer{
+		cfg.Input.FFmpegSource.Layers[i] = models.Layer{
 			ID:        i,
 			Active:    true,
 			InputType: "srt",
@@ -287,37 +307,42 @@ func TestBuildFFmpegArgs_10SRT(t *testing.T) {
 
 func TestBuildFFmpegArgs_InactiveSources(t *testing.T) {
 	cfg := &models.Config{
-		Input: models.InputSettings{Resolution: "1920x1080"},
+		Input: models.InputSettings{
+			Resolution: "1920x1080",
+			FFmpegSource: models.FFmpegSource{
+				Active: true,
+				Layers: []models.Layer{
+					{
+						ID:        0,
+						Active:    true,
+						InputType: "loop",
+						InputPath: "active_video.mp4",
+						Size:      1920,
+						X:         0,
+						Y:         0,
+					},
+					{
+						ID:        1,
+						Active:    false,
+						InputType: "srt",
+						InputPath: "srt://example.com:9999",
+						X:         0,
+						Y:         0,
+					},
+					{
+						ID:        2,
+						Active:    false,
+						InputType: "local",
+						InputPath: "/inactive_images/",
+						X:         0,
+						Y:         0,
+					},
+				},
+			},
+		},
 		Output: models.OutputSettings{
 			Resolution: "1920x1080",
 			FPS:        60,
-		},
-		Layers: []models.Layer{
-			{
-				ID:        0,
-				Active:    true,
-				InputType: "loop",
-				InputPath: "active_video.mp4",
-				Size:      1920,
-				X:         0,
-				Y:         0,
-			},
-			{
-				ID:        1,
-				Active:    false,
-				InputType: "srt",
-				InputPath: "srt://example.com:9999",
-				X:         0,
-				Y:         0,
-			},
-			{
-				ID:        2,
-				Active:    false,
-				InputType: "local",
-				InputPath: "/inactive_images/",
-				X:         0,
-				Y:         0,
-			},
 		},
 	}
 

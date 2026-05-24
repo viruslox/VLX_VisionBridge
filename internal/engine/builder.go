@@ -38,16 +38,17 @@ func BuildFFmpegArgs(cfg *models.Config) ([]string, error) {
 		return nil, fmt.Errorf("invalid output resolution values: %s", cfg.Output.Resolution)
 	}
 
-	if len(cfg.Layers) == 0 {
-		return []string{}, nil
-	}
-
 	hasActiveLayer := false
-	for _, layer := range cfg.Layers {
-		if layer.Active {
-			hasActiveLayer = true
-			break
+	if cfg.Input.FFmpegSource.Active {
+		for _, layer := range cfg.Input.FFmpegSource.Layers {
+			if layer.Active {
+				hasActiveLayer = true
+				break
+			}
 		}
+	}
+	if cfg.Input.ChromiumSource.Active {
+		hasActiveLayer = true
 	}
 
 	if !hasActiveLayer {

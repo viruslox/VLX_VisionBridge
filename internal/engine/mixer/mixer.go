@@ -20,81 +20,100 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 	currentBasePad := "[base]"
 	var audioPads []string
 
-	for i, layer := range cfg.Layers {
-		if !layer.Active {
-			continue
-		}
-
-		res := source.BuildInputArgs(layer)
-		args = append(args, res.Args...)
-
-		media := layer.Media
-		if media == "" {
-			media = "Video+Audio"
-		}
-
-		layerVideoPad := ""
-		layerAudioPad := ""
-
-		if res.InputCount == 1 {
-			layerVideoPad = string(append(strconv.AppendInt([]byte("["), int64(inputIdx), 10), ":v]"...))
-			layerAudioPad = string(append(strconv.AppendInt([]byte("["), int64(inputIdx), 10), ":a]"...))
-		} else if res.InputCount == 2 {
-			layerVideoPad = string(append(strconv.AppendInt([]byte("["), int64(inputIdx), 10), ":v]"...))
-			layerAudioPad = string(append(strconv.AppendInt([]byte("["), int64(inputIdx+1), 10), ":a]"...))
-		}
-
-		// Handle Video
-		if (media == "Video" || media == "Video+Audio") && res.HasVideo {
-			var buf [24]byte
-			scaledPad := string(append(strconv.AppendInt(append(buf[:0], "[v"...), int64(i), 10), "_scaled]"...))
-			outPad := string(append(strconv.AppendInt(append(buf[:0], "[out"...), int64(i), 10), ']'))
-
-			filterComplex.WriteString(layerVideoPad)
-			filterComplex.WriteString(" scale=")
-			filterComplex.WriteString(strconv.Itoa(layer.Size))
-			filterComplex.WriteString(":-1 ")
-			filterComplex.WriteString(scaledPad)
-			filterComplex.WriteString(";\n")
-
-			filterComplex.WriteString(currentBasePad)
-			filterComplex.WriteString(scaledPad)
-			filterComplex.WriteString(" overlay@layer")
-			filterComplex.WriteString(strconv.Itoa(layer.ID))
-			filterComplex.WriteString("=x=")
-			filterComplex.WriteString(strconv.Itoa(layer.X))
-			filterComplex.WriteString(":y=")
-			filterComplex.WriteString(strconv.Itoa(layer.Y))
-			filterComplex.WriteString(" ")
-			filterComplex.WriteString(outPad)
-			filterComplex.WriteString(";\n")
-			currentBasePad = outPad
-		}
-
-		// Handle Audio
-		if (media == "Audio" || media == "Video+Audio") && res.HasAudio {
-			var buf [24]byte
-			aOutPad := string(append(strconv.AppendInt(append(buf[:0], "[a"...), int64(i), 10), ']'))
-
-			volumeVal := 1.0
-			if layer.Volume != nil {
-				volumeVal = float64(*layer.Volume) / 100.0
+	if cfg.Input.FFmpegSource.Active {
+		for i, layer := range cfg.Input.FFmpegSource.Layers {
+			if !layer.Active {
+				continue
 			}
 
-			filterComplex.WriteString(layerAudioPad)
-			filterComplex.WriteString(" volume@layer")
-			filterComplex.WriteString(strconv.Itoa(layer.ID))
-			filterComplex.WriteString("=")
-			filterComplex.WriteString(fmt.Sprintf("%.2f", volumeVal))
-			filterComplex.WriteString(" ")
-			filterComplex.WriteString(aOutPad)
-			filterComplex.WriteString(";\n")
+			res := source.BuildInputArgs(layer)
+			args = append(args, res.Args...)
 
-			audioPads = append(audioPads, aOutPad)
+			media := layer.Media
+			if media == "" {
+				media = "Video+Audio"
+			}
+
+			layerVideoPad := ""
+			layerAudioPad := ""
+
+			if res.InputCount == 1 {
+				layerVideoPad = string(append(strconv.AppendInt([]byte("["), int64(inputIdx), 10), ":v]"...))
+				layerAudioPad = string(append(strconv.AppendInt([]byte("["), int64(inputIdx), 10), ":a]"...))
+			} else if res.InputCount == 2 {
+				layerVideoPad = string(append(strconv.AppendInt([]byte("["), int64(inputIdx), 10), ":v]"...))
+				layerAudioPad = string(append(strconv.AppendInt([]byte("["), int64(inputIdx+1), 10), ":a]"...))
+			}
+
+			// Handle Video
+			if (media == "Video" || media == "Video+Audio") && res.HasVideo {
+				var buf [24]byte
+				scaledPad := string(append(strconv.AppendInt(append(buf[:0], "[v"...), int64(i), 10), "_scaled]"...))
+				outPad := string(append(strconv.AppendInt(append(buf[:0], "[out"...), int64(i), 10), ']'))
+
+				filterComplex.WriteString(layerVideoPad)
+				filterComplex.WriteString(" scale=")
+				filterComplex.WriteString(strconv.Itoa(layer.Size))
+				filterComplex.WriteString(":-1 ")
+				filterComplex.WriteString(scaledPad)
+				filterComplex.WriteString(";\n")
+
+				filterComplex.WriteString(currentBasePad)
+				filterComplex.WriteString(scaledPad)
+				filterComplex.WriteString(" overlay@layer")
+				filterComplex.WriteString(strconv.Itoa(layer.ID))
+				filterComplex.WriteString("=x=")
+				filterComplex.WriteString(strconv.Itoa(layer.X))
+				filterComplex.WriteString(":y=")
+				filterComplex.WriteString(strconv.Itoa(layer.Y))
+				filterComplex.WriteString(" ")
+				filterComplex.WriteString(outPad)
+				filterComplex.WriteString(";\n")
+				currentBasePad = outPad
+			}
+
+			// Handle Audio
+			if (media == "Audio" || media == "Video+Audio") && res.HasAudio {
+				var buf [24]byte
+				aOutPad := string(append(strconv.AppendInt(append(buf[:0], "[a"...), int64(i), 10), ']'))
+
+				volumeVal := 1.0
+				if layer.Volume != nil {
+					volumeVal = float64(*layer.Volume) / 100.0
+				}
+
+				filterComplex.WriteString(layerAudioPad)
+				filterComplex.WriteString(" volume@layer")
+				filterComplex.WriteString(strconv.Itoa(layer.ID))
+				filterComplex.WriteString("=")
+				filterComplex.WriteString(fmt.Sprintf("%.2f", volumeVal))
+				filterComplex.WriteString(" ")
+				filterComplex.WriteString(aOutPad)
+				filterComplex.WriteString(";\n")
+
+				audioPads = append(audioPads, aOutPad)
+			}
+
+			inputIdx += res.InputCount
 		}
-
-		inputIdx += res.InputCount
 	}
+
+	if cfg.Input.ChromiumSource.Active {
+		args = append(args, "-f", "x11grab", "-draw_mouse", "0", "-i", ":99")
+
+		layerVideoPad := string(append(strconv.AppendInt([]byte("["), int64(inputIdx), 10), ":v]"...))
+		outPad := "[out_chromium]"
+
+		filterComplex.WriteString(currentBasePad)
+		filterComplex.WriteString(layerVideoPad)
+		filterComplex.WriteString(" overlay=x=0:y=0 ")
+		filterComplex.WriteString(outPad)
+		filterComplex.WriteString(";\n")
+		currentBasePad = outPad
+
+		inputIdx += 1
+	}
+
 
 	var finalAudioPad string
 	if len(audioPads) == 0 {
