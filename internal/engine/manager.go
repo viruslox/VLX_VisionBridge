@@ -255,7 +255,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 
 			htmlContent += `</style>
 </head>
-<body>
+<body style="margin: 0; padding: 0;">
 `
 			htmlContent += elements
 			if scripts != "" {
