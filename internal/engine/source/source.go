@@ -1,7 +1,6 @@
 package source
 
 import (
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -82,8 +81,6 @@ func BuildInputArgs(layer models.Layer) models.InputResult {
 		return models.InputResult{Args: []string{"-i", safePath}, InputCount: 1, HasVideo: true, HasAudio: true}
 	case "rtsp", "rtsps":
 		return models.InputResult{Args: []string{"-rtsp_transport", "tcp", "-i", safePath}, InputCount: 1, HasVideo: true, HasAudio: true}
-	case "overlay":
-		return models.InputResult{Args: []string{"-f", "x11grab", "-draw_mouse", "0", "-i", fmt.Sprintf(":%d", 99+layer.ID)}, InputCount: 1, HasVideo: true, HasAudio: false}
 	default:
 		return models.InputResult{Args: []string{"-i", safePath}, InputCount: 1, HasVideo: true, HasAudio: true}
 	}

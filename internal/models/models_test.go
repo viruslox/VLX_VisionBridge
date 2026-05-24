@@ -20,23 +20,25 @@ output:
     - "rtmp://a.rtmp.youtube.com/live2/xyz"
 input:
   resolution: "1920x1080"
-layers:
-  - id: 1
+  ffmpeg_source:
     active: true
-    input_type: "srt"
-    input_path: "srt://localhost:9000?mode=listener"
-    media: "Video+Audio"
-    size: 1920
-    x: 0
-    y: 0
-  - id: 2
-    active: false
-    input_type: "folder"
-    input_path: "/var/media/loop"
-    media: "Video Only"
-    size: 640
-    x: 10
-    y: 10
+    layers:
+      - id: 1
+        active: true
+        input_type: "srt"
+        input_path: "srt://localhost:9000?mode=listener"
+        media: "Video+Audio"
+        size: 1920
+        x: 0
+        y: 0
+      - id: 2
+        active: false
+        input_type: "folder"
+        input_path: "/var/media/loop"
+        media: "Video Only"
+        size: 640
+        x: 10
+        y: 10
 `)
 
 	var cfg Config
@@ -79,12 +81,12 @@ layers:
 	}
 
 	// Verify Layers
-	if len(cfg.Layers) != 2 {
-		t.Fatalf("Expected 2 layers, got %d", len(cfg.Layers))
+	if len(cfg.Input.FFmpegSource.Layers) != 2 {
+		t.Fatalf("Expected 2 layers, got %d", len(cfg.Input.FFmpegSource.Layers))
 	}
 
 	// Layer 1
-	layer1 := cfg.Layers[0]
+	layer1 := cfg.Input.FFmpegSource.Layers[0]
 	if layer1.ID != 1 {
 		t.Errorf("Expected Layer 1 ID to be 1, got %d", layer1.ID)
 	}
@@ -111,7 +113,7 @@ layers:
 	}
 
 	// Layer 2
-	layer2 := cfg.Layers[1]
+	layer2 := cfg.Input.FFmpegSource.Layers[1]
 	if layer2.ID != 2 {
 		t.Errorf("Expected Layer 2 ID to be 2, got %d", layer2.ID)
 	}

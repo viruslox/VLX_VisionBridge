@@ -19,15 +19,16 @@ output:
   audio_bitrate: "160k"
 input:
   resolution: "1920x1080"
-layers:
-  - id: 1
-    active: true
-    input_type: "folder"
-    input_path: "/path/to/folder"
-    media: "Video+Audio"
-    size: 1920
-    x: 0
-    y: 0
+  ffmpeg_source:
+    layers:
+      - id: 1
+        active: true
+        input_type: "folder"
+        input_path: "/path/to/folder"
+        media: "Video+Audio"
+        size: 1920
+        x: 0
+        y: 0
 `
 	tmpDir := t.TempDir()
 	configFile := filepath.Join(tmpDir, "visionbridge.settings")
@@ -44,11 +45,11 @@ layers:
 	if cfg.Output.Resolution != "1920x1080" {
 		t.Errorf("Expected resolution '1920x1080', got '%s'", cfg.Output.Resolution)
 	}
-	if len(cfg.Layers) != 1 {
-		t.Fatalf("Expected 1 layer, got %d", len(cfg.Layers))
+	if len(cfg.Input.FFmpegSource.Layers) != 1 {
+		t.Fatalf("Expected 1 layer, got %d", len(cfg.Input.FFmpegSource.Layers))
 	}
-	if cfg.Layers[0].ID != 1 {
-		t.Errorf("Expected layer ID 1, got %d", cfg.Layers[0].ID)
+	if cfg.Input.FFmpegSource.Layers[0].ID != 1 {
+		t.Errorf("Expected layer ID 1, got %d", cfg.Input.FFmpegSource.Layers[0].ID)
 	}
 }
 
@@ -80,22 +81,30 @@ output:
 
 func TestDiffConfigs(t *testing.T) {
 	oldCfg := &models.Config{
-		Input:  models.InputSettings{Resolution: "1920x1080"},
-		Output: models.OutputSettings{Resolution: "1920x1080", FPS: 30},
-		Layers: []models.Layer{
-			{ID: 1, Active: true, InputType: "loop", InputPath: "test.mp4", Size: 1920},
-			{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
+		Input: models.InputSettings{
+			Resolution: "1920x1080",
+			FFmpegSource: models.FFmpegSource{
+				Layers: []models.Layer{
+					{ID: 1, Active: true, InputType: "loop", InputPath: "test.mp4", Size: 1920},
+					{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
+				},
+			},
 		},
+		Output: models.OutputSettings{Resolution: "1920x1080", FPS: 30},
 	}
 
 	// Test case 1: No change
 	newCfg1 := &models.Config{
-		Input:  models.InputSettings{Resolution: "1920x1080"},
-		Output: models.OutputSettings{Resolution: "1920x1080", FPS: 30},
-		Layers: []models.Layer{
-			{ID: 1, Active: true, InputType: "loop", InputPath: "test.mp4", Size: 1920},
-			{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
+		Input: models.InputSettings{
+			Resolution: "1920x1080",
+			FFmpegSource: models.FFmpegSource{
+				Layers: []models.Layer{
+					{ID: 1, Active: true, InputType: "loop", InputPath: "test.mp4", Size: 1920},
+					{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
+				},
+			},
 		},
+		Output: models.OutputSettings{Resolution: "1920x1080", FPS: 30},
 	}
 	diff1 := DiffConfigs(oldCfg, newCfg1)
 	if diff1.RequiresRestart || diff1.RequiresFilterUpdate {
@@ -104,9 +113,8 @@ func TestDiffConfigs(t *testing.T) {
 
 	// Test case 2: Output change -> requires restart
 	newCfg2 := &models.Config{
-		Input:  models.InputSettings{Resolution: "1920x1080"},
+		Input:  oldCfg.Input,
 		Output: models.OutputSettings{Resolution: "1280x720", FPS: 30},
-		Layers: oldCfg.Layers,
 	}
 	diff2 := DiffConfigs(oldCfg, newCfg2)
 	if !diff2.RequiresRestart {
@@ -115,12 +123,16 @@ func TestDiffConfigs(t *testing.T) {
 
 	// Test case 3: Filter update (change active state)
 	newCfg3 := &models.Config{
-		Input:  oldCfg.Input,
-		Output: oldCfg.Output,
-		Layers: []models.Layer{
-			{ID: 1, Active: false, InputType: "loop", InputPath: "test.mp4", Size: 1920},
-			{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
+		Input: models.InputSettings{
+			Resolution: "1920x1080",
+			FFmpegSource: models.FFmpegSource{
+				Layers: []models.Layer{
+					{ID: 1, Active: false, InputType: "loop", InputPath: "test.mp4", Size: 1920},
+					{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
+				},
+			},
 		},
+		Output: oldCfg.Output,
 	}
 	diff3 := DiffConfigs(oldCfg, newCfg3)
 	if !diff3.RequiresRestart || diff3.RequiresFilterUpdate {
@@ -129,12 +141,16 @@ func TestDiffConfigs(t *testing.T) {
 
 	// Test case 4: Input path change -> requires restart
 	newCfg4 := &models.Config{
-		Input:  oldCfg.Input,
-		Output: oldCfg.Output,
-		Layers: []models.Layer{
-			{ID: 1, Active: true, InputType: "loop", InputPath: "new.mp4", Size: 1920},
-			{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
+		Input: models.InputSettings{
+			Resolution: "1920x1080",
+			FFmpegSource: models.FFmpegSource{
+				Layers: []models.Layer{
+					{ID: 1, Active: true, InputType: "loop", InputPath: "new.mp4", Size: 1920},
+					{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
+				},
+			},
 		},
+		Output: oldCfg.Output,
 	}
 	diff4 := DiffConfigs(oldCfg, newCfg4)
 	if !diff4.RequiresRestart {
@@ -147,21 +163,25 @@ func TestWatcher(t *testing.T) {
 output:
   resolution: "1920x1080"
   fps: 60
-layers:
-  - id: 1
-    active: true
-    input_type: "folder"
-    input_path: "/path1"
+input:
+  ffmpeg_source:
+    layers:
+      - id: 1
+        active: true
+        input_type: "folder"
+        input_path: "/path1"
 `
 	yamlContent2 := `
 output:
   resolution: "1920x1080"
   fps: 60
-layers:
-  - id: 1
-    active: false
-    input_type: "folder"
-    input_path: "/path1"
+input:
+  ffmpeg_source:
+    layers:
+      - id: 1
+        active: false
+        input_type: "folder"
+        input_path: "/path1"
 `
 
 	tmpDir := t.TempDir()

@@ -120,110 +120,171 @@ func (pm *ProcessManager) Stop() {
 	pm.mu.Unlock()
 }
 
+func buildOverlayElement(id string, zIndex int, path string, width, x, y, volume *int) (string, string, string) {
+	if path == "" {
+		return "", "", ""
+	}
+
+	style := fmt.Sprintf("  #%s { z-index: %d; position: absolute; ", id, zIndex)
+	if x != nil {
+		style += fmt.Sprintf("left: %dpx; ", *x)
+	} else {
+		style += "left: 0; "
+	}
+	if y != nil {
+		style += fmt.Sprintf("top: %dpx; ", *y)
+	} else {
+		style += "top: 0; "
+	}
+	if width != nil {
+		style += fmt.Sprintf("width: %dpx; ", *width)
+	}
+	style += "}\n"
+
+	var element string
+	lowerPath := strings.ToLower(path)
+
+	// Check for local file
+	srcURL := path
+	if strings.HasPrefix(path, "/") {
+		srcURL = "file://" + path
+	}
+
+	vol := 1.0
+	if volume != nil {
+		vol = float64(*volume) / 100.0
+	}
+	script := fmt.Sprintf("      var e_%s = document.getElementById('%s'); if (e_%s) e_%s.volume = %f;\n", id, id, id, id, vol)
+
+	if strings.HasSuffix(lowerPath, ".mp4") || strings.HasSuffix(lowerPath, ".webm") {
+		element = fmt.Sprintf(`  <video id="%s" src="%s" autoplay loop></video>`+"\n", id, srcURL)
+	} else if strings.HasSuffix(lowerPath, ".png") {
+		element = fmt.Sprintf(`  <img id="%s" src="%s" />`+"\n", id, srcURL)
+		script = ""
+	} else if strings.HasSuffix(lowerPath, ".mp3") {
+		element = fmt.Sprintf(`  <audio id="%s" src="%s" autoplay loop></audio>`+"\n", id, srcURL)
+	} else {
+		element = fmt.Sprintf(`  <iframe id="%s" src="%s" allow="camera; microphone; display-capture" allowtransparency="true" frameborder="0"></iframe>`+"\n", id, srcURL)
+		script = ""
+	}
+
+	return style, element, script
+}
+
 func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
 	activeOverlays := make(map[int]bool)
 
-	for _, layer := range cfg.Layers {
-		if !layer.Active || layer.InputType != "overlay" {
-			continue
-		}
-
-		if layer.ID != 99 {
-			log.Printf("Warning: overlay layer must have ID 99, skipping layer %d", layer.ID)
-			continue
-		}
-
-		activeOverlays[layer.ID] = true
+	if cfg.Input.ChromiumSource.Active {
+		activeOverlays[99] = true
 
 		// Check if already running
-		if cmd, exists := pm.overlayCmds[layer.ID]; exists && cmd != nil && cmd.Process != nil {
-			// Basic check if process is still running could be added here,
-			// but os/exec.Cmd.ProcessState != nil means it exited.
+		shouldStart := true
+		if cmd, exists := pm.overlayCmds[99]; exists && cmd != nil && cmd.Process != nil {
 			if cmd.ProcessState == nil {
-				continue // Still running
+				shouldStart = false // Still running
 			}
 		}
 
-		// Generate HTML file
-		htmlContent := `<!DOCTYPE html>
+		if shouldStart {
+			// Generate HTML file
+			htmlContent := `<!DOCTYPE html>
 <html>
 <head>
 <style>
   body { margin: 0; padding: 0; overflow: hidden; background: transparent; }
-  iframe { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; border: none; }
+  iframe, video { border: none; }
 `
-		if layer.LowerActive && layer.LowerPath != "" {
-			htmlContent += `  #lower { z-index: 1; }` + "\n"
-		}
-		if layer.MiddleActive && layer.MiddlePath != "" {
-			htmlContent += `  #middle { z-index: 2; }` + "\n"
-		}
-		if layer.UpperActive && layer.UpperPath != "" {
-			htmlContent += `  #upper { z-index: 3; }` + "\n"
-		}
-		if layer.WatermarkActive && layer.WatermarkPath != "" {
-			htmlContent += `  #watermark { z-index: 4; position: absolute; top: 0; left: 0; pointer-events: none; }` + "\n"
-		}
-		htmlContent += `</style>
+			var elements string
+			var scripts string
+			cs := cfg.Input.ChromiumSource
+
+			if cs.Z1Active {
+				s, e, sc := buildOverlayElement("z1", 1, cs.Z1Path, cs.Z1Width, cs.Z1X, cs.Z1Y, cs.Z1Volume)
+				htmlContent += s
+				elements += e
+				scripts += sc
+			}
+			if cs.Z2Active {
+				s, e, sc := buildOverlayElement("z2", 2, cs.Z2Path, cs.Z2Width, cs.Z2X, cs.Z2Y, cs.Z2Volume)
+				htmlContent += s
+				elements += e
+				scripts += sc
+			}
+			if cs.Z3Active {
+				s, e, sc := buildOverlayElement("z3", 3, cs.Z3Path, cs.Z3Width, cs.Z3X, cs.Z3Y, cs.Z3Volume)
+				htmlContent += s
+				elements += e
+				scripts += sc
+			}
+			if cs.Z4Active {
+				s, e, sc := buildOverlayElement("z4", 4, cs.Z4Path, cs.Z4Width, cs.Z4X, cs.Z4Y, cs.Z4Volume)
+				htmlContent += s
+				elements += e
+				scripts += sc
+			}
+			if cs.Z5Active {
+				s, e, sc := buildOverlayElement("z5", 5, cs.Z5Path, cs.Z5Width, cs.Z5X, cs.Z5Y, cs.Z5Volume)
+				htmlContent += s
+				elements += e
+				scripts += sc
+			}
+			if cs.Z6Active {
+				s, e, sc := buildOverlayElement("z6", 6, cs.Z6Path, cs.Z6Width, cs.Z6X, cs.Z6Y, cs.Z6Volume)
+				htmlContent += s
+				elements += e
+				scripts += sc
+			}
+			if cs.Z7Active {
+				s, e, sc := buildOverlayElement("z7", 7, cs.Z7Path, cs.Z7Width, cs.Z7X, cs.Z7Y, cs.Z7Volume)
+				htmlContent += s
+				elements += e
+				scripts += sc
+			}
+
+			htmlContent += `</style>
 </head>
 <body>
 `
-		if layer.LowerActive && layer.LowerPath != "" {
-			htmlContent += fmt.Sprintf(`  <iframe id="lower" src="%s" allowtransparency="true"></iframe>`+"\n", layer.LowerPath)
-		}
-		if layer.MiddleActive && layer.MiddlePath != "" {
-			htmlContent += fmt.Sprintf(`  <iframe id="middle" src="%s" allowtransparency="true"></iframe>`+"\n", layer.MiddlePath)
-		}
-		if layer.UpperActive && layer.UpperPath != "" {
-			htmlContent += fmt.Sprintf(`  <iframe id="upper" src="%s" allowtransparency="true"></iframe>`+"\n", layer.UpperPath)
-		}
-		if layer.WatermarkActive && layer.WatermarkPath != "" {
-			watermarkURL := layer.WatermarkPath
-			if strings.HasPrefix(layer.WatermarkPath, "/") {
-				watermarkURL = "file://" + layer.WatermarkPath
+			htmlContent += elements
+			if scripts != "" {
+				htmlContent += "  <script>\n" + scripts + "  </script>\n"
 			}
-			htmlContent += fmt.Sprintf(`  <img id="watermark" src="%s" />`+"\n", watermarkURL)
-		}
-		htmlContent += `</body>
+			htmlContent += `</body>
 </html>`
 
-		htmlPath := "/opt/VLX_VisionBridge/var/overlay.html"
-		if err := os.MkdirAll("/opt/VLX_VisionBridge/var", 0755); err == nil {
-			if writeErr := os.WriteFile(htmlPath, []byte(htmlContent), 0644); writeErr != nil {
-				log.Printf("Failed to write overlay html: %v", writeErr)
-				htmlPath = layer.InputPath // fallback
+			htmlPath := "/opt/VLX_VisionBridge/var/overlay.html"
+			if err := os.MkdirAll("/opt/VLX_VisionBridge/var", 0755); err == nil {
+				if writeErr := os.WriteFile(htmlPath, []byte(htmlContent), 0644); writeErr != nil {
+					log.Printf("Failed to write overlay html: %v", writeErr)
+				}
 			}
-		} else {
-			htmlPath = layer.InputPath // fallback
+
+			log.Printf("Starting Chromium overlay browser with generated HTML")
+			serverNum := "--server-num=99"
+
+			// file:// URLs need 3 slashes if absolute path follows
+			fileURL := htmlPath
+			if strings.HasPrefix(htmlPath, "/") {
+				fileURL = "file://" + htmlPath
+			}
+
+			cmd := exec.Command("xvfb-run", serverNum, "--server-args=-screen 0 1920x1080x24",
+				"chromium-browser", "--kiosk", "--disable-infobars", "--window-size=1920,1080",
+				"--no-sandbox", "--disable-dev-shm-usage", "--autoplay-policy=no-user-gesture-required", fileURL)
+
+			err := cmd.Start()
+			if err != nil {
+				log.Printf("Failed to start Chromium overlay browser: %v", err)
+			} else {
+				go func() {
+					_ = cmd.Wait()
+				}()
+				pm.overlayCmds[99] = cmd
+			}
 		}
-
-		log.Printf("Starting overlay browser for layer %d with generated HTML", layer.ID)
-		serverNum := fmt.Sprintf("--server-num=%d", 99+layer.ID)
-
-		// file:// URLs need 3 slashes if absolute path follows
-		fileURL := htmlPath
-		if strings.HasPrefix(htmlPath, "/") {
-			fileURL = "file://" + htmlPath
-		}
-
-		cmd := exec.Command("xvfb-run", serverNum, "--server-args=-screen 0 1920x1080x24",
-			"chromium-browser", "--kiosk", "--disable-infobars", "--window-size=1920,1080",
-			"--no-sandbox", "--disable-dev-shm-usage", fileURL)
-
-		err := cmd.Start()
-		if err != nil {
-			log.Printf("Failed to start overlay browser for layer %d: %v", layer.ID, err)
-			continue
-		}
-
-		go func() {
-			_ = cmd.Wait()
-		}()
-
-		pm.overlayCmds[layer.ID] = cmd
 	}
 
 	// Stop any overlay processes that are no longer active
@@ -252,28 +313,30 @@ func (pm *ProcessManager) UpdateFilter(config *models.Config) {
 		return
 	}
 
-	for _, layer := range config.Layers {
-		if !layer.Active {
-			continue
-		}
-
-		res := source.BuildInputArgs(layer)
-		media := layer.Media
-		if media == "" {
-			media = "Video+Audio"
-		}
-
-		if (media == "Video" || media == "Video+Audio") && res.HasVideo {
-			sendZMQCommand(req, fmt.Sprintf("overlay@layer%d x %d", layer.ID, layer.X))
-			sendZMQCommand(req, fmt.Sprintf("overlay@layer%d y %d", layer.ID, layer.Y))
-		}
-
-		if (media == "Audio" || media == "Video+Audio") && res.HasAudio {
-			vol := 1.0
-			if layer.Volume != nil {
-				vol = float64(*layer.Volume) / 100.0
+	if config.Input.FFmpegSource.Active {
+		for _, layer := range config.Input.FFmpegSource.Layers {
+			if !layer.Active {
+				continue
 			}
-			sendZMQCommand(req, fmt.Sprintf("volume@layer%d volume %f", layer.ID, vol))
+
+			res := source.BuildInputArgs(layer)
+			media := layer.Media
+			if media == "" {
+				media = "Video+Audio"
+			}
+
+			if (media == "Video" || media == "Video+Audio") && res.HasVideo {
+				sendZMQCommand(req, fmt.Sprintf("overlay@layer%d x %d", layer.ID, layer.X))
+				sendZMQCommand(req, fmt.Sprintf("overlay@layer%d y %d", layer.ID, layer.Y))
+			}
+
+			if (media == "Audio" || media == "Video+Audio") && res.HasAudio {
+				vol := 1.0
+				if layer.Volume != nil {
+					vol = float64(*layer.Volume) / 100.0
+				}
+				sendZMQCommand(req, fmt.Sprintf("volume@layer%d volume %f", layer.ID, vol))
+			}
 		}
 	}
 }
@@ -351,12 +414,14 @@ func identifyErrorModule(stderr string, cfg *models.Config) string {
 		return ""
 	}
 
-	for _, layer := range cfg.Layers {
-		if !layer.Active || layer.InputPath == "" {
-			continue
-		}
-		if strings.Contains(stderr, layer.InputPath) {
-			return fmt.Sprintf("[layer %d] [input]", layer.ID)
+	if cfg.Input.FFmpegSource.Active {
+		for _, layer := range cfg.Input.FFmpegSource.Layers {
+			if !layer.Active || layer.InputPath == "" {
+				continue
+			}
+			if strings.Contains(stderr, layer.InputPath) {
+				return fmt.Sprintf("[layer %d] [input]", layer.ID)
+			}
 		}
 	}
 
