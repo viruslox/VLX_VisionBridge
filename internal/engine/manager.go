@@ -164,6 +164,9 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 		if layer.UpperActive && layer.UpperPath != "" {
 			htmlContent += `  #upper { z-index: 3; }` + "\n"
 		}
+		if layer.WatermarkActive && layer.WatermarkPath != "" {
+			htmlContent += `  #watermark { z-index: 4; position: absolute; top: 0; left: 0; pointer-events: none; }` + "\n"
+		}
 		htmlContent += `</style>
 </head>
 <body>
@@ -176,6 +179,13 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 		}
 		if layer.UpperActive && layer.UpperPath != "" {
 			htmlContent += fmt.Sprintf(`  <iframe id="upper" src="%s" allowtransparency="true"></iframe>`+"\n", layer.UpperPath)
+		}
+		if layer.WatermarkActive && layer.WatermarkPath != "" {
+			watermarkURL := layer.WatermarkPath
+			if strings.HasPrefix(layer.WatermarkPath, "/") {
+				watermarkURL = "file://" + layer.WatermarkPath
+			}
+			htmlContent += fmt.Sprintf(`  <img id="watermark" src="%s" />`+"\n", watermarkURL)
 		}
 		htmlContent += `</body>
 </html>`

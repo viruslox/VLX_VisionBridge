@@ -43,6 +43,8 @@ layers:
     middle_active: false
     upper_path: "https://example.com/upper" # Highest z-index
     upper_active: false
+    watermark_path: ""       # Watermark image path
+    watermark_active: false
     media: "Video"
     volume: 100
     size: 1920
