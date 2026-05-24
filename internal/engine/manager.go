@@ -279,11 +279,20 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				fileURL = "file://" + htmlPath
 			}
 
+			chromeBin, err := exec.LookPath("chromium")
+			if err != nil {
+				chromeBin, err = exec.LookPath("chromium-browser")
+				if err != nil {
+					log.Printf("Failed to start Chromium overlay browser: chromium/chromium-browser not found")
+					return
+				}
+			}
+
 			cmd := exec.Command("xvfb-run", serverNum, "--server-args=-screen 0 1920x1080x24",
-				"chromium-browser", "--kiosk", "--disable-infobars", "--window-size=1920,1080",
+				chromeBin, "--kiosk", "--disable-infobars", "--window-size=1920,1080",
 				"--no-sandbox", "--disable-dev-shm-usage", "--autoplay-policy=no-user-gesture-required", fileURL)
 
-			err := cmd.Start()
+			err = cmd.Start()
 			if err != nil {
 				log.Printf("Failed to start Chromium overlay browser: %v", err)
 			} else {
