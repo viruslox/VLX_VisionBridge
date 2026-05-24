@@ -166,7 +166,7 @@ func buildOverlayElement(id string, zIndex int, path string, width, x, y, volume
 
 	if strings.HasSuffix(lowerPath, ".mp4") || strings.HasSuffix(lowerPath, ".webm") {
 		element = fmt.Sprintf(`  <video id="%s" src="%s" autoplay loop></video>`+"\n", id, srcURL)
-	} else if strings.HasSuffix(lowerPath, ".png") {
+	} else if strings.HasSuffix(lowerPath, ".png") || strings.HasSuffix(lowerPath, ".jpg") || strings.HasSuffix(lowerPath, ".jpeg") {
 		element = fmt.Sprintf(`  <img id="%s" src="%s" />`+"\n", id, srcURL)
 		script = ""
 	} else if strings.HasSuffix(lowerPath, ".mp3") {
@@ -290,8 +290,9 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 			}
 
 			cmd := exec.Command("xvfb-run", serverNum, "--server-args=-screen 0 1920x1080x24 -ac",
-				chromeBin, "--kiosk", "--disable-infobars", "--window-size=1920,1080",
-				"--no-sandbox", "--disable-dev-shm-usage", "--autoplay-policy=no-user-gesture-required", fileURL)
+				chromeBin, "--kiosk", "--disable-infobars", "--disable-extensions", "--test-type",
+				"--window-size=1920,1080", "--no-sandbox", "--disable-dev-shm-usage",
+				"--autoplay-policy=no-user-gesture-required", fileURL)
 
 			err = cmd.Start()
 			if err != nil {
