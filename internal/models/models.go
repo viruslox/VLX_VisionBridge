@@ -13,15 +13,21 @@ type InputSettings struct {
 }
 
 type Layer struct {
-	ID        int    `yaml:"id"`
-	Active    bool   `yaml:"active"`
-	InputType string `yaml:"input_type"` // e.g., folder, loop, srt
-	InputPath string `yaml:"input_path"`
-	Media     string `yaml:"media"` // Video+Audio, Video Only, Audio Only
-	Size      int    `yaml:"size"`
-	X         int    `yaml:"x"`
-	Y         int    `yaml:"y"`
-	Volume    *int   `yaml:"volume"`
+	ID           int    `yaml:"id"`
+	Active       bool   `yaml:"active"`
+	InputType    string `yaml:"input_type"` // e.g., folder, loop, srt, overlay
+	InputPath    string `yaml:"input_path"` // Kept for backwards compatibility / non-overlay types
+	LowerPath    string `yaml:"lower_path"`
+	LowerActive  bool   `yaml:"lower_active"`
+	MiddlePath   string `yaml:"middle_path"`
+	MiddleActive bool   `yaml:"middle_active"`
+	UpperPath    string `yaml:"upper_path"`
+	UpperActive  bool   `yaml:"upper_active"`
+	Media        string `yaml:"media"` // Video+Audio, Video Only, Audio Only
+	Size         int    `yaml:"size"`
+	X            int    `yaml:"x"`
+	Y            int    `yaml:"y"`
+	Volume       *int   `yaml:"volume"`
 }
 
 type InputResult struct {

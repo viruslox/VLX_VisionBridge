@@ -27,10 +27,24 @@ input:
 layers:
   - id: 0                    # Layer ID
     active: true             # Whether this layer is processed
-    input_type: "local"      # Type: 'local', 'srt', 'rtmp', 'webrtc', 'rtsp', 'overlay'
+    input_type: "local"      # Type: 'local', 'srt', 'rtmp', 'webrtc', 'rtsp'
     input_path: "/opt/VLX_VisionBridge/data/layer0" # Path to folder or address
     media: "Video+Audio"     # Which tracks to include: Video+Audio, Video, Audio
     volume: 100              # Volume percentage
     size: 1920               # Width in pixels
     x: 0                     # X position on canvas
     y: 0                     # Y position on canvas
+  - id: 99                   # Special overlay layer ID (always on top)
+    active: false            # Whether the overlay is processed
+    input_type: "overlay"    # Type must be 'overlay'
+    lower_path: "https://example.com/lower" # Lowest z-index
+    lower_active: true
+    middle_path: "https://example.com/middle" # Middle z-index
+    middle_active: false
+    upper_path: "https://example.com/upper" # Highest z-index
+    upper_active: false
+    media: "Video"
+    volume: 100
+    size: 1920
+    x: 0
+    y: 0
