@@ -199,8 +199,8 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 		if shouldStart {
 			cs := cfg.Input.ChromiumSource
 			bgColor := "transparent"
-			if cs.BgColor != "" {
-				bgColor = cs.BgColor
+			if cs.Z1BgColor != "" {
+				bgColor = cs.Z1BgColor
 			}
 
 			// Generate HTML file

@@ -19,9 +19,9 @@ input:
   resolution: "1920x1080" # Layer's canvas size
   chromium_source:
     active: false
-    bg-color: ""
     z1_active: true
     z1_path: "https://example.com/lower"
+    bg-color: ""
     z1_volume: 100
     z1_width: 1920
     z1_x: 0
