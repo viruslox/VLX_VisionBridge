@@ -21,9 +21,11 @@ type Layer struct {
 	LowerActive  bool   `yaml:"lower_active"`
 	MiddlePath   string `yaml:"middle_path"`
 	MiddleActive bool   `yaml:"middle_active"`
-	UpperPath    string `yaml:"upper_path"`
-	UpperActive  bool   `yaml:"upper_active"`
-	Media        string `yaml:"media"` // Video+Audio, Video Only, Audio Only
+	UpperPath       string `yaml:"upper_path"`
+	UpperActive     bool   `yaml:"upper_active"`
+	WatermarkPath   string `yaml:"watermark_path"`
+	WatermarkActive bool   `yaml:"watermark_active"`
+	Media           string `yaml:"media"` // Video+Audio, Video Only, Audio Only
 	Size         int    `yaml:"size"`
 	X            int    `yaml:"x"`
 	Y            int    `yaml:"y"`
