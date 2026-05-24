@@ -202,6 +202,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 <html>
 <head>
 <style>
+  * { margin: 0; padding: 0; }
   body { margin: 0; padding: 0; overflow: hidden; background: transparent; }
   iframe, video { border: none; }
 `
