@@ -99,7 +99,7 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 	}
 
 	if cfg.Input.ChromiumSource.Active {
-		args = append(args, "-f", "x11grab", "-draw_mouse", "0", "-i", ":99")
+		args = append(args, "-f", "x11grab", "-video_size", cfg.Input.Resolution, "-draw_mouse", "0", "-i", ":99")
 
 		layerVideoPad := string(append(strconv.AppendInt([]byte("["), int64(inputIdx), 10), ":v]"...))
 		outPad := "[out_chromium]"
