@@ -299,7 +299,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 
 			cmd := exec.Command("xvfb-run", serverNum, fmt.Sprintf("--server-args=-screen 0 %sx%sx24 -ac", width, height),
 				chromeBin, "--kiosk", "--disable-infobars", "--disable-extensions", "--test-type",
-				fmt.Sprintf("--window-size=%s,%s", width, height), "--window-position=0,0", "--no-sandbox", "--disable-dev-shm-usage",
+				fmt.Sprintf("--window-size=%s,%s", width, height), "--window-position=0,0", "--hide-scrollbars","--no-sandbox", "--disable-dev-shm-usage",
 				"--autoplay-policy=no-user-gesture-required", fileURL)
 
 			err = cmd.Start()
