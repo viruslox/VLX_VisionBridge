@@ -288,7 +288,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				}
 			}
 
-			cmd := exec.Command("xvfb-run", serverNum, "--server-args=-screen 0 1920x1080x24",
+			cmd := exec.Command("xvfb-run", serverNum, "--server-args=-screen 0 1920x1080x24 -ac",
 				chromeBin, "--kiosk", "--disable-infobars", "--window-size=1920,1080",
 				"--no-sandbox", "--disable-dev-shm-usage", "--autoplay-policy=no-user-gesture-required", fileURL)
 
