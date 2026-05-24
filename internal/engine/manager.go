@@ -197,18 +197,23 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 		}
 
 		if shouldStart {
+			cs := cfg.Input.ChromiumSource
+			bgColor := "transparent"
+			if cs.BgColor != "" {
+				bgColor = cs.BgColor
+			}
+
 			// Generate HTML file
 			htmlContent := `<!DOCTYPE html>
 <html>
 <head>
 <style>
   * { margin: 0; padding: 0; }
-  body { margin: 0; padding: 0; overflow: hidden; background: transparent; }
+  body { margin: 0; padding: 0; overflow: hidden; background: ` + bgColor + `; }
   iframe, video { margin: 0; padding: 0; border: none; }
 `
 			var elements string
 			var scripts string
-			cs := cfg.Input.ChromiumSource
 
 			if cs.Z1Active {
 				s, e, sc := buildOverlayElement("z1", 1, cs.Z1Path, cs.Z1Width, cs.Z1X, cs.Z1Y, cs.Z1Volume)

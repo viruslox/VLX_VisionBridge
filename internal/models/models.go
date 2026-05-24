@@ -15,6 +15,7 @@ type FFmpegSource struct {
 
 type ChromiumSource struct {
 	Active   bool   `yaml:"active"`
+	BgColor  string `yaml:"bg-color"`
 	Z1Active bool   `yaml:"z1_active"`
 	Z1Path   string `yaml:"z1_path"`
 	Z1Volume *int   `yaml:"z1_volume"`
