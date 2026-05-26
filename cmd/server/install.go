@@ -159,7 +159,7 @@ func promptChromiumInstall() {
 
 func promptUser(users []string) string {
 	fmt.Println("\nSelect user to run VLX_VisionBridge:")
-	fmt.Println("1) Create dedicated user (VisionBridge) [default]")
+	fmt.Println("1) Create dedicated user (visionbridge) [default]")
 	for i, u := range users {
 		fmt.Printf("%d) Use existing user '%s'\n", i+2, u)
 	}
@@ -169,8 +169,8 @@ func promptUser(users []string) string {
 	scanner.Scan()
 	choice := strings.TrimSpace(scanner.Text())
 
-	selectedUser := "VisionBridge"
-	if choice != "" && choice != "1" && choice != "VisionBridge" {
+	selectedUser := "visionbridge"
+	if choice != "" && choice != "1" && choice != "visionbridge" {
 		idx, err := strconv.Atoi(choice)
 		if err == nil && idx >= 2 && idx <= len(users)+1 {
 			selectedUser = users[idx-2]
@@ -184,10 +184,10 @@ func promptUser(users []string) string {
 				}
 			}
 			if !found {
-				fmt.Println("Invalid choice, defaulting to VisionBridge.")
+				fmt.Println("Invalid choice, defaulting to visionbridge.")
 			}
 		} else {
-			fmt.Println("Invalid choice, defaulting to VisionBridge.")
+			fmt.Println("Invalid choice, defaulting to visionbridge.")
 		}
 	}
 
@@ -196,12 +196,12 @@ func promptUser(users []string) string {
 }
 
 func setupUserAndSettings(installBase, etcDir, varDir, selectedUser string) {
-	if selectedUser == "VisionBridge" {
-		cmd := exec.Command("id", "-u", "VisionBridge")
+	if selectedUser == "visionbridge" {
+		cmd := exec.Command("id", "-u", "visionbridge")
 		if err := cmd.Run(); err != nil {
-			fmt.Println("Creating user VisionBridge...")
-			if err := exec.Command("useradd", "-m", "-s", "/bin/bash", "VisionBridge").Run(); err != nil {
-				log.Fatalf("Failed to create user VisionBridge: %v", err)
+			fmt.Println("Creating user visionbridge...")
+			if err := exec.Command("useradd", "-m", "-s", "/bin/bash", "visionbridge").Run(); err != nil {
+				log.Fatalf("Failed to create user visionbridge: %v", err)
 			}
 		}
 	}
