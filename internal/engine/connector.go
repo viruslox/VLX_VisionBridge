@@ -77,7 +77,7 @@ func (pm *ProcessManager) handleControlCommand(cmd ControlCommand) {
 				return
 			}
 
-			pm.mu.Lock()
+			pm.mu.Lock() // UPDATE STATE IN MEMORY WITHOUT RESTARTING FFMPEG
 			if pm.config != nil && pm.config.Input.FFmpegSource.Active {
 				for i, layer := range pm.config.Input.FFmpegSource.Layers {
 					if layer.ID == id {
@@ -89,7 +89,7 @@ func (pm *ProcessManager) handleControlCommand(cmd ControlCommand) {
 							newCfg := *pm.config
 							pm.mu.Unlock()
 
-							pm.mu.Lock()
+							pm.mu.Lock() // UPDATE STATE IN MEMORY WITHOUT RESTARTING FFMPEG
 							pm.config = &newCfg
 							pm.mu.Unlock()
 
