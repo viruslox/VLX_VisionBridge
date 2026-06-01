@@ -11,8 +11,9 @@ VLX VisionBridge is a headless, high-performance Linux service written in Go. It
 The project is structured according to common Go conventions, primarily using the `internal/` directory to encapsulate private logic:
 
 - `internal/models`: Defines core structs such as `Layer`, `Config`, and `DatabaseConfig`.
+- `configs`: Contains the `configs/visionbridge.settings.template` embedded directly into the binary via `configs/assets.go` to facilitate self-contained installations.
 - `internal/config`: Handles parsing of the `visionbridge.settings` YAML file and implements configuration watching and diffing.
-- `internal/db`: Manages the SQLite database connection pool and logging queries.
+- `internal/db`: Manages the SQLite database connection pool (using `github.com/mattn/go-sqlite3`) and logging queries.
 - `internal/engine`: The core FFmpeg command generator and process manager. It is further decoupled into:
   - `source`: Prepares input arguments, path sanitization, and input file parsing.
   - `mixer`: Constructs complex filtergraphs and manages dynamic ZMQ updates.
@@ -57,7 +58,7 @@ To eliminate local SRT network overhead and reduce latency for deployments runni
 - **Audio Ingress (`ipc_audio`)**: Accepts raw PCM data (`s16le`, 48kHz, 2-channel) directly via a Unix Domain Socket (`/tmp/vlx_audio.sock`), injecting it seamlessly into the FFmpeg audio mixer.
 - **Control Ingress**: A listener on `/tmp/vlx_control.sock` accepts JSON command payloads, directly mutating the internal State Manager to toggle inputs and trigger actions without requiring Web browser overhead.
 
-- **Dynamic Updates via ZMQ**: Live properties (like `overlay@layerID` coordinates and `volume@layerID`) are manipulated in real-time. The mixer binds a `zmq` filter to `tcp://127.0.0.1:5555` to receive string commands.
+- **Dynamic Updates via ZMQ**: Live properties (like `overlay@layerID` coordinates and `volume@layerID`) are manipulated in real-time. ZMQ messaging is a mandatory dependency (not optional) for the system to provide the essential real-time filter communication required for dynamic updates with FFmpeg. The mixer binds a `zmq` filter to `tcp://127.0.0.1:5555` to receive string commands.
 - **Performance Optimizations**: For performance-sensitive code paths in filter generation, `strings.Builder` and stack buffers are used over `fmt.Sprintf` to minimize memory allocations.
 
 ## Output Pipeline
@@ -70,6 +71,7 @@ The output layer encodes the composite frames into H.264/AAC and pushes to a rob
 ## Resilience & Process Management
 
 A robust `ProcessManager` governs the underlying FFmpeg subprocess:
+- **Health Monitor**: Monitors CPU/RAM usage and stream stability, logging metrics to SQLite.
 - **Error Diagnostics**: Maintains a `tailBuffer` of the last 4096 bytes of the process's standard error stream to pinpoint failures (identifying them as `[input]`, `[mixer]`, or `[output]` issues).
 - **RetryTracker**: Uses a backoff strategy (5 quick retries, 2 slow retries, then dynamic disablement) for isolating failures in sources like Chromium overlays.
 - Process reaps and signal listeners ensure no zombie processes remain after graceful or ungraceful shutdown.
