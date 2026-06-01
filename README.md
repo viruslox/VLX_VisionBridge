@@ -23,18 +23,11 @@ The service is designed for professional 24/7 broadcasting environments where co
 
 - **Canvas Size vs. Output Size**: The fundamental drawing area for layers and overlays is controlled by `input.resolution` (`InputSettings`). The final resolution of the stream that is encoded and pushed to your destinations is controlled by `output.resolution` (`OutputSettings`).
 
-## Architecture Components
-
-1. **Config Watcher**: Monitors `visionbridge.settings` using `fsnotify`.
-2. **State Manager**: Orchestrates the current state between the Config File and SQLite.
-3. **FFmpeg Engine**: A Go wrapper that generates and manages a complex subprocess for video/audio composition.
-4. **Health Monitor**: Monitors CPU/RAM usage and stream stability, logging metrics to SQLite.
-
 ## Technology Stack
 
 - **Language**: Go (Golang)
 - **Processing Engine**: FFmpeg (via os/exec)
 - **Database**: SQLite (State persistence, Logs, Metadata)
-- **Messaging**: ZMQ for real-time filter communication with FFmpeg.
+- **Messaging**: ZMQ is a mandatory dependency for real-time filter communication with FFmpeg.
 
 See [Architecture](ARCHITECTURE.md) for High-Level Design details.
