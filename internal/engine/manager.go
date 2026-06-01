@@ -406,7 +406,7 @@ func (pm *ProcessManager) UpdateFilter(config *models.Config) {
 
 	if config.Input.FFmpegSource.Active {
 		for _, layer := range config.Input.FFmpegSource.Layers {
-			if !layer.Active {
+			if layer.ID == 99 {
 				continue
 			}
 
@@ -414,6 +414,16 @@ func (pm *ProcessManager) UpdateFilter(config *models.Config) {
 			media := layer.Media
 			if media == "" {
 				media = "Video+Audio"
+			}
+
+			if !layer.Active {
+				if (media == "Video" || media == "Video+Audio") && res.HasVideo {
+					sendZMQCommand(req, fmt.Sprintf("overlay@layer%d x -9999", layer.ID))
+				}
+				if (media == "Audio" || media == "Video+Audio") && res.HasAudio {
+					sendZMQCommand(req, fmt.Sprintf("volume@layer%d volume 0.0", layer.ID))
+				}
+				continue
 			}
 
 			if (media == "Video" || media == "Video+Audio") && res.HasVideo {

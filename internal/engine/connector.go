@@ -89,7 +89,11 @@ func (pm *ProcessManager) handleControlCommand(cmd ControlCommand) {
 							newCfg := *pm.config
 							pm.mu.Unlock()
 
-							pm.UpdateConfig(&newCfg)
+							pm.mu.Lock()
+							pm.config = &newCfg
+							pm.mu.Unlock()
+
+							pm.UpdateFilter(&newCfg)
 							return
 						}
 						break
