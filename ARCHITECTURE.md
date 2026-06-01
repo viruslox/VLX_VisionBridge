@@ -50,6 +50,8 @@ An independently spawned Chromium process dynamically rendering up to 7 Z-layers
 
 The FFmpeg Mixer uses advanced `filter_complex` graphs to scale, position, and overlay inputs based on absolute integer-based pixel sizing and X/Y coordinates.
 
+The base canvas size for the filtergraph is defined by `cfg.Input.Resolution` within the `InputSettings`. This establishes the drawing area for all overlays and layers. The final scaled output, which is sent to external destinations, is defined separately by `cfg.Output.Resolution`. Because the input resolution dictates the fundamental structure of the filtergraph and video buffers, any changes to the input resolution require a full FFmpeg restart, whereas changes to individual layer positions or sizes may not.
+
 ### VLX Connector (IPC Integration)
 To eliminate local SRT network overhead and reduce latency for deployments running alongside `VLX_ChatBridge`, VisionBridge integrates a dedicated IPC connector:
 - **Audio Ingress (`ipc_audio`)**: Accepts raw PCM data (`s16le`, 48kHz, 2-channel) directly via a Unix Domain Socket (`/tmp/vlx_audio.sock`), injecting it seamlessly into the FFmpeg audio mixer.
