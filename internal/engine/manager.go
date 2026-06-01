@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/exec"
 	"sync"
@@ -628,9 +629,19 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 	}
 
 	if hasIPCAudio {
-		if _, err := os.Stat("/tmp/vlx_audio.sock"); os.IsNotExist(err) {
+		audioSockPath := "/tmp/vlx_audio.sock"
+		if _, err := os.Stat(audioSockPath); os.IsNotExist(err) {
 			log.Println("Waiting for /tmp/vlx_audio.sock to be created by VLX_ChatBridge...")
 			return monitorActionSleepExponential, "", false
+		} else {
+			// Robust error handling: Even if the file exists, check if it's a valid, listening socket.
+			// This prevents FFmpeg from crashing if it encounters a stale socket file left from a crash.
+			conn, err := net.Dial("unix", audioSockPath)
+			if err != nil {
+				log.Printf("Socket /tmp/vlx_audio.sock exists but is not accepting connections (stale socket): %v. Waiting for VLX_ChatBridge...", err)
+				return monitorActionSleepExponential, "", false
+			}
+			conn.Close()
 		}
 	}
 
