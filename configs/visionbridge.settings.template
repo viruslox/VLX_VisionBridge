@@ -74,7 +74,7 @@ input:
     layers:
       - id: 0                    # Layer ID
         active: true             # Whether this layer is processed
-        input_type: "local"      # Type: 'local', 'srt', 'rtmp', 'webrtc', 'rtsp'
+        input_type: "local"      # Type: 'local', 'srt', 'rtmp', 'webrtc', 'rtsp', 'ipc_audio'
         input_path: "/opt/VLX_VisionBridge/data/layer0" # Path to folder or address
         media: "Video+Audio"     # Which tracks to include: Video+Audio, Video, Audio
         volume: 100              # Volume percentage

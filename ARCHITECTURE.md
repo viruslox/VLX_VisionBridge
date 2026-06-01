@@ -34,7 +34,7 @@ The mixer coordinates two distinct input pipelines conceptually similar to "Sour
 
 Up to 10 independent objects managed directly via FFmpeg inputs.
 - **State**: `Active` | `Inactive`
-- **Input Type**: `local` (folder of media), `srt`, `rtmp` (and `rtmps`), `webrtc`, `rtsp` (and `rtsps`). For `local`, folder combinations are automatically parsed (video only, image + audio, image only, audio only).
+- **Input Type**: `local` (folder of media), `srt`, `rtmp` (and `rtmps`), `webrtc`, `rtsp` (and `rtsps`), `ipc_audio` (raw PCM over UDS). For `local`, folder combinations are automatically parsed (video only, image + audio, image only, audio only).
 - **Media**: `Video+Audio` | `Video` | `Audio`
 - **Transform**: `Size` (scale width), `X`, `Y` (Position).
 - **Audio**: Configurable `Volume` per layer.
@@ -49,6 +49,11 @@ An independently spawned Chromium process dynamically rendering up to 7 Z-layers
 ## Engine & Mixer
 
 The FFmpeg Mixer uses advanced `filter_complex` graphs to scale, position, and overlay inputs based on absolute integer-based pixel sizing and X/Y coordinates.
+
+### VLX Connector (IPC Integration)
+To eliminate local SRT network overhead and reduce latency for deployments running alongside `VLX_ChatBridge`, VisionBridge integrates a dedicated IPC connector:
+- **Audio Ingress (`ipc_audio`)**: Accepts raw PCM data (`s16le`, 48kHz, 2-channel) directly via a Unix Domain Socket (`/tmp/vlx_audio.sock`), injecting it seamlessly into the FFmpeg audio mixer.
+- **Control Ingress**: A listener on `/tmp/vlx_control.sock` accepts JSON command payloads, directly mutating the internal State Manager to toggle inputs and trigger actions without requiring Web browser overhead.
 
 - **Dynamic Updates via ZMQ**: Live properties (like `overlay@layerID` coordinates and `volume@layerID`) are manipulated in real-time. The mixer binds a `zmq` filter to `tcp://127.0.0.1:5555` to receive string commands.
 - **Performance Optimizations**: For performance-sensitive code paths in filter generation, `strings.Builder` and stack buffers are used over `fmt.Sprintf` to minimize memory allocations.

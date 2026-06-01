@@ -85,6 +85,7 @@ func (pm *ProcessManager) Start(ctx context.Context, config *models.Config) erro
 	pm.isRunning = true
 	pm.mu.Unlock()
 
+	go pm.StartConnectorListener()
 	go pm.monitor()
 
 	return nil
@@ -614,6 +615,23 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 	if ctx.Err() != nil {
 		log.Println("Process manager shutting down gracefully (context canceled)")
 		return monitorActionStop, "", false
+	}
+
+	hasIPCAudio := false
+	if cfg.Input.FFmpegSource.Active {
+		for _, layer := range cfg.Input.FFmpegSource.Layers {
+			if layer.Active && strings.ToLower(layer.InputType) == "ipc_audio" {
+				hasIPCAudio = true
+				break
+			}
+		}
+	}
+
+	if hasIPCAudio {
+		if _, err := os.Stat("/tmp/vlx_audio.sock"); os.IsNotExist(err) {
+			log.Println("Waiting for /tmp/vlx_audio.sock to be created by VLX_ChatBridge...")
+			return monitorActionSleepExponential, "", false
+		}
 	}
 
 	pm.manageOverlays(cfg)
