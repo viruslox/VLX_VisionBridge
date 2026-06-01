@@ -24,8 +24,13 @@ type ControlCommand struct {
 
 func (pm *ProcessManager) StartConnectorListener() {
 	sockPath := "/tmp/vlx_control.sock"
+
+	// Cleanup mechanism: Ensure socket file is removed before binding
+	// to prevent "address already in use" errors if the app crashed previously.
 	if _, err := os.Stat(sockPath); err == nil {
-		os.Remove(sockPath)
+		if err := os.Remove(sockPath); err != nil {
+			log.Printf("Failed to remove existing vlx_control socket at %s: %v", sockPath, err)
+		}
 	}
 
 	listener, err := net.Listen("unix", sockPath)
