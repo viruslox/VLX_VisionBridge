@@ -19,6 +19,10 @@ The service is designed for professional 24/7 broadcasting environments where co
 - **Resource Optimization**: Sources marked as "OFF" are completely excluded from the processing pipeline.
 - **Multi-Destination**: Single encoding pass with multiple output clones.
 
+## Configuration Concepts
+
+- **Canvas Size vs. Output Size**: The fundamental drawing area for layers and overlays is controlled by `input.resolution` (`InputSettings`). The final resolution of the stream that is encoded and pushed to your destinations is controlled by `output.resolution` (`OutputSettings`).
+
 ## Architecture Components
 
 1. **Config Watcher**: Monitors `visionbridge.settings` using `fsnotify`.
