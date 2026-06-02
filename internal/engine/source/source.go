@@ -78,11 +78,11 @@ func BuildInputArgs(layer models.Layer) models.InputResult {
 	case "srt":
 		return models.InputResult{Args: []string{"-fflags", "nobuffer", "-flags", "low_delay", "-i", safePath}, InputCount: 1, HasVideo: true, HasAudio: true}
 	case "rtmp", "rtmps":
-		return models.InputResult{Args: []string{"-listen", "1", "-i", safePath}, InputCount: 1, HasVideo: true, HasAudio: true}
+		return models.InputResult{Args: []string{"-fflags", "nobuffer", "-flags", "low_delay", "-listen", "1", "-i", safePath}, InputCount: 1, HasVideo: true, HasAudio: true}
 	case "webrtc":
-		return models.InputResult{Args: []string{"-i", safePath}, InputCount: 1, HasVideo: true, HasAudio: true}
+		return models.InputResult{Args: []string{"-fflags", "nobuffer", "-flags", "low_delay", "-i", safePath}, InputCount: 1, HasVideo: true, HasAudio: true}
 	case "rtsp", "rtsps":
-		return models.InputResult{Args: []string{"-rtsp_transport", "tcp", "-i", safePath}, InputCount: 1, HasVideo: true, HasAudio: true}
+		return models.InputResult{Args: []string{"-fflags", "nobuffer", "-flags", "low_delay", "-rtsp_transport", "tcp", "-i", safePath}, InputCount: 1, HasVideo: true, HasAudio: true}
 	default:
 		return models.InputResult{Args: []string{"-i", safePath}, InputCount: 1, HasVideo: true, HasAudio: true}
 	}
