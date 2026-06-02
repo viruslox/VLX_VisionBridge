@@ -638,7 +638,13 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 	}
 
 	if hasIPCAudio {
-		audioSockPath := "/tmp/vlx_audio.sock"
+		audioSockPath := "/tmp/vlx_audio.sock" // default fallback
+		for _, layer := range pm.config.Input.FFmpegSource.Layers {
+			if strings.ToLower(layer.InputType) == "ipc_audio" && layer.InputPath != "" {
+				audioSockPath = layer.InputPath
+				break
+			}
+		}
 		// We must clean up any stale socket so FFmpeg can successfully bind to it as a listener.
 		if _, err := os.Stat(audioSockPath); err == nil {
 			if err := os.Remove(audioSockPath); err != nil {
