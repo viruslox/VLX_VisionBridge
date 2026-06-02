@@ -56,7 +56,7 @@ The base canvas size for the filtergraph is defined by `cfg.Input.Resolution` wi
 ### VLX Connector (IPC Integration)
 To eliminate local SRT network overhead and reduce latency for deployments running alongside `VLX_ChatBridge`, VisionBridge integrates a dedicated IPC connector:
 - **Audio Ingress (`ipc_audio`)**: Accepts raw PCM data (`s16le`, 48kHz, 2-channel) directly via a Unix Domain Socket (`/tmp/vlx_audio.sock`), injecting it seamlessly into the FFmpeg audio mixer.
-- **Control Ingress**: A listener on `/tmp/vlx_control.sock` accepts JSON command payloads, directly mutating the internal State Manager to toggle inputs and trigger actions without requiring Web browser overhead.
+- **Control Ingress**: A listener on the Unix control socket (`/tmp/vlx_control.sock`) handles incoming control messages. It parses `set_input_state` JSON payloads and safely updates the in-memory config struct using Mutexes. It then dispatches ZMQ commands directly into the FFmpeg filtergraph to adjust elements dynamically without requiring Web browser overhead or restarts.
 
 - **Dynamic Updates via ZMQ**: Live properties (like `overlay@layerID` coordinates and `volume@layerID`) are manipulated in real-time. ZMQ messaging is a mandatory dependency (not optional) for the system to provide the essential real-time filter communication required for dynamic updates with FFmpeg. The mixer binds a `zmq` filter to `tcp://127.0.0.1:5555` to receive string commands.
 - **Performance Optimizations**: For performance-sensitive code paths in filter generation, `strings.Builder` and stack buffers are used over `fmt.Sprintf` to minimize memory allocations.
