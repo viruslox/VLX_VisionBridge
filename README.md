@@ -52,7 +52,7 @@ Optimized for MediaMTX via RTSP/SRT. The `network` input_type automatically inje
 }
 ```
 
-## ⚠️ The Golden Rule of Layer Control ⚠️
+## Layer Control Rules ##
 
 - **Rule 1:** ZMQ commands MUST ONLY target `ffmpeg_source` layers (hardware cameras, local videos).
 - **Rule 2:** `chromium_source` layers (Overlays, Alerts, Maps) MUST be kept `active: true` constantly. Show/Hide logic for web layers must be handled via WebSockets/JavaScript, NOT via ZMQ, to avoid FFmpeg restarts and stream drops.
