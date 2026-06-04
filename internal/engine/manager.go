@@ -485,6 +485,18 @@ func (pm *ProcessManager) monitor() {
 	var lastBuildErr string
 
 	for {
+		pm.mu.Lock()
+		isActive := true
+		if pm.config != nil {
+			isActive = pm.config.Output.Active
+		}
+		pm.mu.Unlock()
+
+		if !isActive {
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+
 		action, finalModule, isMisconfig := pm.executeSingleRun(&lastBuildErr)
 
 		if isMisconfig && finalModule != "" {

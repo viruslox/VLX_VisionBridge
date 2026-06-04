@@ -1,6 +1,7 @@
 package models
 
 type OutputSettings struct {
+	Active       bool     `yaml:"active" json:"active"`
 	Resolution   string   `yaml:"resolution"`
 	FPS          int      `yaml:"fps"`
 	VideoBitrate string   `yaml:"video_bitrate"`
