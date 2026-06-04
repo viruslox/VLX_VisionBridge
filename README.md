@@ -37,7 +37,7 @@ Accepts raw PCM data directly via a Unix Domain Socket. If `InputPath` is left e
 ```
 
 ### Network Input
-Optimized for MediaMTX via RTSP/SRT, ensuring low-latency video ingestion by using `-fflags nobuffer -flags low_delay`.
+Optimized for MediaMTX via RTSP/SRT. The `network` input_type automatically injects `-fflags nobuffer -flags low_delay` for true zero-latency ingestion from MediaMTX (SRT/RTSP).
 ```json
 {
   "id": 2,
@@ -51,6 +51,11 @@ Optimized for MediaMTX via RTSP/SRT, ensuring low-latency video ingestion by usi
   "volume": 1.0
 }
 ```
+
+## ⚠️ The Golden Rule of Layer Control ⚠️
+
+- **Rule 1:** ZMQ commands MUST ONLY target `ffmpeg_source` layers (hardware cameras, local videos).
+- **Rule 2:** `chromium_source` layers (Overlays, Alerts, Maps) MUST be kept `active: true` constantly. Show/Hide logic for web layers must be handled via WebSockets/JavaScript, NOT via ZMQ, to avoid FFmpeg restarts and stream drops.
 
 ## Dynamic Regia
 

@@ -8,6 +8,7 @@ database:
 
 # Global output settings for the stream
 output:
+  active: false           # Keeps FFmpeg dormant (0% CPU) until a [ZMQ_CONTROL] Target=stream Enabled=true IPC command wakes it up
   resolution: "1920x1080" # Target output resolution
   fps: 30                 # Target output framerate
   video_bitrate: "6000k"  # Output video bitrate
@@ -75,7 +76,7 @@ input:
       - id: 0                    # Layer ID
         active: true             # Whether this layer is processed
         input_type: "local"      # Type: 'local', 'srt', 'rtmp', 'webrtc', 'rtsp', 'ipc_audio'
-        input_path: "/opt/VLX_VisionBridge/data/layer0" # Path to folder or address
+        input_path: "/opt/VLX_VisionBridge/data/layer0" # Path to folder or address. For 'ipc_audio', can be dynamically set or left empty to default to '/tmp/vlx_audio.sock'.
         media: "Video+Audio"     # Which tracks to include: Video+Audio, Video, Audio
         volume: 100              # Volume percentage
         size: 1920               # Width in pixels
