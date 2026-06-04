@@ -68,6 +68,22 @@ func (pm *ProcessManager) StartConnectorListener() {
 }
 
 func (pm *ProcessManager) handleControlCommand(cmd ControlCommand) {
+	if cmd.Action == "set_input_state" && cmd.Target == "stream" {
+		pm.mu.Lock()
+		log.Printf("Stream output Active state changing to: %v", cmd.Payload.Enabled)
+		if pm.config != nil {
+			pm.config.Output.Active = cmd.Payload.Enabled
+		}
+
+		// If turning OFF the stream, brutally kill the running FFmpeg process
+		if !cmd.Payload.Enabled && pm.cmd != nil && pm.cmd.Process != nil {
+			log.Println("Killing active FFmpeg process to stop stream...")
+			pm.cmd.Process.Kill()
+		}
+		pm.mu.Unlock()
+		return
+	}
+
 	if cmd.Action == "set_input_state" {
 		if strings.HasPrefix(cmd.Target, "layer") {
 			idStr := strings.TrimPrefix(cmd.Target, "layer")
