@@ -56,7 +56,8 @@ The base canvas size for the filtergraph is defined by `cfg.Input.Resolution` wi
 ### VLX Connector (IPC Integration)
 To eliminate local SRT network overhead and reduce latency for deployments running alongside `VLX_ChatBridge`, VisionBridge integrates a dedicated IPC connector:
 - **Audio Ingress (`ipc_audio`)**: Accepts raw PCM data (`s16le`, 48kHz, 2-channel) directly via a Unix Domain Socket (`/tmp/vlx_audio.sock`), injecting it seamlessly into the FFmpeg audio mixer.
-- **Control Ingress**: A listener on the Unix control socket (`/tmp/vlx_control.sock`) handles incoming control messages. It parses `set_input_state` JSON payloads and safely updates the in-memory config struct using Mutexes. It then dispatches ZMQ commands directly into the FFmpeg filtergraph to adjust elements dynamically without requiring Web browser overhead or restarts.
+- **Control Ingress**: A listener on the Unix control socket (`/tmp/vlx_control.sock`) handles incoming control messages. It parses `set_input_state` JSON IPC events, safely updates the in-memory config struct using Mutexes, and dynamically dispatches ZMQ commands directly into the FFmpeg filtergraph to adjust elements (like layers) without requiring Web browser overhead or killing the FFmpeg process.
+- **Auto-Fallback Concept**: Users can hook `runOnPublish` / `runOnUnpublish` scripts in MediaMTX to inject JSON into VisionBridge's control socket. This allows creating an automatic "Be Right Back" screen or fallback sequence upon signal loss.
 
 - **Dynamic Updates via ZMQ**: Live properties (like `overlay@layerID` coordinates and `volume@layerID`) are manipulated in real-time. ZMQ messaging is a mandatory dependency (not optional) for the system to provide the essential real-time filter communication required for dynamic updates with FFmpeg. The mixer binds a `zmq` filter to `tcp://127.0.0.1:5555` to receive string commands.
 - **Performance Optimizations**: For performance-sensitive code paths in filter generation, `strings.Builder` and stack buffers are used over `fmt.Sprintf` to minimize memory allocations.
@@ -71,6 +72,7 @@ The output layer encodes the composite frames into H.264/AAC and pushes to a rob
 ## Resilience & Process Management
 
 A robust `ProcessManager` governs the underlying FFmpeg subprocess:
+- **Idle Behavior**: If the stream output is deactivated via configuration or IPC, the ProcessManager keeps FFmpeg fully dormant (consuming 0% CPU) until a `[ZMQ_CONTROL] Target=stream Enabled=true` command wakes it up.
 - **Health Monitor**: Monitors CPU/RAM usage and stream stability, logging metrics to SQLite.
 - **Error Diagnostics**: Maintains a `tailBuffer` of the last 4096 bytes of the process's standard error stream to pinpoint failures (identifying them as `[input]`, `[mixer]`, or `[output]` issues).
 - **RetryTracker**: Uses a backoff strategy (5 quick retries, 2 slow retries, then dynamic disablement) for isolating failures in sources like Chromium overlays.
