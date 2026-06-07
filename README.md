@@ -19,6 +19,14 @@ The service is designed for professional 24/7 broadcasting environments where co
 - **Resource Optimization**: Sources marked as "OFF" are completely excluded from the processing pipeline.
 - **Multi-Destination**: Single encoding pass with multiple output clones.
 
+## Best Practices
+
+- **Top-Most Overlay**: The `chromium_source` overlay should be kept as the top-most layer in the filter chain to avoid performance issues associated with complex layering. It is automatically rendered on top of all other sources.
+- **Layer Conventions**: To ensure a stable and performance-oriented configuration, `ffmpeg_source` is limited to a maximum of 3 layers (IDs 0, 1, 2) which share identical capabilities. The recommended convention is:
+  - **Layer 1**: Primary Input (e.g., GoPro).
+  - **Layer 0**: Fallback/Placeholder (e.g., VODs).
+  - **Layer 2**: Secondary Input / Guest.
+
 ## Layer Configuration Examples
 
 VisionBridge operates alongside MediaMTX and ChatBridge on the same localhost. It handles low-latency video ingestion and real-time scene switching via ZeroMQ without restarting FFmpeg.

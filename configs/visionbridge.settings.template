@@ -66,17 +66,57 @@ input:
 
   ffmpeg_source:
     active: false
-    # Layers (0-9) configured as inputs and their layouts
+    # Layers (0-2) configured as inputs and their layouts
     # For 'local' input_type, the input_path must be a folder. Content is accepted if:
     # - video (mp4 and webm)
     # - images and audio (png and mp3)
     # - images only (png)
     # - audio only (mp3)
     layers:
-      - id: 0                    # Layer ID
+      - id: 0                    # Layer 0 = Fallback/Placeholder (e.g., VODs)
         active: true             # Whether this layer is processed
         input_type: "local"      # Type: 'local', 'srt', 'rtmp', 'webrtc', 'rtsp', 'ipc_audio'
         input_path: "/opt/VLX_VisionBridge/data/layer0" # Path to folder or address. For 'ipc_audio', can be dynamically set or left empty to default to '/tmp/vlx_audio.sock'.
+        media: "Video+Audio"     # Which tracks to include: Video+Audio, Video, Audio
+        volume: 100              # Volume percentage
+        size: 1920               # Width in pixels
+        x: 0                     # X position on canvas
+        y: 0                     # Y position on canvas
+        folder_options:
+          is_folder: false       # True to treat input_path as a playlist directory
+          shuffle: false         # True to shuffle the playlist
+          loop: false            # True to loop the playlist
+          delay_sec: 0           # Seconds of delay spacer between videos
+          spacer_width: 1920     # Width of the generated spacer
+          spacer_height: 1080    # Height of the generated spacer
+          spacer_fps: 30         # Framerate of the generated spacer
+          spacer_sample_rate: 48000 # Audio sample rate of the generated spacer
+          spacer_color: "black"  # Color for the background when not using an image
+          spacer_image: ""       # Leave empty to use spacer_color, or provide an absolute path to a PNG/JPG
+      - id: 1                    # Layer 1 = Primary Input (e.g., GoPro)
+        active: false            # Whether this layer is processed
+        input_type: "local"      # Type: 'local', 'srt', 'rtmp', 'webrtc', 'rtsp', 'ipc_audio'
+        input_path: "/opt/VLX_VisionBridge/data/layer1" # Path to folder or address. For 'ipc_audio', can be dynamically set or left empty to default to '/tmp/vlx_audio.sock'.
+        media: "Video+Audio"     # Which tracks to include: Video+Audio, Video, Audio
+        volume: 100              # Volume percentage
+        size: 1920               # Width in pixels
+        x: 0                     # X position on canvas
+        y: 0                     # Y position on canvas
+        folder_options:
+          is_folder: false       # True to treat input_path as a playlist directory
+          shuffle: false         # True to shuffle the playlist
+          loop: false            # True to loop the playlist
+          delay_sec: 0           # Seconds of delay spacer between videos
+          spacer_width: 1920     # Width of the generated spacer
+          spacer_height: 1080    # Height of the generated spacer
+          spacer_fps: 30         # Framerate of the generated spacer
+          spacer_sample_rate: 48000 # Audio sample rate of the generated spacer
+          spacer_color: "black"  # Color for the background when not using an image
+          spacer_image: ""       # Leave empty to use spacer_color, or provide an absolute path to a PNG/JPG
+      - id: 2                    # Layer 2 = Secondary Input / Guest
+        active: false            # Whether this layer is processed
+        input_type: "local"      # Type: 'local', 'srt', 'rtmp', 'webrtc', 'rtsp', 'ipc_audio'
+        input_path: "/opt/VLX_VisionBridge/data/layer2" # Path to folder or address. For 'ipc_audio', can be dynamically set or left empty to default to '/tmp/vlx_audio.sock'.
         media: "Video+Audio"     # Which tracks to include: Video+Audio, Video, Audio
         volume: 100              # Volume percentage
         size: 1920               # Width in pixels
