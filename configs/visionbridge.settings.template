@@ -87,3 +87,9 @@ input:
           shuffle: false         # True to shuffle the playlist
           loop: false            # True to loop the playlist
           delay_sec: 0           # Seconds of black screen delay between videos
+          spacer_width: 1920
+          spacer_height: 1080
+          spacer_fps: 30
+          spacer_sample_rate: 48000
+          spacer_color: "black"
+          spacer_image: ""       # Leave empty to use spacer_color, or provide an absolute path to a PNG/JPG

@@ -14,17 +14,39 @@ import (
 	"github.com/user/VLX_VisionBridge/internal/models"
 )
 
-func generateSpacer(path string, delaySec int) error {
-	cmd := exec.Command("ffmpeg",
-		"-y",
-		"-f", "lavfi", "-i", "color=c=black:s=1920x1080:r=30",
-		"-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000",
-		"-c:v", "libx264",
-		"-t", strconv.Itoa(delaySec),
-		"-pix_fmt", "yuv420p",
-		"-c:a", "aac",
-		path,
-	)
+func generateSpacer(path string, opts models.FolderOptions) error {
+	var cmd *exec.Cmd
+
+	if opts.SpacerImage != "" {
+		cmd = exec.Command("ffmpeg",
+			"-y",
+			"-loop", "1",
+			"-framerate", strconv.Itoa(opts.SpacerFPS),
+			"-i", opts.SpacerImage,
+			"-f", "lavfi",
+			"-i", fmt.Sprintf("anullsrc=channel_layout=stereo:sample_rate=%d", opts.SpacerSampleRate),
+			"-vf", fmt.Sprintf("scale=%d:%d,setsar=1", opts.SpacerWidth, opts.SpacerHeight),
+			"-c:v", "libx264",
+			"-t", strconv.Itoa(opts.DelaySec),
+			"-pix_fmt", "yuv420p",
+			"-c:a", "aac",
+			path,
+		)
+	} else {
+		cmd = exec.Command("ffmpeg",
+			"-y",
+			"-f", "lavfi",
+			"-i", fmt.Sprintf("color=c=%s:s=%dx%d:r=%d", opts.SpacerColor, opts.SpacerWidth, opts.SpacerHeight, opts.SpacerFPS),
+			"-f", "lavfi",
+			"-i", fmt.Sprintf("anullsrc=channel_layout=stereo:sample_rate=%d", opts.SpacerSampleRate),
+			"-c:v", "libx264",
+			"-t", strconv.Itoa(opts.DelaySec),
+			"-pix_fmt", "yuv420p",
+			"-c:a", "aac",
+			path,
+		)
+	}
+
 	err := cmd.Run()
 	if err != nil {
 		return fmt.Errorf("failed to generate spacer: %w", err)
@@ -102,8 +124,25 @@ func BuildInputArgs(layer models.Layer) models.InputResult {
 				var spacerPath string
 				var spacerErr error
 				if layer.FolderOptions.DelaySec > 0 {
+					opts := layer.FolderOptions
+					if opts.SpacerWidth == 0 {
+						opts.SpacerWidth = 1920
+					}
+					if opts.SpacerHeight == 0 {
+						opts.SpacerHeight = 1080
+					}
+					if opts.SpacerFPS == 0 {
+						opts.SpacerFPS = 30
+					}
+					if opts.SpacerSampleRate == 0 {
+						opts.SpacerSampleRate = 48000
+					}
+					if opts.SpacerColor == "" {
+						opts.SpacerColor = "black"
+					}
+
 					spacerPath = fmt.Sprintf("/tmp/vlx_spacer_%d.mp4", layer.ID)
-					spacerErr = generateSpacer(spacerPath, layer.FolderOptions.DelaySec)
+					spacerErr = generateSpacer(spacerPath, opts)
 				}
 
 				for _, video := range videos {
