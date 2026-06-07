@@ -74,10 +74,16 @@ type InputSettings struct {
 }
 
 type FolderOptions struct {
-	IsFolder bool `yaml:"is_folder"`
-	Shuffle  bool `yaml:"shuffle"`
-	Loop     bool `yaml:"loop"`
-	DelaySec int  `yaml:"delay_sec"`
+	IsFolder         bool   `yaml:"is_folder"`
+	Shuffle          bool   `yaml:"shuffle"`
+	Loop             bool   `yaml:"loop"`
+	DelaySec         int    `yaml:"delay_sec"`
+	SpacerWidth      int    `yaml:"spacer_width"`
+	SpacerHeight     int    `yaml:"spacer_height"`
+	SpacerFPS        int    `yaml:"spacer_fps"`
+	SpacerSampleRate int    `yaml:"spacer_sample_rate"`
+	SpacerColor      string `yaml:"spacer_color"`
+	SpacerImage      string `yaml:"spacer_image"`
 }
 
 type Layer struct {
