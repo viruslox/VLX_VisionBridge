@@ -82,3 +82,8 @@ input:
         size: 1920               # Width in pixels
         x: 0                     # X position on canvas
         y: 0                     # Y position on canvas
+        folder_options:
+          is_folder: false       # True to treat input_path as a playlist directory
+          shuffle: false         # True to shuffle the playlist
+          loop: false            # True to loop the playlist
+          delay_sec: 0           # Seconds of black screen delay between videos

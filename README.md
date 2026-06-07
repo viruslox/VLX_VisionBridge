@@ -36,6 +36,25 @@ Accepts raw PCM data directly via a Unix Domain Socket. If `InputPath` is left e
 }
 ```
 
+### Folder Playlist Input
+When the input path is a directory and the layer configuration includes `folder_options` with `is_folder: true`, VisionBridge treats it as a playlist. It plays all valid video files (e.g., MP4, WebM) found in the directory. You can shuffle the playlist, loop it, and insert a delay (black screen spacer) between videos.
+```yaml
+id: 3
+active: true
+input_type: "local"
+input_path: "/opt/VLX_VisionBridge/data/layer3"
+media: "Video+Audio"
+size: 1920
+x: 0
+y: 0
+volume: 100
+folder_options:
+  is_folder: true
+  shuffle: true
+  loop: true
+  delay_sec: 5
+```
+
 ### Network Input
 Optimized for MediaMTX via RTSP/SRT. The `network` input_type automatically injects `-fflags nobuffer -flags low_delay` for true zero-latency ingestion from MediaMTX (SRT/RTSP).
 ```json
