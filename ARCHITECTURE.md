@@ -33,7 +33,7 @@ The mixer coordinates two distinct input pipelines conceptually similar to "Sour
 
 ### 1. Standard Media Layers (`ffmpeg_source`)
 
-Up to 10 independent objects managed directly via FFmpeg inputs.
+Up to 10 independent objects managed directly via FFmpeg inputs. Customizable delay spacers (color or image-based) are dynamically generated for local playlist pipelines.
 - **State**: `Active` | `Inactive`
 - **Input Type**: `local` (folder of media), `srt`, `rtmp` (and `rtmps`), `webrtc`, `rtsp` (and `rtsps`), `ipc_audio` (raw PCM over UDS). For `local`, folder combinations are automatically parsed (video only, image + audio, image only, audio only).
 - **Media**: `Video+Audio` | `Video` | `Audio`

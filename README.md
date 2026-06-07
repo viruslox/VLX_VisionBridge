@@ -37,7 +37,7 @@ Accepts raw PCM data directly via a Unix Domain Socket. If `InputPath` is left e
 ```
 
 ### Folder Playlist Input
-When the input path is a directory and the layer configuration includes `folder_options` with `is_folder: true`, VisionBridge treats it as a playlist. It plays all valid video files (e.g., MP4, WebM) found in the directory. You can shuffle the playlist, loop it, and insert a delay (black screen spacer) between videos.
+When the input path is a directory and the layer configuration includes `folder_options` with `is_folder: true`, VisionBridge treats it as a playlist. It plays all valid video files (e.g., MP4, WebM) found in the directory. You can shuffle the playlist, loop it, and insert a delay (customizable delay spacer (color or image-based)) between videos.
 ```yaml
 id: 3
 active: true
@@ -53,6 +53,12 @@ folder_options:
   shuffle: true
   loop: true
   delay_sec: 5
+  spacer_width: 1920
+  spacer_height: 1080
+  spacer_fps: 30
+  spacer_sample_rate: 48000
+  spacer_color: "black"
+  spacer_image: ""
 ```
 
 ### Network Input

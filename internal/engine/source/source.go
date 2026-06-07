@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/user/VLX_VisionBridge/internal/models"
 )
@@ -18,13 +17,21 @@ func generateSpacer(path string, opts models.FolderOptions) error {
 	var cmd *exec.Cmd
 
 	if opts.SpacerImage != "" {
+		if _, err := os.Stat(opts.SpacerImage); err != nil {
+			fmt.Printf("spacer image not found: %v\nfalling back to color spacer...\n", err)
+			opts.SpacerImage = ""
+			return generateSpacer(path, opts)
+		}
 		cmd = exec.Command("ffmpeg",
 			"-y",
 			"-loop", "1",
+			// Dynamically injected SpacerFPS
 			"-framerate", strconv.Itoa(opts.SpacerFPS),
 			"-i", opts.SpacerImage,
 			"-f", "lavfi",
+			// Dynamically injected SpacerSampleRate
 			"-i", fmt.Sprintf("anullsrc=channel_layout=stereo:sample_rate=%d", opts.SpacerSampleRate),
+			// Use scale filter for SpacerWidth:SpacerHeight
 			"-vf", fmt.Sprintf("scale=%d:%d,setsar=1", opts.SpacerWidth, opts.SpacerHeight),
 			"-c:v", "libx264",
 			"-t", strconv.Itoa(opts.DelaySec),
@@ -36,8 +43,10 @@ func generateSpacer(path string, opts models.FolderOptions) error {
 		cmd = exec.Command("ffmpeg",
 			"-y",
 			"-f", "lavfi",
+			// Dynamically injected SpacerWidth, SpacerHeight, SpacerFPS
 			"-i", fmt.Sprintf("color=c=%s:s=%dx%d:r=%d", opts.SpacerColor, opts.SpacerWidth, opts.SpacerHeight, opts.SpacerFPS),
 			"-f", "lavfi",
+			// Dynamically injected SpacerSampleRate
 			"-i", fmt.Sprintf("anullsrc=channel_layout=stereo:sample_rate=%d", opts.SpacerSampleRate),
 			"-c:v", "libx264",
 			"-t", strconv.Itoa(opts.DelaySec),
@@ -106,7 +115,6 @@ func BuildInputArgs(layer models.Layer) models.InputResult {
 		if hasVideo && !hasImage && !hasAudio && len(videos) > 0 {
 			if layer.FolderOptions.IsFolder {
 				if layer.FolderOptions.Shuffle {
-					rand.Seed(time.Now().UnixNano())
 					rand.Shuffle(len(videos), func(i, j int) {
 						videos[i], videos[j] = videos[j], videos[i]
 					})
