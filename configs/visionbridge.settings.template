@@ -86,10 +86,10 @@ input:
           is_folder: false       # True to treat input_path as a playlist directory
           shuffle: false         # True to shuffle the playlist
           loop: false            # True to loop the playlist
-          delay_sec: 0           # Seconds of black screen delay between videos
-          spacer_width: 1920
-          spacer_height: 1080
-          spacer_fps: 30
-          spacer_sample_rate: 48000
-          spacer_color: "black"
+          delay_sec: 0           # Seconds of delay spacer between videos
+          spacer_width: 1920     # Width of the generated spacer
+          spacer_height: 1080    # Height of the generated spacer
+          spacer_fps: 30         # Framerate of the generated spacer
+          spacer_sample_rate: 48000 # Audio sample rate of the generated spacer
+          spacer_color: "black"  # Color for the background when not using an image
           spacer_image: ""       # Leave empty to use spacer_color, or provide an absolute path to a PNG/JPG
