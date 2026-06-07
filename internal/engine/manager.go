@@ -395,6 +395,19 @@ func (pm *ProcessManager) UpdateFilter(config *models.Config) {
 	pm.config = config
 	pm.mu.Unlock()
 
+	if config != nil && config.Input.FFmpegSource.Active {
+		var validLayers []models.Layer
+		for _, layer := range config.Input.FFmpegSource.Layers {
+			if layer.ID >= 0 && layer.ID <= 2 {
+				validLayers = append(validLayers, layer)
+			}
+		}
+		if len(validLayers) > 3 {
+			validLayers = validLayers[:3]
+		}
+		config.Input.FFmpegSource.Layers = validLayers
+	}
+
 	req := zmq4.NewReq(context.Background())
 	defer req.Close()
 	err := req.Dial("tcp://127.0.0.1:5555")
@@ -459,6 +472,19 @@ func sendZMQCommand(req zmq4.Socket, cmd string) {
 func (pm *ProcessManager) UpdateConfig(config *models.Config) {
 	pm.mu.Lock()
 	pm.config = config
+
+	if pm.config != nil && pm.config.Input.FFmpegSource.Active {
+		var validLayers []models.Layer
+		for _, layer := range pm.config.Input.FFmpegSource.Layers {
+			if layer.ID >= 0 && layer.ID <= 2 {
+				validLayers = append(validLayers, layer)
+			}
+		}
+		if len(validLayers) > 3 {
+			validLayers = validLayers[:3]
+		}
+		pm.config.Input.FFmpegSource.Layers = validLayers
+	}
 
 	if pm.cmd != nil && pm.cmd.Process != nil {
 		log.Println("Signaling FFmpeg process to stop gracefully for config update...")
