@@ -21,6 +21,7 @@ type ChromiumSource struct {
 	Z1BgColor string `yaml:"bg-color"`
 	Z1Volume *int   `yaml:"z1_volume"`
 	Z1Width  *int   `yaml:"z1_width"`
+	Z1Height *int   `yaml:"z1_height"`
 	Z1X      *int   `yaml:"z1_x"`
 	Z1Y      *int   `yaml:"z1_y"`
 
@@ -28,6 +29,7 @@ type ChromiumSource struct {
 	Z2Path   string `yaml:"z2_path"`
 	Z2Volume *int   `yaml:"z2_volume"`
 	Z2Width  *int   `yaml:"z2_width"`
+	Z2Height *int   `yaml:"z2_height"`
 	Z2X      *int   `yaml:"z2_x"`
 	Z2Y      *int   `yaml:"z2_y"`
 
@@ -35,6 +37,7 @@ type ChromiumSource struct {
 	Z3Path   string `yaml:"z3_path"`
 	Z3Volume *int   `yaml:"z3_volume"`
 	Z3Width  *int   `yaml:"z3_width"`
+	Z3Height *int   `yaml:"z3_height"`
 	Z3X      *int   `yaml:"z3_x"`
 	Z3Y      *int   `yaml:"z3_y"`
 
@@ -42,6 +45,7 @@ type ChromiumSource struct {
 	Z4Path   string `yaml:"z4_path"`
 	Z4Volume *int   `yaml:"z4_volume"`
 	Z4Width  *int   `yaml:"z4_width"`
+	Z4Height *int   `yaml:"z4_height"`
 	Z4X      *int   `yaml:"z4_x"`
 	Z4Y      *int   `yaml:"z4_y"`
 
@@ -49,6 +53,7 @@ type ChromiumSource struct {
 	Z5Path   string `yaml:"z5_path"`
 	Z5Volume *int   `yaml:"z5_volume"`
 	Z5Width  *int   `yaml:"z5_width"`
+	Z5Height *int   `yaml:"z5_height"`
 	Z5X      *int   `yaml:"z5_x"`
 	Z5Y      *int   `yaml:"z5_y"`
 
@@ -56,6 +61,7 @@ type ChromiumSource struct {
 	Z6Path   string `yaml:"z6_path"`
 	Z6Volume *int   `yaml:"z6_volume"`
 	Z6Width  *int   `yaml:"z6_width"`
+	Z6Height *int   `yaml:"z6_height"`
 	Z6X      *int   `yaml:"z6_x"`
 	Z6Y      *int   `yaml:"z6_y"`
 
@@ -63,8 +69,17 @@ type ChromiumSource struct {
 	Z7Path   string `yaml:"z7_path"`
 	Z7Volume *int   `yaml:"z7_volume"`
 	Z7Width  *int   `yaml:"z7_width"`
+	Z7Height *int   `yaml:"z7_height"`
 	Z7X      *int   `yaml:"z7_x"`
 	Z7Y      *int   `yaml:"z7_y"`
+
+	Z8Active bool   `yaml:"z8_active"`
+	Z8Path   string `yaml:"z8_path"`
+	Z8Volume *int   `yaml:"z8_volume"`
+	Z8Width  *int   `yaml:"z8_width"`
+	Z8Height *int   `yaml:"z8_height"`
+	Z8X      *int   `yaml:"z8_x"`
+	Z8Y      *int   `yaml:"z8_y"`
 }
 
 type InputSettings struct {

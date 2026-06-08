@@ -25,44 +25,58 @@ input:
     bg-color: ""
     z1_volume: 100
     z1_width: 1920
+    z1_height: 1080
     z1_x: 0
     z1_y: 0
     z2_active: false
     z2_path: "https://example.com/middle"
     z2_volume: 100
     z2_width: 1920
+    z2_height: 1080
     z2_x: 0
     z2_y: 0
     z3_active: false
     z3_path: "https://example.com/upper"
     z3_volume: 100
     z3_width: 1920
+    z3_height: 1080
     z3_x: 0
     z3_y: 0
     z4_active: false
     z4_path: ""
     z4_volume: 100
     z4_width: 1920
+    z4_height: 1080
     z4_x: 0
     z4_y: 0
     z5_active: false
     z5_path: ""
     z5_volume: 100
     z5_width: 1920
+    z5_height: 1080
     z5_x: 0
     z5_y: 0
     z6_active: false
     z6_path: ""
     z6_volume: 100
     z6_width: 1920
+    z6_height: 1080
     z6_x: 0
     z6_y: 0
     z7_active: false
     z7_path: ""
     z7_volume: 100
     z7_width: 1920
+    z7_height: 1080
     z7_x: 0
     z7_y: 0
+    z8_active: false
+    z8_path: ""
+    z8_volume: 100
+    z8_width: 1920
+    z8_height: 1080
+    z8_x: 0
+    z8_y: 0
 
   ffmpeg_source:
     active: false

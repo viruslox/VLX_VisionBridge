@@ -129,7 +129,7 @@ func (pm *ProcessManager) Stop() {
 	pm.mu.Unlock()
 }
 
-func buildOverlayElement(id string, zIndex int, path string, width, x, y, volume *int) (string, string, string) {
+func buildOverlayElement(id string, zIndex int, path string, width, height, x, y, volume *int) (string, string, string) {
 	if path == "" {
 		return "", "", ""
 	}
@@ -147,6 +147,9 @@ func buildOverlayElement(id string, zIndex int, path string, width, x, y, volume
 	}
 	if width != nil {
 		style += fmt.Sprintf("width: %dpx; ", *width)
+	}
+	if height != nil {
+		style += fmt.Sprintf("height: %dpx; ", *height)
 	}
 	style += "}\n"
 
@@ -199,9 +202,17 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 
 		if shouldStart {
 			cs := cfg.Input.ChromiumSource
-			bgColor := "transparent"
+			bgColor := "#00FF00"
 			if cs.Z1BgColor != "" {
 				bgColor = cs.Z1BgColor
+			}
+
+			resParts := strings.Split(cfg.Input.Resolution, "x")
+			resWidth := "1920"
+			resHeight := "1080"
+			if len(resParts) == 2 {
+				resWidth = resParts[0]
+				resHeight = resParts[1]
 			}
 
 			// Generate HTML file
@@ -217,43 +228,49 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 			var scripts string
 
 			if cs.Z1Active {
-				s, e, sc := buildOverlayElement("z1", 1, cs.Z1Path, cs.Z1Width, cs.Z1X, cs.Z1Y, cs.Z1Volume)
+				s, e, sc := buildOverlayElement("z1", 1, cs.Z1Path, cs.Z1Width, cs.Z1Height, cs.Z1X, cs.Z1Y, cs.Z1Volume)
 				htmlContent += s
 				elements += e
 				scripts += sc
 			}
 			if cs.Z2Active {
-				s, e, sc := buildOverlayElement("z2", 2, cs.Z2Path, cs.Z2Width, cs.Z2X, cs.Z2Y, cs.Z2Volume)
+				s, e, sc := buildOverlayElement("z2", 2, cs.Z2Path, cs.Z2Width, cs.Z2Height, cs.Z2X, cs.Z2Y, cs.Z2Volume)
 				htmlContent += s
 				elements += e
 				scripts += sc
 			}
 			if cs.Z3Active {
-				s, e, sc := buildOverlayElement("z3", 3, cs.Z3Path, cs.Z3Width, cs.Z3X, cs.Z3Y, cs.Z3Volume)
+				s, e, sc := buildOverlayElement("z3", 3, cs.Z3Path, cs.Z3Width, cs.Z3Height, cs.Z3X, cs.Z3Y, cs.Z3Volume)
 				htmlContent += s
 				elements += e
 				scripts += sc
 			}
 			if cs.Z4Active {
-				s, e, sc := buildOverlayElement("z4", 4, cs.Z4Path, cs.Z4Width, cs.Z4X, cs.Z4Y, cs.Z4Volume)
+				s, e, sc := buildOverlayElement("z4", 4, cs.Z4Path, cs.Z4Width, cs.Z4Height, cs.Z4X, cs.Z4Y, cs.Z4Volume)
 				htmlContent += s
 				elements += e
 				scripts += sc
 			}
 			if cs.Z5Active {
-				s, e, sc := buildOverlayElement("z5", 5, cs.Z5Path, cs.Z5Width, cs.Z5X, cs.Z5Y, cs.Z5Volume)
+				s, e, sc := buildOverlayElement("z5", 5, cs.Z5Path, cs.Z5Width, cs.Z5Height, cs.Z5X, cs.Z5Y, cs.Z5Volume)
 				htmlContent += s
 				elements += e
 				scripts += sc
 			}
 			if cs.Z6Active {
-				s, e, sc := buildOverlayElement("z6", 6, cs.Z6Path, cs.Z6Width, cs.Z6X, cs.Z6Y, cs.Z6Volume)
+				s, e, sc := buildOverlayElement("z6", 6, cs.Z6Path, cs.Z6Width, cs.Z6Height, cs.Z6X, cs.Z6Y, cs.Z6Volume)
 				htmlContent += s
 				elements += e
 				scripts += sc
 			}
 			if cs.Z7Active {
-				s, e, sc := buildOverlayElement("z7", 7, cs.Z7Path, cs.Z7Width, cs.Z7X, cs.Z7Y, cs.Z7Volume)
+				s, e, sc := buildOverlayElement("z7", 7, cs.Z7Path, cs.Z7Width, cs.Z7Height, cs.Z7X, cs.Z7Y, cs.Z7Volume)
+				htmlContent += s
+				elements += e
+				scripts += sc
+			}
+			if cs.Z8Active {
+				s, e, sc := buildOverlayElement("z8", 8, cs.Z8Path, cs.Z8Width, cs.Z8Height, cs.Z8X, cs.Z8Y, cs.Z8Volume)
 				htmlContent += s
 				elements += e
 				scripts += sc
@@ -261,7 +278,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 
 			htmlContent += `</style>
 </head>
-<body style="margin: 0; padding: 0;">
+<body style="margin: 0; padding: 0; width: ` + resWidth + `px; height: ` + resHeight + `px;">
 `
 			htmlContent += elements
 			if scripts != "" {
@@ -295,18 +312,10 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				}
 			}
 
-			resParts := strings.Split(cfg.Input.Resolution, "x")
-			width := "1920"
-			height := "1080"
-			if len(resParts) == 2 {
-				width = resParts[0]
-				height = resParts[1]
-			}
-
-			cmd := exec.Command("xvfb-run", serverNum, fmt.Sprintf("--server-args=-screen 0 %sx%sx24 -ac", width, height),
+			cmd := exec.Command("xvfb-run", serverNum, fmt.Sprintf("--server-args=-screen 0 %sx%sx24 -ac", resWidth, resHeight),
 				chromeBin, "--kiosk", "--disable-infobars", "--disable-extensions", "--test-type",
-				fmt.Sprintf("--window-size=%s,%s", width, height), "--window-position=0,0", "--hide-scrollbars","--no-sandbox", "--disable-dev-shm-usage",
-				"--autoplay-policy=no-user-gesture-required", fileURL)
+				fmt.Sprintf("--window-size=%s,%s", resWidth, resHeight), "--window-position=0,0", "--hide-scrollbars","--no-sandbox", "--disable-dev-shm-usage",
+				"--autoplay-policy=no-user-gesture-required", "--force-device-scale-factor=1", fileURL)
 
 			err = cmd.Start()
 			if err != nil {
