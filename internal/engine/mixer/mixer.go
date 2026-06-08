@@ -101,11 +101,27 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 	if cfg.Input.ChromiumSource.Active {
 		args = append(args, "-f", "x11grab", "-video_size", cfg.Input.Resolution, "-draw_mouse", "0", "-i", ":99")
 
+		chromaColor := cfg.Input.ChromiumSource.Z1BgColor
+		if chromaColor == "" {
+			chromaColor = "#00FF00"
+		}
+		if strings.HasPrefix(chromaColor, "#") {
+			chromaColor = "0x" + chromaColor[1:]
+		}
+
 		layerVideoPad := string(append(strconv.AppendInt([]byte("["), int64(inputIdx), 10), ":v]"...))
+		chromaPad := "[chroma_chromium]"
 		outPad := "[out_chromium]"
 
-		filterComplex.WriteString(currentBasePad)
 		filterComplex.WriteString(layerVideoPad)
+		filterComplex.WriteString(" colorkey=")
+		filterComplex.WriteString(chromaColor)
+		filterComplex.WriteString(":0.1:0.1 ")
+		filterComplex.WriteString(chromaPad)
+		filterComplex.WriteString(";\n")
+
+		filterComplex.WriteString(currentBasePad)
+		filterComplex.WriteString(chromaPad)
 		filterComplex.WriteString(" overlay=x=0:y=0 ")
 		filterComplex.WriteString(outPad)
 		filterComplex.WriteString(";\n")

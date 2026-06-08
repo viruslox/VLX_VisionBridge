@@ -164,7 +164,7 @@ func BuildInputArgs(layer models.Layer) models.InputResult {
 				if layer.FolderOptions.Loop {
 					args = append(args, "-stream_loop", "-1")
 				}
-				args = append(args, "-f", "concat", "-safe", "0", "-i", playlistPath)
+				args = append(args, "-fflags", "+genpts+igndts", "-f", "concat", "-safe", "0", "-async", "1", "-vsync", "1", "-i", playlistPath)
 				return models.InputResult{Args: args, InputCount: 1, HasVideo: true, HasAudio: true}
 			} else {
 				args = append(args, "-re", "-stream_loop", "-1", "-i", videos[0])
