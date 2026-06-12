@@ -4,17 +4,15 @@ import (
 	"encoding/json"
 	"net"
 	"os"
-	"testing"
-	"time"
 	"os/exec"
 	"testing"
+	"time"
 
 	"github.com/user/VLX_VisionBridge/internal/models"
 )
 
 func TestStartConnectorListener(t *testing.T) {
 	// Initialize the ProcessManager
-func TestHandleControlCommand_Stream(t *testing.T) {
 	pm := NewProcessManager(nil)
 	pm.config = &models.Config{
 		Output: models.OutputSettings{
@@ -59,6 +57,37 @@ func TestHandleControlCommand_Stream(t *testing.T) {
 		Timestamp: time.Now().Unix(),
 		Action:    "set_input_state",
 		Target:    "stream",
+		Payload: ControlPayload{
+			Enabled: true,
+		},
+	}
+
+	encoder := json.NewEncoder(conn)
+	if err := encoder.Encode(&cmd); err != nil {
+		t.Fatalf("Failed to encode and send JSON payload: %v", err)
+	}
+
+	// 4. Wait a moment for the command to be processed
+	time.Sleep(100 * time.Millisecond)
+
+	// 5. Verify the configuration state changed
+	pm.mu.Lock()
+	active := pm.config.Output.Active
+	pm.mu.Unlock()
+
+	if !active {
+		t.Errorf("Expected Output.Active to be true, got %v", active)
+	}
+}
+
+func TestHandleControlCommand_Stream(t *testing.T) {
+	pm := NewProcessManager(nil)
+	pm.config = &models.Config{
+		Output: models.OutputSettings{
+			Active: false,
+		},
+	}
+
 	// Enable stream
 	cmdEnable := ControlCommand{
 		Action: "set_input_state",
@@ -124,23 +153,6 @@ func TestHandleControlCommand_Layer(t *testing.T) {
 		Payload: ControlPayload{
 			Enabled: true,
 		},
-	}
-
-	encoder := json.NewEncoder(conn)
-	if err := encoder.Encode(&cmd); err != nil {
-		t.Fatalf("Failed to encode and send JSON payload: %v", err)
-	}
-
-	// 4. Wait a moment for the command to be processed
-	time.Sleep(100 * time.Millisecond)
-
-	// 5. Verify the configuration state changed
-	pm.mu.Lock()
-	active := pm.config.Output.Active
-	pm.mu.Unlock()
-
-	if !active {
-		t.Errorf("Expected Output.Active to be true, got %v", active)
 	}
 	pm.handleControlCommand(cmdEnable)
 
