@@ -121,6 +121,9 @@ func (pm *ProcessManager) handleControlCommand(cmd ControlCommand) {
 	} else if cmd.Action == "trigger_alert" {
 		log.Printf("trigger_alert action received for target %s, text: %s", cmd.Target, cmd.Payload.Text)
 		// Custom logic can be handled here or via ZMQ if drawtext is implemented.
+	} else if cmd.Action == "reload" && cmd.Target == "chromium" {
+		log.Println("Reloading Chromium overlay via control command")
+		pm.ReloadChromium()
 	} else {
 		log.Printf("Unknown action received: %s", cmd.Action)
 	}
