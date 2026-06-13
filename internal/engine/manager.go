@@ -495,6 +495,12 @@ func (pm *ProcessManager) UpdateConfig(config *models.Config) {
 		pm.config.Input.FFmpegSource.Layers = validLayers
 	}
 
+	if cmd, exists := pm.overlayCmds[99]; exists && cmd != nil && cmd.Process != nil {
+		log.Println("Signaling Chromium overlay process to stop gracefully for config update...")
+		_ = cmd.Process.Signal(syscall.SIGTERM)
+		delete(pm.overlayCmds, 99)
+	}
+
 	if pm.cmd != nil && pm.cmd.Process != nil {
 		log.Println("Signaling FFmpeg process to stop gracefully for config update...")
 		_ = pm.cmd.Process.Signal(syscall.SIGTERM)
@@ -858,4 +864,20 @@ func (pm *ProcessManager) waitForProcess(ctx context.Context, cmd *exec.Cmd) (er
 	}
 
 	return runErr, stderrStr
+}
+
+// ReloadChromium safely restarts the Chromium headless process.
+func (pm *ProcessManager) ReloadChromium() {
+	pm.mu.Lock()
+	if cmd, exists := pm.overlayCmds[99]; exists && cmd != nil && cmd.Process != nil {
+		log.Println("Signaling Chromium overlay process to stop gracefully for manual reload...")
+		_ = cmd.Process.Signal(syscall.SIGTERM)
+		delete(pm.overlayCmds, 99)
+	}
+	cfg := pm.config
+	pm.mu.Unlock()
+
+	if cfg != nil {
+		pm.manageOverlays(cfg)
+	}
 }
