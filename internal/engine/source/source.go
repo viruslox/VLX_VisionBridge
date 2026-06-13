@@ -191,7 +191,7 @@ func BuildInputArgs(layer models.Layer) models.InputResult {
 	case "srt":
 		return models.InputResult{Args: []string{"-fflags", "nobuffer", "-flags", "low_delay", "-i", safePath}, InputCount: 1, HasVideo: true, HasAudio: true}
 	case "rtmp", "rtmps":
-		return models.InputResult{Args: []string{"-fflags", "nobuffer", "-flags", "low_delay", "-listen", "1", "-i", safePath}, InputCount: 1, HasVideo: true, HasAudio: true}
+		return models.InputResult{Args: []string{"-fflags", "nobuffer", "-flags", "low_delay", "-i", safePath}, InputCount: 1, HasVideo: true, HasAudio: true}
 	case "webrtc":
 		return models.InputResult{Args: []string{"-fflags", "nobuffer", "-flags", "low_delay", "-i", safePath}, InputCount: 1, HasVideo: true, HasAudio: true}
 	case "rtsp", "rtsps":
