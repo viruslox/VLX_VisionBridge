@@ -83,7 +83,7 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 				}
 
 				filterComplex.WriteString(layerAudioPad)
-				filterComplex.WriteString(" aresample=48000:async=1,aformat=sample_rates=48000:channel_layouts=stereo,asetpts=N/SR,")
+				filterComplex.WriteString(" aresample=async=1,aformat=sample_rates=48000:channel_layouts=stereo,asetpts=N,")
 				filterComplex.WriteString(" volume@layer")
 				filterComplex.WriteString(strconv.Itoa(layer.ID))
 				filterComplex.WriteString("=")
@@ -149,7 +149,7 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 			layerAudioPad := string(append(strconv.AppendInt([]byte("["), int64(inputIdx+1), 10), ":a]"...))
 			aOutPad := "[a_chromium]"
 			filterComplex.WriteString(layerAudioPad)
-			filterComplex.WriteString(" aresample=48000:async=1,aformat=sample_rates=48000:channel_layouts=stereo,asetpts=N/SR,")
+			filterComplex.WriteString(" aresample=async=1,aformat=sample_rates=48000:channel_layouts=stereo,asetpts=N,")
 			filterComplex.WriteString(" volume@layer99=1.00 ")
 			filterComplex.WriteString(aOutPad)
 			filterComplex.WriteString(";\n")
