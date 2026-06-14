@@ -144,7 +144,7 @@ func promptChromiumInstall() {
 			log.Printf("Warning: Failed to run apt-get update: %v", err)
 		}
 
-		cmd := exec.Command("apt-get", "install", "-y", "xvfb", "chromium-common", "chromium", "chromium-headless-shell", "chromium-driver", "chromium-lwn4chrome", "chromium-sandbox", "chromium-shell")
+		cmd := exec.Command("apt-get", "install", "-y", "xvfb", "chromium-common", "chromium", "chromium-headless-shell", "chromium-driver", "chromium-lwn4chrome", "chromium-sandbox", "chromium-shell", "pulseaudio")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
