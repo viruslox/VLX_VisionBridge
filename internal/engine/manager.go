@@ -312,6 +312,9 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				}
 			}
 
+			os.Remove("/tmp/.X99-lock")
+			os.RemoveAll("/tmp/.X11-unix/X99")
+
 			cmd := exec.Command("xvfb-run", serverNum, fmt.Sprintf("--server-args=-screen 0 %sx%sx24 -ac", resWidth, resHeight),
 				chromeBin, "--kiosk", "--disable-infobars", "--disable-extensions", "--test-type",
 				fmt.Sprintf("--window-size=%s,%s", resWidth, resHeight), "--window-position=0,0", "--hide-scrollbars","--no-sandbox", "--disable-dev-shm-usage",
