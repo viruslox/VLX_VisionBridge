@@ -12,9 +12,10 @@ import (
 func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 	var args []string
 	var filterComplex strings.Builder
-	filterComplex.WriteString("color=s=")
-	filterComplex.WriteString(cfg.Input.Resolution)
-	filterComplex.WriteString(":c=black [base];\n")
+
+	// FIX 1: Forza il framerate del canvas a 30fps. Senza questo,
+	// il background gira a 25fps di default e "strozza" tutte le sorgenti a 30/60fps causando buffering e lag.
+	filterComplex.WriteString(fmt.Sprintf("color=s=%s:r=30:c=black [base];\n", cfg.Input.Resolution))
 
 	inputIdx := 0
 	currentBasePad := "[base]"
@@ -38,59 +39,37 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 			layerAudioPad := ""
 
 			if res.InputCount == 1 {
-				layerVideoPad = string(append(strconv.AppendInt([]byte("["), int64(inputIdx), 10), ":v]"...))
-				layerAudioPad = string(append(strconv.AppendInt([]byte("["), int64(inputIdx), 10), ":a]"...))
+				layerVideoPad = fmt.Sprintf("[%d:v]", inputIdx)
+				layerAudioPad = fmt.Sprintf("[%d:a]", inputIdx)
 			} else if res.InputCount == 2 {
-				layerVideoPad = string(append(strconv.AppendInt([]byte("["), int64(inputIdx), 10), ":v]"...))
-				layerAudioPad = string(append(strconv.AppendInt([]byte("["), int64(inputIdx+1), 10), ":a]"...))
+				layerVideoPad = fmt.Sprintf("[%d:v]", inputIdx)
+				layerAudioPad = fmt.Sprintf("[%d:a]", inputIdx+1)
 			}
 
 			// Handle Video
 			if (media == "Video" || media == "Video+Audio") && res.HasVideo {
-				var buf [24]byte
-				scaledPad := string(append(strconv.AppendInt(append(buf[:0], "[v"...), int64(i), 10), "_scaled]"...))
-				outPad := string(append(strconv.AppendInt(append(buf[:0], "[out"...), int64(i), 10), ']'))
+				scaledPad := fmt.Sprintf("[v%d_scaled]", i)
+				outPad := fmt.Sprintf("[out%d]", i)
 
-				filterComplex.WriteString(layerVideoPad)
-				filterComplex.WriteString(" scale=")
-				filterComplex.WriteString(strconv.Itoa(layer.Size))
-				filterComplex.WriteString(":-1 ")
-				filterComplex.WriteString(scaledPad)
-				filterComplex.WriteString(";\n")
-
-				filterComplex.WriteString(currentBasePad)
-				filterComplex.WriteString(scaledPad)
-				filterComplex.WriteString(" overlay@layer")
-				filterComplex.WriteString(strconv.Itoa(layer.ID))
-				filterComplex.WriteString("=x=")
-				filterComplex.WriteString(strconv.Itoa(layer.X))
-				filterComplex.WriteString(":y=")
-				filterComplex.WriteString(strconv.Itoa(layer.Y))
-				filterComplex.WriteString(" ")
-				filterComplex.WriteString(outPad)
-				filterComplex.WriteString(";\n")
+				// FIX 2: setpts=PTS-STARTPTS per il video. Azzera i timestamp (uptime vs local),
+				// impedendo ad FFmpeg di freezarsi per cercare di allineare ore di scarto.
+				filterComplex.WriteString(fmt.Sprintf("%s setpts=PTS-STARTPTS,scale=%d:-1 %s;\n", layerVideoPad, layer.Size, scaledPad))
+				filterComplex.WriteString(fmt.Sprintf("%s%s overlay@layer%d=x=%d:y=%d %s;\n", currentBasePad, scaledPad, layer.ID, layer.X, layer.Y, outPad))
+				
 				currentBasePad = outPad
 			}
 
 			// Handle Audio
 			if (media == "Audio" || media == "Video+Audio") && res.HasAudio {
-				var buf [24]byte
-				aOutPad := string(append(strconv.AppendInt(append(buf[:0], "[a"...), int64(i), 10), ']'))
+				aOutPad := fmt.Sprintf("[a%d]", i)
 
 				volumeVal := 1.0
 				if layer.Volume != nil {
 					volumeVal = float64(*layer.Volume) / 100.0
 				}
 
-				filterComplex.WriteString(layerAudioPad)
-				filterComplex.WriteString(" aresample=async=1,aformat=sample_rates=48000:channel_layouts=stereo,asetpts=N,")
-				filterComplex.WriteString(" volume@layer")
-				filterComplex.WriteString(strconv.Itoa(layer.ID))
-				filterComplex.WriteString("=")
-				filterComplex.WriteString(fmt.Sprintf("%.2f", volumeVal))
-				filterComplex.WriteString(" ")
-				filterComplex.WriteString(aOutPad)
-				filterComplex.WriteString(";\n")
+				// FIX 3: asetpts=PTS-STARTPTS riallinea in modo assoluto e ferreo l'audio al suo frame video.
+				filterComplex.WriteString(fmt.Sprintf("%s aresample=48000:async=1,aformat=sample_rates=48000:channel_layouts=stereo,asetpts=PTS-STARTPTS, volume@layer%d=%.2f %s;\n", layerAudioPad, layer.ID, volumeVal, aOutPad))
 
 				audioPads = append(audioPads, aOutPad)
 			}
@@ -114,9 +93,9 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 		}
 
 		if hasAudio {
-			args = append(args, "-f", "x11grab", "-video_size", cfg.Input.Resolution, "-draw_mouse", "0", "-i", ":99", "-f", "pulse", "-i", "default")
+			args = append(args, "-f", "x11grab", "-thread_queue_size", "1024", "-video_size", cfg.Input.Resolution, "-draw_mouse", "0", "-i", ":99", "-f", "pulse", "-thread_queue_size", "1024", "-i", "default")
 		} else {
-			args = append(args, "-f", "x11grab", "-video_size", cfg.Input.Resolution, "-draw_mouse", "0", "-i", ":99")
+			args = append(args, "-f", "x11grab", "-thread_queue_size", "1024", "-video_size", cfg.Input.Resolution, "-draw_mouse", "0", "-i", ":99")
 		}
 
 		chromaColor := cfg.Input.ChromiumSource.Z1BgColor
@@ -127,32 +106,23 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 			chromaColor = "0x" + chromaColor[1:]
 		}
 
-		layerVideoPad := string(append(strconv.AppendInt([]byte("["), int64(inputIdx), 10), ":v]"...))
+		layerVideoPad := fmt.Sprintf("[%d:v]", inputIdx)
 		chromaPad := "[chroma_chromium]"
 		outPad := "[out_chromium]"
 
-		filterComplex.WriteString(layerVideoPad)
-		filterComplex.WriteString(" colorkey=")
-		filterComplex.WriteString(chromaColor)
-		filterComplex.WriteString(":0.1:0.1 ")
-		filterComplex.WriteString(chromaPad)
-		filterComplex.WriteString(";\n")
-
-		filterComplex.WriteString(currentBasePad)
-		filterComplex.WriteString(chromaPad)
-		filterComplex.WriteString(" overlay=x=0:y=0 ")
-		filterComplex.WriteString(outPad)
-		filterComplex.WriteString(";\n")
+		// FIX 4: reset dei timestamp video di Chromium per neutralizzare l'uptime di sistema
+		filterComplex.WriteString(fmt.Sprintf("%s setpts=PTS-STARTPTS,colorkey=%s:0.1:0.1 %s;\n", layerVideoPad, chromaColor, chromaPad))
+		filterComplex.WriteString(fmt.Sprintf("%s%s overlay=x=0:y=0 %s;\n", currentBasePad, chromaPad, outPad))
+		
 		currentBasePad = outPad
 
 		if hasAudio {
-			layerAudioPad := string(append(strconv.AppendInt([]byte("["), int64(inputIdx+1), 10), ":a]"...))
+			layerAudioPad := fmt.Sprintf("[%d:a]", inputIdx+1)
 			aOutPad := "[a_chromium]"
-			filterComplex.WriteString(layerAudioPad)
-			filterComplex.WriteString(" aresample=async=1,aformat=sample_rates=48000:channel_layouts=stereo,asetpts=N,")
-			filterComplex.WriteString(" volume@layer99=1.00 ")
-			filterComplex.WriteString(aOutPad)
-			filterComplex.WriteString(";\n")
+
+			// FIX 5: reset dei timestamp audio di Pulse per agganciarli al video
+			filterComplex.WriteString(fmt.Sprintf("%s aresample=48000:async=1,aformat=sample_rates=48000:channel_layouts=stereo,asetpts=PTS-STARTPTS, volume@layer99=1.00 %s;\n", layerAudioPad, aOutPad))
+			
 			audioPads = append(audioPads, aOutPad)
 			inputIdx += 2
 		} else {
@@ -160,10 +130,9 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 		}
 	}
 
-
 	var finalAudioPad string
 	if len(audioPads) == 0 {
-		filterComplex.WriteString("anullsrc=r=44100:cl=stereo [a_out];\n")
+		filterComplex.WriteString("anullsrc=r=48000:cl=stereo [a_out];\n")
 		finalAudioPad = "[a_out]"
 	} else if len(audioPads) == 1 {
 		finalAudioPad = audioPads[0]
@@ -171,17 +140,12 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 		for _, pad := range audioPads {
 			filterComplex.WriteString(pad)
 		}
-		filterComplex.WriteString(" amix=inputs=")
-		filterComplex.WriteString(strconv.Itoa(len(audioPads)))
-		filterComplex.WriteString(":duration=longest:dropout_transition=0 [a_out];\n")
+		filterComplex.WriteString(fmt.Sprintf(" amix=inputs=%d:duration=longest:dropout_transition=0 [a_out];\n", len(audioPads)))
 		finalAudioPad = "[a_out]"
 	}
 
 	finalVideoPad := "[v_out]"
-	filterComplex.WriteString(currentBasePad)
-	filterComplex.WriteString(" zmq=b=tcp\\\\://127.0.0.1\\\\:5555 ")
-	filterComplex.WriteString(finalVideoPad)
-	filterComplex.WriteString(";\n")
+	filterComplex.WriteString(fmt.Sprintf("%s zmq=b=tcp\\\\://127.0.0.1\\\\:5555 %s;\n", currentBasePad, finalVideoPad))
 
 	return args, filterComplex.String(), finalVideoPad, finalAudioPad
 }
