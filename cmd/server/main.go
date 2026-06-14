@@ -69,6 +69,24 @@ func HandleConfigChange(pm ProcessUpdater, newCfg *models.Config, diff config.Di
 	}
 }
 
+// managePulseAudio starts the PulseAudio daemon and returns a cleanup closure.
+func managePulseAudio() func() {
+	// Kill any existing/stale pulseaudio daemon
+	_ = exec.Command("pulseaudio", "-k").Run()
+
+	// Start the daemon
+	if err := exec.Command("pulseaudio", "-D", "--exit-idle-time=-1").Run(); err != nil {
+		log.Printf("Warning: Failed to start PulseAudio daemon: %v", err)
+	} else {
+		log.Println("PulseAudio daemon started successfully.")
+	}
+
+	return func() {
+		log.Println("Stopping PulseAudio daemon...")
+		_ = exec.Command("pulseaudio", "-k").Run()
+	}
+}
+
 // SetupDatabase initializes the database connection and ensures tables are set up.
 func SetupDatabase(dsn string) *sql.DB {
 	if dsn == "" {
@@ -130,6 +148,8 @@ func main() {
 	defer cancel()
 
 	// 4. Setup Process Manager
+	cleanupPulse := managePulseAudio()
+	defer cleanupPulse()
 	pm := engine.NewProcessManager(dbConn)
 	defer pm.Stop()
 
