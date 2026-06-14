@@ -83,6 +83,7 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 				}
 
 				filterComplex.WriteString(layerAudioPad)
+				filterComplex.WriteString(" aresample=48000,aformat=sample_rates=48000:channel_layouts=stereo,")
 				filterComplex.WriteString(" volume@layer")
 				filterComplex.WriteString(strconv.Itoa(layer.ID))
 				filterComplex.WriteString("=")
@@ -99,7 +100,24 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 	}
 
 	if cfg.Input.ChromiumSource.Active {
-		args = append(args, "-f", "x11grab", "-video_size", cfg.Input.Resolution, "-draw_mouse", "0", "-i", ":99")
+		hasAudio := false
+		cs := cfg.Input.ChromiumSource
+		if (cs.Z1Volume != nil && *cs.Z1Volume > 0) ||
+			(cs.Z2Volume != nil && *cs.Z2Volume > 0) ||
+			(cs.Z3Volume != nil && *cs.Z3Volume > 0) ||
+			(cs.Z4Volume != nil && *cs.Z4Volume > 0) ||
+			(cs.Z5Volume != nil && *cs.Z5Volume > 0) ||
+			(cs.Z6Volume != nil && *cs.Z6Volume > 0) ||
+			(cs.Z7Volume != nil && *cs.Z7Volume > 0) ||
+			(cs.Z8Volume != nil && *cs.Z8Volume > 0) {
+			hasAudio = true
+		}
+
+		if hasAudio {
+			args = append(args, "-f", "x11grab", "-video_size", cfg.Input.Resolution, "-draw_mouse", "0", "-i", ":99", "-f", "pulse", "-i", "default")
+		} else {
+			args = append(args, "-f", "x11grab", "-video_size", cfg.Input.Resolution, "-draw_mouse", "0", "-i", ":99")
+		}
 
 		chromaColor := cfg.Input.ChromiumSource.Z1BgColor
 		if chromaColor == "" {
@@ -127,7 +145,19 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 		filterComplex.WriteString(";\n")
 		currentBasePad = outPad
 
-		inputIdx += 1
+		if hasAudio {
+			layerAudioPad := string(append(strconv.AppendInt([]byte("["), int64(inputIdx+1), 10), ":a]"...))
+			aOutPad := "[a_chromium]"
+			filterComplex.WriteString(layerAudioPad)
+			filterComplex.WriteString(" aresample=48000,aformat=sample_rates=48000:channel_layouts=stereo,")
+			filterComplex.WriteString(" volume@layer99=1.00 ")
+			filterComplex.WriteString(aOutPad)
+			filterComplex.WriteString(";\n")
+			audioPads = append(audioPads, aOutPad)
+			inputIdx += 2
+		} else {
+			inputIdx += 1
+		}
 	}
 
 
