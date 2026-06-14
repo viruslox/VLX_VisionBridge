@@ -35,7 +35,7 @@ The mixer coordinates two distinct input pipelines conceptually similar to "Sour
 
 Up to 10 independent objects managed directly via FFmpeg inputs. Customizable delay spacers (color or image-based) are dynamically generated for local playlist pipelines.
 - **State**: `Active` | `Inactive`
-- **Input Type**: `local` (folder of media), `srt`, `rtmp` (and `rtmps`), `webrtc`, `rtsp` (and `rtsps`), `ipc_audio` (raw PCM over UDS). For `local`, folder combinations are automatically parsed (video only, image + audio, image only, audio only).
+- **Input Type**: `local` (folder of media), `srt`, `rtmp` (and `rtmps`), `webrtc`, `rtsp` (and `rtsps`). For `local`, folder combinations are automatically parsed (video only, image + audio, image only, audio only).
 - **Media**: `Video+Audio` | `Video` | `Audio`
 - **Transform**: `Size` (scale width), `X`, `Y` (Position).
 - **Audio**: Configurable `Volume` per layer.
@@ -55,7 +55,6 @@ The base canvas size for the filtergraph is defined by `cfg.Input.Resolution` wi
 
 ### VLX Connector (IPC Integration)
 To eliminate local SRT network overhead and reduce latency for deployments running alongside `VLX_ChatBridge`, VisionBridge integrates a dedicated IPC connector:
-- **Audio Ingress (`ipc_audio`)**: Accepts raw PCM data (`s16le`, 48kHz, 2-channel) directly via a Unix Domain Socket (`/tmp/vlx_audio.sock`), injecting it seamlessly into the FFmpeg audio mixer.
 - **Control Ingress**: A listener on the Unix control socket (`/tmp/vlx_control.sock`) handles incoming control messages. It parses `set_input_state` JSON IPC events, safely updates the in-memory config struct using Mutexes, and dynamically dispatches ZMQ commands directly into the FFmpeg filtergraph to adjust elements (like layers) without requiring Web browser overhead or killing the FFmpeg process.
 - **Auto-Fallback Concept**: Users can hook `runOnPublish` / `runOnUnpublish` scripts in MediaMTX to inject JSON into VisionBridge's control socket. This allows creating an automatic "Be Right Back" screen or fallback sequence upon signal loss.
 

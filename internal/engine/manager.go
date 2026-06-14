@@ -683,34 +683,6 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 		return monitorActionStop, "", false
 	}
 
-	hasIPCAudio := false
-	if cfg.Input.FFmpegSource.Active {
-		for _, layer := range cfg.Input.FFmpegSource.Layers {
-			if layer.Active && strings.ToLower(layer.InputType) == "ipc_audio" {
-				hasIPCAudio = true
-				break
-			}
-		}
-	}
-
-	if hasIPCAudio {
-		audioSockPath := "/tmp/vlx_audio.sock" // default fallback
-		for _, layer := range pm.config.Input.FFmpegSource.Layers {
-			if strings.ToLower(layer.InputType) == "ipc_audio" && layer.InputPath != "" {
-				audioSockPath = layer.InputPath
-				break
-			}
-		}
-		// We must clean up any stale socket so FFmpeg can successfully bind to it as a listener.
-		if _, err := os.Stat(audioSockPath); err == nil {
-			if err := os.Remove(audioSockPath); err != nil {
-				log.Printf("Failed to remove stale audio socket: %v", err)
-			} else {
-				log.Println("Removed stale audio socket before starting FFmpeg.")
-			}
-		}
-	}
-
 	pm.manageOverlays(cfg)
 
 	args, err := BuildFFmpegArgs(cfg)

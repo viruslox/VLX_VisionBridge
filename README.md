@@ -31,19 +31,6 @@ The service is designed for professional 24/7 broadcasting environments where co
 
 VisionBridge operates alongside MediaMTX and ChatBridge on the same localhost. It handles low-latency video ingestion and real-time scene switching via ZeroMQ without restarting FFmpeg.
 
-### IPC Audio Input
-Accepts raw PCM data directly via a Unix Domain Socket. If `InputPath` is left empty, it defaults to `/tmp/vlx_audio.sock`, but it can also be explicitly defined.
-```json
-{
-  "id": 1,
-  "active": true,
-  "input_type": "ipc_audio",
-  "input_path": "",
-  "media": "Audio",
-  "volume": 1.0
-}
-```
-
 ### Folder Playlist Input
 When the input path is a directory and the layer configuration includes `folder_options` with `is_folder: true`, VisionBridge treats it as a playlist. It plays all valid video files (e.g., MP4, WebM) found in the directory. You can shuffle the playlist, loop it, and insert a delay (customizable delay spacer (color or image-based)) between videos.
 ```yaml
