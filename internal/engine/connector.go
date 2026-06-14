@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/user"
 	"strconv"
 	"strings"
 )
@@ -23,7 +24,19 @@ type ControlCommand struct {
 }
 
 func (pm *ProcessManager) StartConnectorListener() {
+	if pm.config != nil && !pm.config.Connector.IPCControlIn {
+		log.Println("IPC Control In is disabled in configuration. Skipping connector listener.")
+		return
+	}
+
 	sockPath := "/tmp/vlx_control.sock"
+	groupName := "frameflow"
+	if pm.config != nil && pm.config.Connector.ControlSocket != "" {
+		sockPath = pm.config.Connector.ControlSocket
+	}
+	if pm.config != nil && pm.config.Connector.Group != "" {
+		groupName = pm.config.Connector.Group
+	}
 
 	// Cleanup mechanism: Ensure socket file is removed before binding
 	// to prevent "address already in use" errors if the app crashed previously.
@@ -39,6 +52,42 @@ func (pm *ProcessManager) StartConnectorListener() {
 		return
 	}
 	defer listener.Close()
+
+	// Apply permissions to the socket
+	if err := os.Chmod(sockPath, 0770); err != nil {
+		log.Printf("Warning: Failed to set permissions on socket %s: %v", sockPath, err)
+	}
+
+	// Change ownership
+	var uid, gid int = -1, -1
+
+	// Lookup user visionbridge
+	u, err := user.Lookup("visionbridge")
+	if err != nil {
+		log.Printf("Warning: User 'visionbridge' not found, skipping user ownership change for socket.")
+	} else {
+		if parsedUID, err := strconv.Atoi(u.Uid); err == nil {
+			uid = parsedUID
+		}
+	}
+
+	// Lookup group
+	g, err := user.LookupGroup(groupName)
+	if err != nil {
+		log.Printf("Warning: Group '%s' not found, skipping group ownership change for socket.", groupName)
+	} else {
+		if parsedGID, err := strconv.Atoi(g.Gid); err == nil {
+			gid = parsedGID
+		}
+	}
+
+	if uid != -1 || gid != -1 {
+		if err := os.Chown(sockPath, uid, gid); err != nil {
+			log.Printf("Warning: Failed to set ownership on socket %s: %v", sockPath, err)
+		} else {
+			log.Printf("Socket %s ownership set to UID %d, GID %d", sockPath, uid, gid)
+		}
+	}
 
 	log.Printf("Listening for control commands on %s", sockPath)
 
