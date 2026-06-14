@@ -89,8 +89,8 @@ input:
     layers:
       - id: 0                    # Layer 0 = Fallback/Placeholder (e.g., VODs)
         active: true             # Whether this layer is processed
-        input_type: "local"      # Type: 'local', 'srt', 'rtmp', 'webrtc', 'rtsp', 'ipc_audio'
-        input_path: "/opt/VLX_VisionBridge/data/layer0" # Path to folder or address. For 'ipc_audio', can be dynamically set or left empty to default to '/tmp/vlx_audio.sock'.
+        input_type: "local"      # Type: 'local', 'srt', 'rtmp', 'webrtc', 'rtsp'
+        input_path: "/opt/VLX_VisionBridge/data/layer0" # Path to folder or address.
         media: "Video+Audio"     # Which tracks to include: Video+Audio, Video, Audio
         volume: 100              # Volume percentage
         size: 1920               # Width in pixels
@@ -109,8 +109,8 @@ input:
           spacer_image: ""       # Leave empty to use spacer_color, or provide an absolute path to a PNG/JPG
       - id: 1                    # Layer 1 = Primary Input (e.g., GoPro)
         active: false            # Whether this layer is processed
-        input_type: "local"      # Type: 'local', 'srt', 'rtmp', 'webrtc', 'rtsp', 'ipc_audio'
-        input_path: "/opt/VLX_VisionBridge/data/layer1" # Path to folder or address. For 'ipc_audio', can be dynamically set or left empty to default to '/tmp/vlx_audio.sock'.
+        input_type: "local"      # Type: 'local', 'srt', 'rtmp', 'webrtc', 'rtsp'
+        input_path: "/opt/VLX_VisionBridge/data/layer1" # Path to folder or address.
         media: "Video+Audio"     # Which tracks to include: Video+Audio, Video, Audio
         volume: 100              # Volume percentage
         size: 1920               # Width in pixels
@@ -129,8 +129,8 @@ input:
           spacer_image: ""       # Leave empty to use spacer_color, or provide an absolute path to a PNG/JPG
       - id: 2                    # Layer 2 = Secondary Input / Guest
         active: false            # Whether this layer is processed
-        input_type: "local"      # Type: 'local', 'srt', 'rtmp', 'webrtc', 'rtsp', 'ipc_audio'
-        input_path: "/opt/VLX_VisionBridge/data/layer2" # Path to folder or address. For 'ipc_audio', can be dynamically set or left empty to default to '/tmp/vlx_audio.sock'.
+        input_type: "local"      # Type: 'local', 'srt', 'rtmp', 'webrtc', 'rtsp'
+        input_path: "/opt/VLX_VisionBridge/data/layer2" # Path to folder or address.
         media: "Video+Audio"     # Which tracks to include: Video+Audio, Video, Audio
         volume: 100              # Volume percentage
         size: 1920               # Width in pixels

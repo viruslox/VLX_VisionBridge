@@ -182,12 +182,6 @@ func BuildInputArgs(layer models.Layer) models.InputResult {
 		}
 		return models.InputResult{Args: []string{"-i", safePath}, InputCount: 1, HasVideo: true, HasAudio: true}
 
-	case "ipc_audio":
-		sockPath := safePath
-		if sockPath == "" {
-			sockPath = "/tmp/vlx_audio.sock"
-		}
-		return models.InputResult{Args: []string{"-listen", "1", "-f", "s16le", "-ar", "48000", "-ac", "2", "-thread_queue_size", "1024", "-i", "unix://" + sockPath}, InputCount: 1, HasVideo: false, HasAudio: true}
 	case "srt":
 		return models.InputResult{Args: []string{"-fflags", "nobuffer", "-flags", "low_delay", "-i", safePath}, InputCount: 1, HasVideo: true, HasAudio: true}
 	case "rtmp", "rtmps":
