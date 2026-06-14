@@ -15,6 +15,11 @@ func TestStartConnectorListener(t *testing.T) {
 	// Initialize the ProcessManager
 	pm := NewProcessManager(nil)
 	pm.config = &models.Config{
+		Connector: models.ConnectorSettings{
+			IPCControlIn:  true,
+			Group:         "frameflow",
+			ControlSocket: "/tmp/vlx_control.sock",
+		},
 		Output: models.OutputSettings{
 			Active: false,
 		},

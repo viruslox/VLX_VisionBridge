@@ -125,8 +125,15 @@ type DatabaseConfig struct {
 	DSN string `yaml:"dsn"`
 }
 
+type ConnectorSettings struct {
+	IPCControlIn  bool   `yaml:"ipc_control_in" json:"ipc_control_in"`
+	Group         string `yaml:"group" json:"group"`
+	ControlSocket string `yaml:"control_socket" json:"control_socket"`
+}
+
 type Config struct {
-	Database DatabaseConfig `yaml:"database"`
-	Output   OutputSettings `yaml:"output"`
-	Input    InputSettings  `yaml:"input"`
+	Database  DatabaseConfig    `yaml:"database"`
+	Connector ConnectorSettings `yaml:"connector"`
+	Output    OutputSettings    `yaml:"output"`
+	Input     InputSettings     `yaml:"input"`
 }

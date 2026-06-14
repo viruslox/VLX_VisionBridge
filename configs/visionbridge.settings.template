@@ -6,6 +6,11 @@ visionbridge_DIR: "/opt/VLX_VisionBridge"
 database:
   dsn: "/opt/VLX_VisionBridge/var/visionbridge.db" # SQLite database path
 
+connector:
+  ipc_control_in: true
+  group: "frameflow"
+  control_socket: "/tmp/vlx_control.sock"
+
 # Global output settings for the stream
 output:
   active: false           # Keeps FFmpeg dormant (0% CPU) until a [ZMQ_CONTROL] Target=stream Enabled=true IPC command wakes it up
