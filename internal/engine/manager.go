@@ -7,9 +7,9 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"sync"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -314,8 +314,10 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 
 			cmd := exec.Command("xvfb-run", serverNum, fmt.Sprintf("--server-args=-screen 0 %sx%sx24 -ac", resWidth, resHeight),
 				chromeBin, "--kiosk", "--disable-infobars", "--disable-extensions", "--test-type",
-				fmt.Sprintf("--window-size=%s,%s", resWidth, resHeight), "--window-position=0,0", "--hide-scrollbars","--no-sandbox", "--disable-dev-shm-usage",
+				fmt.Sprintf("--window-size=%s,%s", resWidth, resHeight), "--window-position=0,0", "--hide-scrollbars", "--no-sandbox", "--disable-dev-shm-usage",
 				"--autoplay-policy=no-user-gesture-required", "--force-device-scale-factor=1", fileURL)
+
+			cmd.Env = append(os.Environ(), "PULSE_SINK=vlx_chromium_sink")
 
 			err = cmd.Start()
 			if err != nil {

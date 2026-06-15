@@ -155,7 +155,7 @@ func TestBuildFilterComplex(t *testing.T) {
 				Input: models.InputSettings{
 					Resolution: "1920x1080",
 					ChromiumSource: models.ChromiumSource{
-						Active:    true,
+						Active: true,
 					},
 				},
 			},

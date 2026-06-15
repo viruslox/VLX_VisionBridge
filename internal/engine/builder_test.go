@@ -165,20 +165,20 @@ func TestBuildFFmpegArgs(t *testing.T) {
 
 func TestBuildFFmpegArgs_TeeMuxerInjection(t *testing.T) {
 	cfg := &models.Config{
-			Input: models.InputSettings{
-				Resolution: "1920x1080",
-				FFmpegSource: models.FFmpegSource{
-					Active: true,
-					Layers: []models.Layer{
-						{
-							ID:        0,
-							Active:    true,
-							InputType: "loop",
-							InputPath: "video.mp4",
-						},
+		Input: models.InputSettings{
+			Resolution: "1920x1080",
+			FFmpegSource: models.FFmpegSource{
+				Active: true,
+				Layers: []models.Layer{
+					{
+						ID:        0,
+						Active:    true,
+						InputType: "loop",
+						InputPath: "video.mp4",
 					},
 				},
 			},
+		},
 		Output: models.OutputSettings{
 			Resolution: "1920x1080",
 			FPS:        60,
@@ -202,20 +202,20 @@ func TestBuildFFmpegArgs_TeeMuxerInjection(t *testing.T) {
 
 func TestBuildFFmpegArgs_ValidDestinations(t *testing.T) {
 	cfg := &models.Config{
-			Input: models.InputSettings{
-				Resolution: "1920x1080",
-				FFmpegSource: models.FFmpegSource{
-					Active: true,
-					Layers: []models.Layer{
-						{
-							ID:        0,
-							Active:    true,
-							InputType: "loop",
-							InputPath: "video.mp4",
-						},
+		Input: models.InputSettings{
+			Resolution: "1920x1080",
+			FFmpegSource: models.FFmpegSource{
+				Active: true,
+				Layers: []models.Layer{
+					{
+						ID:        0,
+						Active:    true,
+						InputType: "loop",
+						InputPath: "video.mp4",
 					},
 				},
 			},
+		},
 		Output: models.OutputSettings{
 			Resolution: "1920x1080",
 			FPS:        60,
