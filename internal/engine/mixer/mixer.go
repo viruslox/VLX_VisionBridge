@@ -2,7 +2,6 @@ package mixer
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/user/VLX_VisionBridge/internal/engine/source"
@@ -98,13 +97,7 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 			args = append(args, "-f", "x11grab", "-thread_queue_size", "1024", "-video_size", cfg.Input.Resolution, "-draw_mouse", "0", "-i", ":99")
 		}
 
-		chromaColor := cfg.Input.ChromiumSource.Z1BgColor
-		if chromaColor == "" {
-			chromaColor = "#00FF00"
-		}
-		if strings.HasPrefix(chromaColor, "#") {
-			chromaColor = "0x" + chromaColor[1:]
-		}
+		chromaColor := "0x00FF00"
 
 		layerVideoPad := fmt.Sprintf("[%d:v]", inputIdx)
 		chromaPad := "[chroma_chromium]"
