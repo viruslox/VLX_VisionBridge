@@ -308,5 +308,55 @@ func Install() {
 
 	promptChromiumInstall()
 
+	generateSystemdService(selectedUser, installBase)
+
 	fmt.Println("Installation complete.")
+}
+
+func generateSystemdService(selectedUser, installBase string) {
+	fmt.Println("Generating systemd service for user:", selectedUser)
+
+	out, err := exec.Command("id", "-u", selectedUser).Output()
+	if err != nil {
+		log.Printf("Failed to get UID for %s: %v", selectedUser, err)
+		return
+	}
+	uid := strings.TrimSpace(string(out))
+
+	serviceContent := fmt.Sprintf(`[Unit]
+Description=VLX VisionBridge Service
+After=network.target sound.target
+
+[Service]
+Type=simple
+User=%s
+Environment="XDG_RUNTIME_DIR=/run/user/%s"
+Environment="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%s/bus"
+Environment="PULSE_SERVER=unix:/run/user/%s/pulse/native"
+Environment="DISPLAY=:0"
+ExecStart=%s/bin/VLX_VisionBridge
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+`, selectedUser, uid, uid, uid, installBase)
+
+	err = os.WriteFile("/etc/systemd/system/visionbridge.service", []byte(serviceContent), 0644)
+	if err != nil {
+		log.Printf("Failed to write systemd service file: %v", err)
+		return
+	}
+
+	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
+		log.Printf("Failed to reload systemd daemon: %v", err)
+		return
+	}
+
+	if err := exec.Command("systemctl", "enable", "visionbridge.service").Run(); err != nil {
+		log.Printf("Failed to enable visionbridge.service: %v", err)
+		return
+	}
+
+	fmt.Println("Successfully generated and enabled visionbridge.service")
 }

@@ -14,7 +14,11 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 
 	// FIX 1: Forza il framerate del canvas a 30fps. Senza questo,
 	// il background gira a 25fps di default e "strozza" tutte le sorgenti a 30/60fps causando buffering e lag.
-	filterComplex.WriteString(fmt.Sprintf("color=s=%s:r=30:c=black [base];\n", cfg.Input.Resolution))
+	bgColor := cfg.Input.BgColor
+	if bgColor == "" {
+		bgColor = "black"
+	}
+	filterComplex.WriteString(fmt.Sprintf("color=s=%s:r=30:c=%s [base];\n", cfg.Input.Resolution, bgColor))
 
 	inputIdx := 0
 	currentBasePad := "[base]"
@@ -54,7 +58,7 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 				// impedendo ad FFmpeg di freezarsi per cercare di allineare ore di scarto.
 				filterComplex.WriteString(fmt.Sprintf("%s setpts=PTS-STARTPTS,scale=%d:-1 %s;\n", layerVideoPad, layer.Size, scaledPad))
 				filterComplex.WriteString(fmt.Sprintf("%s%s overlay@layer%d=x=%d:y=%d %s;\n", currentBasePad, scaledPad, layer.ID, layer.X, layer.Y, outPad))
-				
+
 				currentBasePad = outPad
 			}
 
@@ -92,7 +96,7 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 		}
 
 		if hasAudio {
-			args = append(args, "-f", "x11grab", "-thread_queue_size", "1024", "-video_size", cfg.Input.Resolution, "-draw_mouse", "0", "-i", ":99", "-f", "pulse", "-thread_queue_size", "1024", "-i", "default")
+			args = append(args, "-f", "x11grab", "-thread_queue_size", "1024", "-video_size", cfg.Input.Resolution, "-draw_mouse", "0", "-i", ":99", "-f", "pulse", "-thread_queue_size", "1024", "-i", "vlx_chromium_sink.monitor")
 		} else {
 			args = append(args, "-f", "x11grab", "-thread_queue_size", "1024", "-video_size", cfg.Input.Resolution, "-draw_mouse", "0", "-i", ":99")
 		}
@@ -106,7 +110,7 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 		// FIX 4: reset dei timestamp video di Chromium per neutralizzare l'uptime di sistema
 		filterComplex.WriteString(fmt.Sprintf("%s setpts=PTS-STARTPTS,colorkey=%s:0.1:0.1 %s;\n", layerVideoPad, chromaColor, chromaPad))
 		filterComplex.WriteString(fmt.Sprintf("%s%s overlay=x=0:y=0 %s;\n", currentBasePad, chromaPad, outPad))
-		
+
 		currentBasePad = outPad
 
 		if hasAudio {
@@ -115,7 +119,7 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 
 			// FIX 5: reset dei timestamp audio di Pulse per agganciarli al video
 			filterComplex.WriteString(fmt.Sprintf("%s aresample=48000:async=1,aformat=sample_rates=48000:channel_layouts=stereo,asetpts=PTS-STARTPTS, volume@layer99=1.00 %s;\n", layerAudioPad, aOutPad))
-			
+
 			audioPads = append(audioPads, aOutPad)
 			inputIdx += 2
 		} else {

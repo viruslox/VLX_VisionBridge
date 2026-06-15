@@ -82,6 +82,7 @@ type ChromiumSource struct {
 }
 
 type InputSettings struct {
+	BgColor        string         `yaml:"bg_color" json:"bg_color"`
 	Resolution     string         `yaml:"resolution"`
 	FFmpegSource   FFmpegSource   `yaml:"ffmpeg_source"`
 	ChromiumSource ChromiumSource `yaml:"chromium_source"`

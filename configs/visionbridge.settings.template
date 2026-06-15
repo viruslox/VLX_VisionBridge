@@ -22,6 +22,7 @@ output:
     - "rtmp://localhost/live/test"
 
 input:
+  bg_color: "black"       # Global canvas background color
   resolution: "1920x1080" # Layer's canvas size
   chromium_source:
     active: false
