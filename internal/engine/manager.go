@@ -206,7 +206,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 <html>
 <head>
 <style>
-  * { margin: 0; padding: 0; }
+  * { margin: 0; padding: 0; overflow: hidden; }
   body { margin: 0; padding: 0; overflow: hidden; background: ` + bgColor + `; }
   iframe, video { margin: 0; padding: 0; border: none; }
 `
@@ -296,10 +296,27 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				}
 			}
 
-			// FIX: Eseguiamo Chromium direttamente agganciandoci al server Xvfb globale gestito da main.go
-			cmd := exec.Command(chromeBin, "--kiosk", "--disable-infobars", "--disable-extensions", "--test-type",
-				fmt.Sprintf("--window-size=%s,%s", resWidth, resHeight), "--window-position=0,0", "--hide-scrollbars", "--no-sandbox", "--disable-dev-shm-usage",
-				"--autoplay-policy=no-user-gesture-required", "--force-device-scale-factor=1", fileURL)
+			// OPTIMIZATION: Aggiunti flag per disattivare qualsiasi throttling grafico ed energetico di Chromium headless
+			cmd := exec.Command(chromeBin, 
+				"--kiosk", 
+				"--disable-infobars", 
+				"--disable-extensions", 
+				"--test-type",
+				fmt.Sprintf("--window-size=%s,%s", resWidth, resHeight), 
+				"--window-position=0,0", 
+				"--hide-scrollbars", 
+				"--no-sandbox", 
+				"--disable-dev-shm-usage",
+				"--autoplay-policy=no-user-gesture-required", 
+				"--force-device-scale-factor=1",
+				"--disable-background-timer-throttling",
+				"--disable-backgrounding-occluded-windows",
+				"--disable-renderer-backgrounding",
+				"--unthrottled-timer-nested-iframes",
+				"--disable-frame-rate-limit",
+				"--use-gl=swiftshader",
+				fileURL,
+			)
 
 			cmd.Env = append(os.Environ(), "DISPLAY=:99", "PULSE_SINK=vlx_chromium_sink")
 
