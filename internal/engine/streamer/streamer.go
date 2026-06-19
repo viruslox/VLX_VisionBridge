@@ -42,7 +42,11 @@ func BuildOutputArgs(cfg *models.Config) ([]string, error) {
 	if cfg.Output.FPS > 0 {
 		args = append(args, "-r", strconv.Itoa(cfg.Output.FPS))
 	}
-	args = append(args, "-c:v", "libx264", "-pix_fmt", "yuv420p")
+	
+	// OPTIMIZATION: Configurato l'encoder x264 con parametri specifici per live streaming a bassissima latenza.
+	// Il preset 'ultrafast' abbatte il consumo di CPU, mentre 'zerolatency' elimina il buffering interno dell'encoder.
+	args = append(args, "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-pix_fmt", "yuv420p")
+	
 	if cfg.Output.VideoBitrate != "" {
 		args = append(args, "-b:v", cfg.Output.VideoBitrate, "-maxrate", cfg.Output.VideoBitrate, "-bufsize", cfg.Output.VideoBitrate)
 	}
