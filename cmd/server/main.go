@@ -8,9 +8,9 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/user/VLX_VisionBridge/internal/config"
 	"github.com/user/VLX_VisionBridge/internal/db"
@@ -71,101 +71,79 @@ func HandleConfigChange(pm ProcessUpdater, newCfg *models.Config, diff config.Di
 	}
 }
 
-// managePulseAudio starts the PulseAudio daemon and returns a cleanup closure.
+// managePulseAudio starts an isolated, headless PulseAudio daemon and returns a cleanup closure.
 func managePulseAudio(cfg *models.Config) func() {
-	var dbusPid int
+	// Assicura la presenza della cartella var per le configurazioni temporanee
+	_ = os.MkdirAll("/opt/VLX_VisionBridge/var", 0755)
 
-	// Helper inline per catturare l'output combinato (stdout + stderr) in caso di errore
-	runAudioCmd := func(name string, arg ...string) error {
-		cmd := exec.Command(name, arg...)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("exit status %v: %s", err, strings.TrimSpace(string(out)))
-		}
-		return nil
+	socketPath := "/tmp/vlx_visionbridge_pulse.socket"
+	configPath := "/opt/VLX_VisionBridge/var/pulse_isolated.pa"
+
+	// Pulisce eventuali socket residui da vecchi crash
+	_ = os.Remove(socketPath)
+
+	// Profilo PulseAudio headless: non dichiarando driver ALSA/oss non entrerà 
+	// MAI in conflitto con PipeWire o altre istanze utente attive sull'host.
+	pulseConfig := fmt.Sprintf(
+		"load-module module-native-protocol-unix auth-anonymous=1 socket=%s\n"+
+			"load-module module-null-sink sink_name=vlx_chromium_sink sink_properties=device.description=vlx_chromium_sink\n"+
+			"set-default-sink vlx_chromium_sink\n",
+		socketPath,
+	)
+
+	if err := os.WriteFile(configPath, []byte(pulseConfig), 0644); err != nil {
+		log.Printf("Error: Failed to write isolated PulseAudio config: %v", err)
 	}
 
-	// 1. Controllo preventivo: verifichiamo se il server audio (Pulse o PipeWire) è già raggiungibile nativamente
-	pulseRunning := exec.Command("pactl", "info").Run() == nil
-	if pulseRunning {
-		log.Println("PulseAudio/PipeWire daemon is already running and accessible natively.")
-	} else {
-		log.Println("Native PulseAudio/PipeWire daemon not reachable. Checking session context...")
-	}
-
-	// 2. Inizializza D-BUS solo se non è già presente nell'ambiente corrente
-	if os.Getenv("DBUS_SESSION_BUS_ADDRESS") == "" {
-		out, err := exec.Command("dbus-launch").Output()
-		if err == nil {
-			lines := strings.Split(string(out), "\n")
-			for _, line := range lines {
-				parts := strings.SplitN(line, "=", 2)
-				if len(parts) == 2 {
-					os.Setenv(parts[0], parts[1])
-					if parts[0] == "DBUS_SESSION_BUS_PID" {
-						pid, err := strconv.Atoi(parts[1])
-						if err == nil {
-							dbusPid = pid
-						}
-					}
-				}
-			}
-			log.Println("Launched a new isolated D-Bus session bus.")
-			// Se prima non era raggiungibile, ricontrolliamo sotto il nuovo contesto bus
-			if !pulseRunning {
-				pulseRunning = exec.Command("pactl", "info").Run() == nil
-			}
-		} else {
-			log.Printf("Warning: Failed to launch dbus: %v", err)
-		}
-	}
-
-	// 3. Determina e applica la risoluzione dinamica per Xvfb
+	// Determina la risoluzione dinamica dello schermo virtuale
 	screenRes := "1920x1080" // Fallback
 	if cfg != nil && cfg.Input.Resolution != "" {
 		screenRes = cfg.Input.Resolution
 	}
 
 	log.Printf("Starting Xvfb on display :99 with resolution %s...", screenRes)
-	_ = exec.Command("Xvfb", ":99", "-screen", "0", fmt.Sprintf("%sx24", screenRes)).Start()
+	xvfbCmd := exec.Command("Xvfb", ":99", "-screen", "0", fmt.Sprintf("%sx24", screenRes))
+	if err := xvfbCmd.Start(); err != nil {
+		log.Printf("Warning: Failed to start Xvfb: %v", err)
+	}
 	os.Setenv("DISPLAY", ":99")
 
-	// 4. Se il server audio non è ancora accessibile, tenta l'avvio del demone autonomo
-	if !pulseRunning {
-		log.Println("Attempting to start standalone PulseAudio daemon...")
-		_ = exec.Command("pulseaudio", "-k").Run()
-		if err := runAudioCmd("pulseaudio", "--start", "--exit-idle-time=-1"); err != nil {
-			log.Printf("Warning: Failed to start PulseAudio daemon: %v", err)
-		} else {
-			log.Println("PulseAudio daemon started successfully.")
-			pulseRunning = true
-		}
+	log.Println("Starting completely isolated PulseAudio server instance for software loopback audio...")
+	pulseCmd := exec.Command("pulseaudio", "-n", "-F", configPath, "--exit-idle-time=-1", "--daemonize=no")
+	
+	var pulseStderr strings.Builder
+	pulseCmd.Stderr = &pulseStderr
+
+	if err := pulseCmd.Start(); err != nil {
+		log.Printf("Warning: Failed to launch standalone PulseAudio process: %v", err)
 	}
 
-	// 5. Creazione della scheda audio virtuale null-sink con logging dettagliato dello stderr
-	_ = exec.Command("pactl", "unload-module", "module-null-sink").Run()
-	if err := runAudioCmd("pactl", "load-module", "module-null-sink", "sink_name=vlx_chromium_sink", "sink_properties=device.description=vlx_chromium_sink"); err != nil {
-		log.Printf("Warning: Failed to create virtual audio card: %v", err)
-	} else {
-		log.Println("Virtual audio card 'vlx_chromium_sink' created successfully.")
-	}
+	// Forziamo l'ambiente corrente e tutti i processi figli (pactl, chromium, ffmpeg)
+	// ad usare esclusivamente il nostro socket UNIX privato, bypassando D-Bus e XDG_RUNTIME
+	os.Setenv("PULSE_SERVER", fmt.Sprintf("unix:%s", socketPath))
 
-	// 6. Impostazione del sink predefinito con logging dello stderr
-	if err := runAudioCmd("pactl", "set-default-sink", "vlx_chromium_sink"); err != nil {
-		log.Printf("Warning: Failed to set default sink: %v", err)
+	// Piccolo warm-up per garantire la corretta inizializzazione del socket su filesystem
+	time.Sleep(400 * time.Millisecond)
+
+	// Test di comunicazione sul canale isolato appena creato
+	out, err := exec.Command("pactl", "info").CombinedOutput()
+	if err != nil {
+		log.Printf("Warning: Isolated PulseAudio connectivity check failed: %v.\nDetails: %s\nPulseAudio log: %s", 
+			err, strings.TrimSpace(string(out)), strings.TrimSpace(pulseStderr.String()))
 	} else {
-		log.Println("Set 'vlx_chromium_sink' as default audio sink.")
+		log.Println("Isolated PulseAudio instance successfully initialized and verified via loopback socket.")
 	}
 
 	return func() {
-		// Chiudiamo il demone pulseaudio solo se lo abbiamo spawnato noi direttamente
-		if !pulseRunning {
-			log.Println("Stopping PulseAudio daemon...")
-			_ = exec.Command("pulseaudio", "-k").Run()
+		log.Println("Stopping isolated PulseAudio and Xvfb background tasks...")
+		if pulseCmd.Process != nil {
+			_ = pulseCmd.Process.Kill()
 		}
-		if dbusPid > 0 {
-			_ = syscall.Kill(dbusPid, syscall.SIGTERM)
+		if xvfbCmd.Process != nil {
+			_ = xvfbCmd.Process.Kill()
 		}
+		_ = os.Remove(socketPath)
+		_ = os.Remove(configPath)
 	}
 }
 
