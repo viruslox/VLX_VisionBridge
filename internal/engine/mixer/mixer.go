@@ -79,14 +79,34 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 	if cfg.Input.ChromiumSource.Active {
 		cs := cfg.Input.ChromiumSource
 		
-		// FIX: Controlliamo se ci sono zone attive indipendentemente dal volume (che se è nil, di default è 100%)
 		hasAudio := cs.Z1Active || cs.Z2Active || cs.Z3Active || cs.Z4Active ||
 			cs.Z5Active || cs.Z6Active || cs.Z7Active || cs.Z8Active
 
+		// OPTIMIZATION: Aggiunto -framerate fisso e -use_wallclock_as_timestamps per azzerare il delay ed evitare audio gracchiante
 		if hasAudio {
-			args = append(args, "-f", "x11grab", "-thread_queue_size", "1024", "-video_size", cfg.Input.Resolution, "-draw_mouse", "0", "-i", ":99", "-f", "pulse", "-thread_queue_size", "1024", "-i", "vlx_chromium_sink.monitor")
+			args = append(args, 
+				"-f", "x11grab", 
+				"-thread_queue_size", "4096", 
+				"-framerate", "30", 
+				"-video_size", cfg.Input.Resolution, 
+				"-draw_mouse", "0", 
+				"-use_wallclock_as_timestamps", "1", 
+				"-i", ":99", 
+				"-f", "pulse", 
+				"-thread_queue_size", "4096", 
+				"-use_wallclock_as_timestamps", "1", 
+				"-i", "vlx_chromium_sink.monitor",
+			)
 		} else {
-			args = append(args, "-f", "x11grab", "-thread_queue_size", "1024", "-video_size", cfg.Input.Resolution, "-draw_mouse", "0", "-i", ":99")
+			args = append(args, 
+				"-f", "x11grab", 
+				"-thread_queue_size", "4096", 
+				"-framerate", "30", 
+				"-video_size", cfg.Input.Resolution, 
+				"-draw_mouse", "0", 
+				"-use_wallclock_as_timestamps", "1", 
+				"-i", ":99",
+			)
 		}
 
 		chromaColor := "0x00FF00"
