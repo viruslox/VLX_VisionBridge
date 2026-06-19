@@ -144,7 +144,7 @@ func promptChromiumInstall() {
 			log.Printf("Warning: Failed to run apt-get update: %v", err)
 		}
 
-		cmd := exec.Command("apt-get", "install", "-y", "xvfb", "chromium-common", "chromium", "chromium-headless-shell", "chromium-driver", "chromium-lwn4chrome", "chromium-sandbox", "chromium-shell", "pulseaudio")
+		cmd := exec.Command("apt-get", "install", "-y", "xvfb", "chromium-common", "chromium", "chromium-headless-shell", "chromium-driver", "chromium-lwn4chrome", "chromium-sandbox", "chromium-shell", "pulseaudio", "pulseaudio-utils", "dbus-x11")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
@@ -306,6 +306,22 @@ func Install() {
 
 	setupUserAndSettings(installBase, etcDir, varDir, selectedUser)
 
+	fmt.Println("Removing pipewire and disabling lingering for users...")
+	if err := exec.Command("apt-get", "purge", "-y", "pipewire", "wireplumber", "pipewire-pulse", "pipewire-audio").Run(); err != nil {
+		log.Printf("Warning: Failed to purge pipewire packages: %v", err)
+	}
+	if err := exec.Command("apt-get", "autoremove", "-y").Run(); err != nil {
+		log.Printf("Warning: Failed to autoremove packages: %v", err)
+	}
+
+	for _, u := range users {
+		_ = exec.Command("loginctl", "disable-linger", u).Run()
+	}
+	if selectedUser != "visionbridge" {
+		_ = exec.Command("loginctl", "disable-linger", "visionbridge").Run()
+	}
+	_ = exec.Command("loginctl", "disable-linger", selectedUser).Run()
+
 	promptChromiumInstall()
 
 	generateSystemdService(selectedUser, installBase)
@@ -316,13 +332,6 @@ func Install() {
 func generateSystemdService(selectedUser, installBase string) {
 	fmt.Println("Generating systemd service for user:", selectedUser)
 
-	out, err := exec.Command("id", "-u", selectedUser).Output()
-	if err != nil {
-		log.Printf("Failed to get UID for %s: %v", selectedUser, err)
-		return
-	}
-	uid := strings.TrimSpace(string(out))
-
 	serviceContent := fmt.Sprintf(`[Unit]
 Description=VLX VisionBridge Service
 After=network.target sound.target
@@ -330,19 +339,16 @@ After=network.target sound.target
 [Service]
 Type=simple
 User=%s
-Environment="XDG_RUNTIME_DIR=/run/user/%s"
-Environment="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%s/bus"
-Environment="PULSE_SERVER=unix:/run/user/%s/pulse/native"
-Environment="DISPLAY=:0"
+Environment="DISPLAY=:99"
 ExecStart=%s/bin/VLX_VisionBridge
 Restart=always
 RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
-`, selectedUser, uid, uid, uid, installBase)
+`, selectedUser, installBase)
 
-	err = os.WriteFile("/etc/systemd/system/visionbridge.service", []byte(serviceContent), 0644)
+	err := os.WriteFile("/etc/systemd/system/visionbridge.service", []byte(serviceContent), 0644)
 	if err != nil {
 		log.Printf("Failed to write systemd service file: %v", err)
 		return

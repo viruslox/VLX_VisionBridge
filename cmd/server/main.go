@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/user/VLX_VisionBridge/internal/config"
@@ -71,19 +73,58 @@ func HandleConfigChange(pm ProcessUpdater, newCfg *models.Config, diff config.Di
 
 // managePulseAudio starts the PulseAudio daemon and returns a cleanup closure.
 func managePulseAudio() func() {
+	var dbusPid int
+
+	// 1. be sure to initialize D-BUS for the visionbridge user session
+	out, err := exec.Command("dbus-launch").Output()
+	if err == nil {
+		lines := strings.Split(string(out), "\n")
+		for _, line := range lines {
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) == 2 {
+				os.Setenv(parts[0], parts[1])
+				if parts[0] == "DBUS_SESSION_BUS_PID" {
+					pid, err := strconv.Atoi(parts[1])
+					if err == nil {
+						dbusPid = pid
+					}
+				}
+			}
+		}
+	} else {
+		log.Printf("Warning: Failed to launch dbus: %v", err)
+	}
+
+	// 2. Verify what virtual display chromium actual use
+	_ = exec.Command("Xvfb", ":99", "-screen", "0", "1280x1024x24").Start()
+	os.Setenv("DISPLAY", ":99")
+
 	// Kill any existing/stale pulseaudio daemon
 	_ = exec.Command("pulseaudio", "-k").Run()
 
-	// Start the daemon
-	if err := exec.Command("pulseaudio", "-D", "--exit-idle-time=-1").Run(); err != nil {
+	// 3. launch PulseAudio and disable autooof
+	if err := exec.Command("pulseaudio", "--start", "--exit-idle-time=-1").Run(); err != nil {
 		log.Printf("Warning: Failed to start PulseAudio daemon: %v", err)
 	} else {
 		log.Println("PulseAudio daemon started successfully.")
 	}
 
+	// 4. Create virtual audio card
+	if err := exec.Command("pactl", "load-module", "module-null-sink", "sink_name=vlx_chromium_sink", "sink_properties=device.description=vlx_chromium_sink").Run(); err != nil {
+		log.Printf("Warning: Failed to create virtual audio card: %v", err)
+	}
+
+	// 5. set our virtual device as default
+	if err := exec.Command("pacmd", "set-default-sink", "vlx_chromium_sink").Run(); err != nil {
+		log.Printf("Warning: Failed to set default sink: %v", err)
+	}
+
 	return func() {
 		log.Println("Stopping PulseAudio daemon...")
 		_ = exec.Command("pulseaudio", "-k").Run()
+		if dbusPid > 0 {
+			_ = syscall.Kill(dbusPid, syscall.SIGTERM)
+		}
 	}
 }
 
