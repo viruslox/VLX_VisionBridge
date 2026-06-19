@@ -56,6 +56,8 @@ func BuildFFmpegArgs(cfg *models.Config) ([]string, error) {
 	}
 
 	var args []string
+	args = append(args, "-fflags", "nobuffer+genpts", "-flags", "low_delay")
+
 	argsFilter, filterComplex, lastVideoPad, finalAudioPad := mixer.BuildFilterComplex(cfg)
 	args = append(args, argsFilter...)
 	args = append(args, "-filter_complex", filterComplex)

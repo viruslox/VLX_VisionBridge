@@ -40,7 +40,7 @@ func BuildOutputArgs(cfg *models.Config) ([]string, error) {
 		args = append(args, "-s", cfg.Output.Resolution)
 	}
 	if cfg.Output.FPS > 0 {
-		args = append(args, "-r", strconv.Itoa(cfg.Output.FPS))
+		args = append(args, "-r", strconv.Itoa(cfg.Output.FPS), "-fps_mode", "cfr")
 	}
 	
 	// OPTIMIZATION: Configurato l'encoder x264 con parametri specifici per live streaming a bassissima latenza.
