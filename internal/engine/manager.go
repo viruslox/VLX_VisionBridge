@@ -364,41 +364,6 @@ func (pm *ProcessManager) monitorChromium(cmd *exec.Cmd) {
 	if pm.db != nil {
 		_ = db.LogStreamEvent(pm.db, "crash", fmt.Sprintf("Chromium browser crashed: %v", err))
 	}
-
-	module := "[chromium]"
-
-	pm.mu.Lock()
-	tracker, exists := pm.retries[module]
-	if !exists {
-		tracker = &RetryTracker{}
-		pm.retries[module] = tracker
-	}
-	if !tracker.LastCrash.IsZero() && time.Since(tracker.LastCrash) > 30*time.Second {
-		tracker.ConsecutiveCrashes = 0
-	}
-	tracker.ConsecutiveCrashes++
-	tracker.LastCrash = time.Now()
-	crashes := tracker.ConsecutiveCrashes
-	pm.mu.Unlock()
-
-	if crashes <= 5 {
-		log.Printf("Module %s crashed %d times (quick retry in 1s)...", module, crashes)
-		time.Sleep(1 * time.Second)
-	} else if crashes <= 7 {
-		log.Printf("Module %s crashed %d times (wait retry in 10s)...", module, crashes)
-		time.Sleep(10 * time.Second)
-	} else {
-		log.Printf("Module %s crashed %d times. Max retries exceeded, disabling it.", module, crashes)
-		pm.disableModule(module)
-	}
-
-	pm.mu.Lock()
-	cfg := pm.config
-	pm.mu.Unlock()
-
-	if cfg != nil {
-		pm.manageOverlays(cfg)
-	}
 }
 
 func (pm *ProcessManager) UpdateFilter(config *models.Config) {

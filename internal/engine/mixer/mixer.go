@@ -28,28 +28,30 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 		hasAudio := cs.Z1Active || cs.Z2Active || cs.Z3Active || cs.Z4Active ||
 			cs.Z5Active || cs.Z6Active || cs.Z7Active || cs.Z8Active
 
+		framerate := "30"
+		if cfg.Input.Framerate > 0 {
+			framerate = fmt.Sprintf("%d", cfg.Input.Framerate)
+		}
+
 		if hasAudio {
 			args = append(args,
 				"-f", "x11grab",
 				"-thread_queue_size", "128",
-				"-framerate", "30",
+				"-framerate", framerate,
 				"-video_size", cfg.Input.Resolution,
 				"-draw_mouse", "0",
-				"-use_wallclock_as_timestamps", "1",
 				"-i", ":99",
 				"-f", "pulse",
 				"-thread_queue_size", "128",
-				"-use_wallclock_as_timestamps", "1",
 				"-i", "vlx_chromium_sink.monitor",
 			)
 		} else {
 			args = append(args,
 				"-f", "x11grab",
 				"-thread_queue_size", "128",
-				"-framerate", "30",
+				"-framerate", framerate,
 				"-video_size", cfg.Input.Resolution,
 				"-draw_mouse", "0",
-				"-use_wallclock_as_timestamps", "1",
 				"-i", ":99",
 			)
 		}
@@ -146,7 +148,11 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 	}
 
 	finalVideoPad := "[v_out]"
-	filterComplex.WriteString(fmt.Sprintf("%s zmq=b=tcp\\\\://127.0.0.1\\\\:5555 %s;\n", currentBasePad, finalVideoPad))
+	if cfg.Input.ChromiumSource.Active && !cfg.Input.FFmpegSource.Active {
+		filterComplex.WriteString(fmt.Sprintf("%s null %s;\n", currentBasePad, finalVideoPad))
+	} else {
+		filterComplex.WriteString(fmt.Sprintf("%s zmq=b=tcp\\\\://127.0.0.1\\\\:5555 %s;\n", currentBasePad, finalVideoPad))
+	}
 
 	return args, filterComplex.String(), finalVideoPad, finalAudioPad
 }

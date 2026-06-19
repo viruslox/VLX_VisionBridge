@@ -44,6 +44,7 @@ func TestBuildOutputArgs(t *testing.T) {
 			expected: []string{
 				"-s", "1920x1080",
 				"-r", "60",
+				"-fps_mode", "cfr",
 				"-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-pix_fmt", "yuv420p",
 				"-b:v", "6000k", "-maxrate", "6000k", "-bufsize", "6000k",
 				"-c:a", "aac", "-b:a", "160k",
