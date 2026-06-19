@@ -80,7 +80,6 @@ func (pm *ProcessManager) Start(ctx context.Context, config *models.Config) erro
 	}
 
 	pm.config = config
-	// Avoid returning a cancel func since we don't use it directly, instead we signal via channel
 	pm.ctx, pm.cancel = context.WithCancel(ctx)
 	pm.isRunning = true
 	pm.mu.Unlock()
@@ -100,17 +99,11 @@ func (pm *ProcessManager) Stop() {
 	}
 	pm.isRunning = false
 
-	// Issue graceful signal if command is running
 	if pm.cmd != nil && pm.cmd.Process != nil {
 		log.Println("Signaling FFmpeg process to stop gracefully...")
 		_ = pm.cmd.Process.Signal(syscall.SIGTERM)
-
-		// Create a separate wait path since run wait does not complete if process hangs
-		// But we don't call Wait() directly here to avoid race with cmd.Run().
-		// We rely on cmd.Run() returning in monitor() and monitor handling the cancellation.
 	}
 
-	// Trigger cancellation
 	if pm.cancel != nil {
 		pm.cancel()
 	}
@@ -118,7 +111,6 @@ func (pm *ProcessManager) Stop() {
 		pm.cond.Broadcast()
 	}
 
-	// Stop all overlay processes
 	for id, overlayCmd := range pm.overlayCmds {
 		if overlayCmd != nil && overlayCmd.Process != nil {
 			log.Printf("Signaling overlay process for layer %d to stop gracefully...", id)
@@ -156,7 +148,6 @@ func buildOverlayElement(id string, zIndex int, path string, width, height, x, y
 	var element string
 	lowerPath := strings.ToLower(path)
 
-	// Check for local file
 	srcURL := path
 	if strings.HasPrefix(path, "/") {
 		srcURL = "file://" + path
@@ -192,11 +183,10 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 	if cfg.Input.ChromiumSource.Active {
 		activeOverlays[99] = true
 
-		// Check if already running
 		shouldStart := true
 		if cmd, exists := pm.overlayCmds[99]; exists && cmd != nil && cmd.Process != nil {
 			if cmd.ProcessState == nil {
-				shouldStart = false // Still running
+				shouldStart = false
 			}
 		}
 
@@ -212,7 +202,6 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				resHeight = resParts[1]
 			}
 
-			// Generate HTML file
 			htmlContent := `<!DOCTYPE html>
 <html>
 <head>
@@ -292,9 +281,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 			}
 
 			log.Printf("Starting Chromium overlay browser with generated HTML")
-			serverNum := "--server-num=99"
 
-			// file:// URLs need 3 slashes if absolute path follows
 			fileURL := htmlPath
 			if strings.HasPrefix(htmlPath, "/") {
 				fileURL = "file://" + htmlPath
@@ -309,15 +296,12 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				}
 			}
 
-			os.Remove("/tmp/.X99-lock")
-			os.RemoveAll("/tmp/.X11-unix/X99")
-
-			cmd := exec.Command("xvfb-run", serverNum, fmt.Sprintf("--server-args=-screen 0 %sx%sx24 -ac", resWidth, resHeight),
-				chromeBin, "--kiosk", "--disable-infobars", "--disable-extensions", "--test-type",
+			// FIX: Eseguiamo Chromium direttamente agganciandoci al server Xvfb globale gestito da main.go
+			cmd := exec.Command(chromeBin, "--kiosk", "--disable-infobars", "--disable-extensions", "--test-type",
 				fmt.Sprintf("--window-size=%s,%s", resWidth, resHeight), "--window-position=0,0", "--hide-scrollbars", "--no-sandbox", "--disable-dev-shm-usage",
 				"--autoplay-policy=no-user-gesture-required", "--force-device-scale-factor=1", fileURL)
 
-			cmd.Env = append(os.Environ(), "PULSE_SINK=vlx_chromium_sink")
+			cmd.Env = append(os.Environ(), "DISPLAY=:99", "PULSE_SINK=vlx_chromium_sink")
 
 			err = cmd.Start()
 			if err != nil {
@@ -329,7 +313,6 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 		}
 	}
 
-	// Stop any overlay processes that are no longer active
 	for id, cmd := range pm.overlayCmds {
 		if !activeOverlays[id] {
 			if cmd != nil && cmd.Process != nil {
@@ -347,10 +330,9 @@ func (pm *ProcessManager) monitorChromium(cmd *exec.Cmd) {
 	pm.mu.Lock()
 	if !pm.isRunning || pm.ctx.Err() != nil {
 		pm.mu.Unlock()
-		return // Expected stop
+		return
 	}
 
-	// Make sure we're still tracking this specific cmd
 	if currentCmd, exists := pm.overlayCmds[99]; !exists || currentCmd != cmd {
 		pm.mu.Unlock()
 		return
@@ -390,7 +372,6 @@ func (pm *ProcessManager) monitorChromium(cmd *exec.Cmd) {
 		pm.disableModule(module)
 	}
 
-	// Trigger a reconfiguration/restart of active overlays
 	pm.mu.Lock()
 	cfg := pm.config
 	pm.mu.Unlock()
@@ -400,7 +381,6 @@ func (pm *ProcessManager) monitorChromium(cmd *exec.Cmd) {
 	}
 }
 
-// UpdateFilter updates the filter parameters dynamically via ZMQ.
 func (pm *ProcessManager) UpdateFilter(config *models.Config) {
 	pm.mu.Lock()
 	pm.config = config
@@ -479,7 +459,6 @@ func sendZMQCommand(req zmq4.Socket, cmd string) {
 	log.Printf("ZMQ reply for '%s': %s", cmd, string(reply.Frames[0]))
 }
 
-// UpdateConfig updates the configuration and signals the monitor loop.
 func (pm *ProcessManager) UpdateConfig(config *models.Config) {
 	pm.mu.Lock()
 	pm.config = config
@@ -522,7 +501,6 @@ const (
 	monitorActionSleepExponential
 )
 
-// monitor runs the FFmpeg process and handles automatic recovery.
 func (pm *ProcessManager) monitor() {
 	backoff := 1 * time.Second
 	var lastBuildErr string
@@ -545,7 +523,7 @@ func (pm *ProcessManager) monitor() {
 		if isMisconfig && finalModule != "" {
 			log.Printf("Misconfiguration detected for module %s, disabling it.", finalModule)
 			pm.disableModule(finalModule)
-			continue // Immediately retry with the module disabled
+			continue
 		}
 
 		if action == monitorActionSleepExponential && finalModule != "" {
@@ -574,7 +552,7 @@ func (pm *ProcessManager) monitor() {
 			} else {
 				log.Printf("Module %s crashed %d times. Max retries exceeded, disabling it.", finalModule, crashes)
 				pm.disableModule(finalModule)
-				continue // Immediately retry with the module disabled
+				continue
 			}
 		}
 
@@ -587,11 +565,9 @@ func (pm *ProcessManager) monitor() {
 			time.Sleep(backoff)
 			continue
 		case monitorActionSleepExponential:
-			// Fallback if no specific module was identified
 			log.Printf("Restarting FFmpeg in %v...", backoff)
 			time.Sleep(backoff)
 
-			// Exponential backoff
 			backoff *= 2
 			maxBackoff := 30 * time.Second
 			if backoff > maxBackoff {
@@ -614,7 +590,6 @@ func (pm *ProcessManager) disableModule(module string) {
 	if module == "[chromium]" {
 		pm.config.Input.ChromiumSource.Active = false
 	} else if strings.HasPrefix(module, "[layer ") {
-		// Extract layer ID from "[layer <id>] [input]"
 		parts := strings.Split(module, "]")
 		if len(parts) > 0 {
 			idStr := strings.TrimPrefix(parts[0], "[layer ")
@@ -694,16 +669,12 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 		}
 		return monitorActionSleepConstant, "", false
 	}
-	// Reset the error cache when the build is successful so a future identical error can be logged again
 	*lastBuildErr = ""
 
 	if len(args) == 0 {
 		log.Println("No active layers, not starting FFmpeg.")
 
 		pm.mu.Lock()
-		// We must check the condition inside the lock to avoid lost wakeups.
-		// Re-evaluating len(args) here would require rebuilding args, which we don't want to do inside the lock.
-		// Instead, we just wait until we are signaled by UpdateConfig or Stop.
 		if pm.isRunning && pm.ctx.Err() == nil {
 			pm.cond.Wait()
 		}
@@ -718,14 +689,12 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 	}
 
 	if ctx.Err() != nil {
-		// Context cancelled, normal shutdown
 		if pm.db != nil {
 			_ = db.LogStreamEvent(pm.db, "stop", "FFmpeg process stopped gracefully")
 		}
 		return monitorActionStop, "", false
 	}
 
-	// Unexpected exit
 	errMsg := "FFmpeg exited unexpectedly"
 	var finalModule string
 	var isMisconfig bool
@@ -735,7 +704,6 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 		if stderrStr != "" {
 			lines := strings.Split(strings.TrimSpace(stderrStr), "\n")
 			if len(lines) > 0 {
-				// Find the last actual error line, "Conversion failed!" is often just the generic exit message
 				reason = lines[len(lines)-1]
 				if reason == "Conversion failed!" && len(lines) > 1 {
 					reason = lines[len(lines)-2] + " | " + reason
@@ -777,7 +745,6 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 }
 
 func (pm *ProcessManager) runProcess(ctx context.Context, args []string) (bool, error, string) {
-	// Create command without context to allow graceful SIGTERM before context kill
 	cmd := exec.Command("ffmpeg", args...)
 
 	tb := &tailBuffer{}
@@ -798,7 +765,6 @@ func (pm *ProcessManager) runProcess(ctx context.Context, args []string) (bool, 
 	}
 	log.Println("Starting FFmpeg process...")
 
-	// Start the process asynchronously to allow monitoring for context cancellation
 	err := cmd.Start()
 	if err != nil {
 		return false, err, tb.String()
@@ -829,7 +795,6 @@ func (pm *ProcessManager) waitForProcess(ctx context.Context, cmd *exec.Cmd) (er
 			log.Println("FFmpeg process stopped gracefully.")
 		}
 	case runErr = <-done:
-		// Process exited on its own
 	}
 
 	stderrStr := ""
