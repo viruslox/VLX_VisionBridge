@@ -192,7 +192,10 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 
 		if shouldStart {
 			cs := cfg.Input.ChromiumSource
-			bgColor := "#00FF00"
+			bgColor := cfg.Input.BgColor
+			if bgColor == "" {
+				bgColor = "black"
+			}
 
 			resParts := strings.Split(cfg.Input.Resolution, "x")
 			resWidth := "1920"

@@ -20,7 +20,7 @@ func TestBuildOutputArgs(t *testing.T) {
 				Output: models.OutputSettings{},
 			},
 			expected: []string{
-				"-c:v", "libx264", "-pix_fmt", "yuv420p",
+				"-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-pix_fmt", "yuv420p",
 				"-c:a", "aac",
 				"-flags", "+global_header",
 			},
@@ -44,7 +44,7 @@ func TestBuildOutputArgs(t *testing.T) {
 			expected: []string{
 				"-s", "1920x1080",
 				"-r", "60",
-				"-c:v", "libx264", "-pix_fmt", "yuv420p",
+				"-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency", "-pix_fmt", "yuv420p",
 				"-b:v", "6000k", "-maxrate", "6000k", "-bufsize", "6000k",
 				"-c:a", "aac", "-b:a", "160k",
 				"-flags", "+global_header",

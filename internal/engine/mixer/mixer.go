@@ -16,13 +16,64 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 	if bgColor == "" {
 		bgColor = "black"
 	}
-	filterComplex.WriteString(fmt.Sprintf("color=s=%s:r=30:c=%s [base];\n", cfg.Input.Resolution, bgColor))
 
 	inputIdx := 0
-	currentBasePad := "[base]"
+	currentBasePad := ""
 	var audioPads []string
 
-	if cfg.Input.FFmpegSource.Active {
+	// MUTUAL EXCLUSIVITY: ChromiumSource vs FFmpegSource
+	if cfg.Input.ChromiumSource.Active {
+		cs := cfg.Input.ChromiumSource
+
+		hasAudio := cs.Z1Active || cs.Z2Active || cs.Z3Active || cs.Z4Active ||
+			cs.Z5Active || cs.Z6Active || cs.Z7Active || cs.Z8Active
+
+		if hasAudio {
+			args = append(args,
+				"-f", "x11grab",
+				"-thread_queue_size", "128",
+				"-framerate", "30",
+				"-video_size", cfg.Input.Resolution,
+				"-draw_mouse", "0",
+				"-use_wallclock_as_timestamps", "1",
+				"-i", ":99",
+				"-f", "pulse",
+				"-thread_queue_size", "128",
+				"-use_wallclock_as_timestamps", "1",
+				"-i", "vlx_chromium_sink.monitor",
+			)
+		} else {
+			args = append(args,
+				"-f", "x11grab",
+				"-thread_queue_size", "128",
+				"-framerate", "30",
+				"-video_size", cfg.Input.Resolution,
+				"-draw_mouse", "0",
+				"-use_wallclock_as_timestamps", "1",
+				"-i", ":99",
+			)
+		}
+
+		layerVideoPad := fmt.Sprintf("[%d:v]", inputIdx)
+		currentBasePad = layerVideoPad
+
+		if hasAudio {
+			layerAudioPad := fmt.Sprintf("[%d:a]", inputIdx+1)
+			aOutPad := "[a_chromium]"
+
+			// Notice asetpts=PTS-STARTPTS is removed for Chromium live capture
+			filterComplex.WriteString(fmt.Sprintf("%s aresample=48000:async=1,aformat=sample_rates=48000:channel_layouts=stereo, volume@layer99=1.00 %s;\n", layerAudioPad, aOutPad))
+
+			audioPads = append(audioPads, aOutPad)
+			inputIdx += 2
+		} else {
+			inputIdx += 1
+		}
+	} else if cfg.Input.FFmpegSource.Active {
+		// Only create the base color canvas if Chromium is NOT active
+		filterComplex.WriteString(fmt.Sprintf("color=s=%s:r=30:c=%s [base];\n", cfg.Input.Resolution, bgColor))
+		currentBasePad = "[base]"
+
 		for i, layer := range cfg.Input.FFmpegSource.Layers {
 			if !layer.Active {
 				continue
@@ -74,63 +125,10 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 
 			inputIdx += res.InputCount
 		}
-	}
-
-	if cfg.Input.ChromiumSource.Active {
-		cs := cfg.Input.ChromiumSource
-		
-		hasAudio := cs.Z1Active || cs.Z2Active || cs.Z3Active || cs.Z4Active ||
-			cs.Z5Active || cs.Z6Active || cs.Z7Active || cs.Z8Active
-
-		// OPTIMIZATION: Aggiunto -framerate fisso e -use_wallclock_as_timestamps per azzerare il delay ed evitare audio gracchiante
-		if hasAudio {
-			args = append(args, 
-				"-f", "x11grab", 
-				"-thread_queue_size", "4096", 
-				"-framerate", "30", 
-				"-video_size", cfg.Input.Resolution, 
-				"-draw_mouse", "0", 
-				"-use_wallclock_as_timestamps", "1", 
-				"-i", ":99", 
-				"-f", "pulse", 
-				"-thread_queue_size", "4096", 
-				"-use_wallclock_as_timestamps", "1", 
-				"-i", "vlx_chromium_sink.monitor",
-			)
-		} else {
-			args = append(args, 
-				"-f", "x11grab", 
-				"-thread_queue_size", "4096", 
-				"-framerate", "30", 
-				"-video_size", cfg.Input.Resolution, 
-				"-draw_mouse", "0", 
-				"-use_wallclock_as_timestamps", "1", 
-				"-i", ":99",
-			)
-		}
-
-		chromaColor := "0x00FF00"
-
-		layerVideoPad := fmt.Sprintf("[%d:v]", inputIdx)
-		chromaPad := "[chroma_chromium]"
-		outPad := "[out_chromium]"
-
-		filterComplex.WriteString(fmt.Sprintf("%s setpts=PTS-STARTPTS,colorkey=%s:0.1:0.1 %s;\n", layerVideoPad, chromaColor, chromaPad))
-		filterComplex.WriteString(fmt.Sprintf("%s%s overlay=x=0:y=0 %s;\n", currentBasePad, chromaPad, outPad))
-
-		currentBasePad = outPad
-
-		if hasAudio {
-			layerAudioPad := fmt.Sprintf("[%d:a]", inputIdx+1)
-			aOutPad := "[a_chromium]"
-
-			filterComplex.WriteString(fmt.Sprintf("%s aresample=48000:async=1,aformat=sample_rates=48000:channel_layouts=stereo,asetpts=PTS-STARTPTS, volume@layer99=1.00 %s;\n", layerAudioPad, aOutPad))
-
-			audioPads = append(audioPads, aOutPad)
-			inputIdx += 2
-		} else {
-			inputIdx += 1
-		}
+	} else {
+		// Neither active, just generate the base canvas to have something to output
+		filterComplex.WriteString(fmt.Sprintf("color=s=%s:r=30:c=%s [base];\n", cfg.Input.Resolution, bgColor))
+		currentBasePad = "[base]"
 	}
 
 	var finalAudioPad string

@@ -149,7 +149,7 @@ func TestBuildFFmpegArgs(t *testing.T) {
 	if !strings.Contains(argsStr, "-r 60") {
 		t.Errorf("Missing FPS setting: %s", argsStr)
 	}
-	if !strings.Contains(argsStr, "-c:v libx264 -pix_fmt yuv420p -b:v 6000k -maxrate 6000k -bufsize 6000k") {
+	if !strings.Contains(argsStr, "-c:v libx264 -preset ultrafast -tune zerolatency -pix_fmt yuv420p -b:v 6000k -maxrate 6000k -bufsize 6000k") {
 		t.Errorf("Missing VideoBitrate setting: %s", argsStr)
 	}
 	if !strings.Contains(argsStr, "-c:a aac -b:a 160k") {
