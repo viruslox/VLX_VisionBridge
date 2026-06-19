@@ -72,7 +72,7 @@ func HandleConfigChange(pm ProcessUpdater, newCfg *models.Config, diff config.Di
 }
 
 // managePulseAudio starts the PulseAudio daemon and returns a cleanup closure.
-func managePulseAudio() func() {
+func managePulseAudio(cfg *models.Config) func() {
 	var dbusPid int
 
 	// 1. be sure to initialize D-BUS for the visionbridge user session
@@ -95,8 +95,14 @@ func managePulseAudio() func() {
 		log.Printf("Warning: Failed to launch dbus: %v", err)
 	}
 
-	// 2. Verify what virtual display chromium actual use
-	_ = exec.Command("Xvfb", ":99", "-screen", "0", "1280x1024x24").Start()
+	// 2. Determine and apply resolution from configuration dynamically
+	screenRes := "1920x1080" // Default fallback
+	if cfg != nil && cfg.Input.Resolution != "" {
+		screenRes = cfg.Input.Resolution
+	}
+
+	log.Printf("Starting Xvfb on display :99 with resolution %s...", screenRes)
+	_ = exec.Command("Xvfb", ":99", "-screen", "0", fmt.Sprintf("%sx24", screenRes)).Start()
 	os.Setenv("DISPLAY", ":99")
 
 	// Kill any existing/stale pulseaudio daemon
@@ -189,7 +195,7 @@ func main() {
 	defer cancel()
 
 	// 4. Setup Process Manager
-	cleanupPulse := managePulseAudio()
+	cleanupPulse := managePulseAudio(initialConfig)
 	defer cleanupPulse()
 	pm := engine.NewProcessManager(dbConn)
 	defer pm.Stop()
