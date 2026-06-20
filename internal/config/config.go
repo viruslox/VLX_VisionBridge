@@ -48,7 +48,7 @@ func DiffConfigs(oldConfig, newConfig *models.Config) DiffResult {
 		return DiffResult{RequiresRestart: true}
 	}
 
-	if oldConfig.Input.FFmpegSource.Active != newConfig.Input.FFmpegSource.Active {
+	if oldConfig.Input.MediaSource.Active != newConfig.Input.MediaSource.Active {
 		return DiffResult{RequiresRestart: true}
 	}
 
@@ -56,7 +56,7 @@ func DiffConfigs(oldConfig, newConfig *models.Config) DiffResult {
 		return DiffResult{RequiresRestart: true}
 	}
 
-	return layersDiff(oldConfig.Input.FFmpegSource.Layers, newConfig.Input.FFmpegSource.Layers)
+	return layersDiff(oldConfig.Input.MediaSource.Layers, newConfig.Input.MediaSource.Layers)
 }
 
 func chromiumSourceDiff(old, new models.ChromiumSource) bool {

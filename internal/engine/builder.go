@@ -39,8 +39,8 @@ func BuildFFmpegArgs(cfg *models.Config) ([]string, error) {
 	}
 
 	hasActiveLayer := false
-	if cfg.Input.FFmpegSource.Active {
-		for _, layer := range cfg.Input.FFmpegSource.Layers {
+	if cfg.Input.MediaSource.Active {
+		for _, layer := range cfg.Input.MediaSource.Layers {
 			if layer.Active {
 				hasActiveLayer = true
 				break

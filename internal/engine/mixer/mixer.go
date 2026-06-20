@@ -2,157 +2,30 @@ package mixer
 
 import (
 	"fmt"
-	"strings"
 
-	"github.com/user/VLX_VisionBridge/internal/engine/source"
 	"github.com/user/VLX_VisionBridge/internal/models"
 )
 
 func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 	var args []string
-	var filterComplex strings.Builder
 
-	bgColor := cfg.Input.BgColor
-	if bgColor == "" {
-		bgColor = "black"
-	}
+	args = append(args, "compositor", "name=comp", "sink_0::zorder=0", "sink_1::zorder=1", "!", "queue", "leaky=downstream", "max-size-buffers=1", "max-size-time=30000000", "!", "videoconvert", "!", "video/x-raw,format=RGBA", "!", "videoconvert", "!")
 
-	inputIdx := 0
-	currentBasePad := ""
-	var audioPads []string
+	args = append(args, "audiomixer", "name=acomp", "!")
 
-	// MUTUAL EXCLUSIVITY: ChromiumSource vs FFmpegSource
 	if cfg.Input.ChromiumSource.Active {
-		cs := cfg.Input.ChromiumSource
-
-		hasAudio := cs.Z1Active || cs.Z2Active || cs.Z3Active || cs.Z4Active ||
-			cs.Z5Active || cs.Z6Active || cs.Z7Active || cs.Z8Active
-
-		framerate := "30"
-		if cfg.Input.Framerate > 0 {
-			framerate = fmt.Sprintf("%d", cfg.Input.Framerate)
-		}
-
-		if hasAudio {
-			args = append(args,
-				"-f", "x11grab",
-				"-thread_queue_size", "128",
-				"-framerate", framerate,
-				"-video_size", cfg.Input.Resolution,
-				"-draw_mouse", "0",
-				"-i", ":99",
-				"-f", "pulse",
-				"-thread_queue_size", "128",
-				"-i", "vlx_chromium_sink.monitor",
-			)
-		} else {
-			args = append(args,
-				"-f", "x11grab",
-				"-thread_queue_size", "128",
-				"-framerate", framerate,
-				"-video_size", cfg.Input.Resolution,
-				"-draw_mouse", "0",
-				"-i", ":99",
-			)
-		}
-
-		layerVideoPad := fmt.Sprintf("[%d:v]", inputIdx)
-		currentBasePad = layerVideoPad
-
-		if hasAudio {
-			layerAudioPad := fmt.Sprintf("[%d:a]", inputIdx+1)
-			aOutPad := "[a_chromium]"
-
-			// Notice asetpts=PTS-STARTPTS is removed for Chromium live capture
-			filterComplex.WriteString(fmt.Sprintf("%s aresample=48000:async=1,aformat=sample_rates=48000:channel_layouts=stereo, volume@layer99=1.00 %s;\n", layerAudioPad, aOutPad))
-
-			audioPads = append(audioPads, aOutPad)
-			inputIdx += 2
-		} else {
-			inputIdx += 1
-		}
-	} else if cfg.Input.FFmpegSource.Active {
-		// Only create the base color canvas if Chromium is NOT active
-		filterComplex.WriteString(fmt.Sprintf("color=s=%s:r=30:c=%s [base];\n", cfg.Input.Resolution, bgColor))
-		currentBasePad = "[base]"
-
-		for i, layer := range cfg.Input.FFmpegSource.Layers {
-			if !layer.Active {
-				continue
-			}
-
-			res := source.BuildInputArgs(layer)
-			args = append(args, res.Args...)
-
-			media := layer.Media
-			if media == "" {
-				media = "Video+Audio"
-			}
-
-			layerVideoPad := ""
-			layerAudioPad := ""
-
-			if res.InputCount == 1 {
-				layerVideoPad = fmt.Sprintf("[%d:v]", inputIdx)
-				layerAudioPad = fmt.Sprintf("[%d:a]", inputIdx)
-			} else if res.InputCount == 2 {
-				layerVideoPad = fmt.Sprintf("[%d:v]", inputIdx)
-				layerAudioPad = fmt.Sprintf("[%d:a]", inputIdx+1)
-			}
-
-			// Handle Video
-			if (media == "Video" || media == "Video+Audio") && res.HasVideo {
-				scaledPad := fmt.Sprintf("[v%d_scaled]", i)
-				outPad := fmt.Sprintf("[out%d]", i)
-
-				filterComplex.WriteString(fmt.Sprintf("%s setpts=PTS-STARTPTS,scale=%d:-1 %s;\n", layerVideoPad, layer.Size, scaledPad))
-				filterComplex.WriteString(fmt.Sprintf("%s%s overlay@layer%d=x=%d:y=%d %s;\n", currentBasePad, scaledPad, layer.ID, layer.X, layer.Y, outPad))
-
-				currentBasePad = outPad
-			}
-
-			// Handle Audio
-			if (media == "Audio" || media == "Video+Audio") && res.HasAudio {
-				aOutPad := fmt.Sprintf("[a%d]", i)
-
-				volumeVal := 1.0
-				if layer.Volume != nil {
-					volumeVal = float64(*layer.Volume) / 100.0
-				}
-
-				filterComplex.WriteString(fmt.Sprintf("%s aresample=48000:async=1,aformat=sample_rates=48000:channel_layouts=stereo,asetpts=PTS-STARTPTS, volume@layer%d=%.2f %s;\n", layerAudioPad, layer.ID, volumeVal, aOutPad))
-
-				audioPads = append(audioPads, aOutPad)
-			}
-
-			inputIdx += res.InputCount
-		}
-	} else {
-		// Neither active, just generate the base canvas to have something to output
-		filterComplex.WriteString(fmt.Sprintf("color=s=%s:r=30:c=%s [base];\n", cfg.Input.Resolution, bgColor))
-		currentBasePad = "[base]"
+		args = append(args, "udpsrc", "port=50002", "caps=application/x-rtp,media=video,clock-rate=90000,encoding-name=VP8", "!", "rtpvp8depay", "!", "vp8dec", "!", "queue", "leaky=downstream", "max-size-buffers=1", "max-size-time=30000000", "!", "videoconvert", "!", "comp.sink_1")
+		args = append(args, "udpsrc", "port=50003", "caps=application/x-rtp,media=audio,clock-rate=48000,encoding-name=OPUS", "!", "rtpopusdepay", "!", "opusdec", "!", "queue", "leaky=downstream", "max-size-buffers=1", "max-size-time=30000000", "!", "audioconvert", "!", "audioresample", "!", "acomp.sink_1")
 	}
 
-	var finalAudioPad string
-	if len(audioPads) == 0 {
-		filterComplex.WriteString("anullsrc=r=48000:cl=stereo [a_out];\n")
-		finalAudioPad = "[a_out]"
-	} else if len(audioPads) == 1 {
-		finalAudioPad = audioPads[0]
-	} else {
-		for _, pad := range audioPads {
-			filterComplex.WriteString(pad)
+	if cfg.Input.MediaSource.Active {
+		for i, layer := range cfg.Input.MediaSource.Layers {
+			if layer.Active {
+				args = append(args, "uridecodebin", "uri="+layer.InputPath, "name=src_"+fmt.Sprint(i))
+				args = append(args, "src_"+fmt.Sprint(i)+".", "!", "queue", "leaky=downstream", "max-size-buffers=1", "max-size-time=30000000", "!", "videoconvert", "!", fmt.Sprintf("comp.sink_%d", i))
+				args = append(args, "src_"+fmt.Sprint(i)+".", "!", "queue", "leaky=downstream", "max-size-buffers=1", "max-size-time=30000000", "!", "audioconvert", "!", "audioresample", "!", fmt.Sprintf("acomp.sink_%d", i))
+			}
 		}
-		filterComplex.WriteString(fmt.Sprintf(" amix=inputs=%d:duration=longest:dropout_transition=0 [a_out];\n", len(audioPads)))
-		finalAudioPad = "[a_out]"
 	}
-
-	finalVideoPad := "[v_out]"
-	if cfg.Input.ChromiumSource.Active && !cfg.Input.FFmpegSource.Active {
-		filterComplex.WriteString(fmt.Sprintf("%s null %s;\n", currentBasePad, finalVideoPad))
-	} else {
-		filterComplex.WriteString(fmt.Sprintf("%s zmq=b=tcp\\\\://127.0.0.1\\\\:5555 %s;\n", currentBasePad, finalVideoPad))
-	}
-
-	return args, filterComplex.String(), finalVideoPad, finalAudioPad
+	return args, "", "", ""
 }

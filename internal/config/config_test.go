@@ -19,7 +19,7 @@ output:
   audio_bitrate: "160k"
 input:
   resolution: "1920x1080"
-  ffmpeg_source:
+  media_source:
     layers:
       - id: 1
         active: true
@@ -45,11 +45,11 @@ input:
 	if cfg.Output.Resolution != "1920x1080" {
 		t.Errorf("Expected resolution '1920x1080', got '%s'", cfg.Output.Resolution)
 	}
-	if len(cfg.Input.FFmpegSource.Layers) != 1 {
-		t.Fatalf("Expected 1 layer, got %d", len(cfg.Input.FFmpegSource.Layers))
+	if len(cfg.Input.MediaSource.Layers) != 1 {
+		t.Fatalf("Expected 1 layer, got %d", len(cfg.Input.MediaSource.Layers))
 	}
-	if cfg.Input.FFmpegSource.Layers[0].ID != 1 {
-		t.Errorf("Expected layer ID 1, got %d", cfg.Input.FFmpegSource.Layers[0].ID)
+	if cfg.Input.MediaSource.Layers[0].ID != 1 {
+		t.Errorf("Expected layer ID 1, got %d", cfg.Input.MediaSource.Layers[0].ID)
 	}
 }
 
@@ -83,7 +83,7 @@ func TestDiffConfigs(t *testing.T) {
 	oldCfg := &models.Config{
 		Input: models.InputSettings{
 			Resolution: "1920x1080",
-			FFmpegSource: models.FFmpegSource{
+			MediaSource: models.MediaSource{
 				Layers: []models.Layer{
 					{ID: 1, Active: true, InputType: "loop", InputPath: "test.mp4", Size: 1920},
 					{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
@@ -97,7 +97,7 @@ func TestDiffConfigs(t *testing.T) {
 	newCfg1 := &models.Config{
 		Input: models.InputSettings{
 			Resolution: "1920x1080",
-			FFmpegSource: models.FFmpegSource{
+			MediaSource: models.MediaSource{
 				Layers: []models.Layer{
 					{ID: 1, Active: true, InputType: "loop", InputPath: "test.mp4", Size: 1920},
 					{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
@@ -125,7 +125,7 @@ func TestDiffConfigs(t *testing.T) {
 	newCfg3 := &models.Config{
 		Input: models.InputSettings{
 			Resolution: "1920x1080",
-			FFmpegSource: models.FFmpegSource{
+			MediaSource: models.MediaSource{
 				Layers: []models.Layer{
 					{ID: 1, Active: false, InputType: "loop", InputPath: "test.mp4", Size: 1920},
 					{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
@@ -143,7 +143,7 @@ func TestDiffConfigs(t *testing.T) {
 	newCfg4 := &models.Config{
 		Input: models.InputSettings{
 			Resolution: "1920x1080",
-			FFmpegSource: models.FFmpegSource{
+			MediaSource: models.MediaSource{
 				Layers: []models.Layer{
 					{ID: 1, Active: true, InputType: "loop", InputPath: "new.mp4", Size: 1920},
 					{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
@@ -164,7 +164,7 @@ output:
   resolution: "1920x1080"
   fps: 60
 input:
-  ffmpeg_source:
+  media_source:
     layers:
       - id: 1
         active: true
@@ -176,7 +176,7 @@ output:
   resolution: "1920x1080"
   fps: 60
 input:
-  ffmpeg_source:
+  media_source:
     layers:
       - id: 1
         active: false

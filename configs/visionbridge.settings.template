@@ -25,6 +25,8 @@ input:
   bg_color: "black"       # Global canvas background color
   resolution: "1920x1080" # Layer's canvas size
   framerate: "30"
+  webrtc_port_min: 50000
+  webrtc_port_max: 50050
   chromium_source:
     active: false
     z1_active: true
@@ -84,7 +86,7 @@ input:
     z8_x: 0
     z8_y: 0
 
-  ffmpeg_source:
+  media_source:
     active: false
     # Layers (0-2) configured as inputs and their layouts
     # For 'local' input_type, the input_path must be a folder. Content is accepted if:
