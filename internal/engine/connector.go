@@ -143,12 +143,12 @@ func (pm *ProcessManager) handleControlCommand(cmd ControlCommand) {
 			}
 
 			pm.mu.Lock() // UPDATE STATE IN MEMORY WITHOUT RESTARTING FFMPEG
-			if pm.config != nil && pm.config.Input.FFmpegSource.Active {
-				for i, layer := range pm.config.Input.FFmpegSource.Layers {
+			if pm.config != nil && pm.config.Input.MediaSource.Active {
+				for i, layer := range pm.config.Input.MediaSource.Layers {
 					if layer.ID == id {
-						if pm.config.Input.FFmpegSource.Layers[i].Active != cmd.Payload.Enabled {
+						if pm.config.Input.MediaSource.Layers[i].Active != cmd.Payload.Enabled {
 							log.Printf("Setting layer %d Active to %v via control command", id, cmd.Payload.Enabled)
-							pm.config.Input.FFmpegSource.Layers[i].Active = cmd.Payload.Enabled
+							pm.config.Input.MediaSource.Layers[i].Active = cmd.Payload.Enabled
 
 							// Copy config
 							newCfg := *pm.config

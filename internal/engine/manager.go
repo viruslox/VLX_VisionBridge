@@ -84,6 +84,7 @@ func (pm *ProcessManager) Start(ctx context.Context, config *models.Config) erro
 	pm.isRunning = true
 	pm.mu.Unlock()
 
+	go startWebRTCServer()
 	go pm.StartConnectorListener()
 	go pm.monitor()
 
@@ -273,7 +274,58 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 			if scripts != "" {
 				htmlContent += "  <script>\n" + scripts + "  </script>\n"
 			}
-			htmlContent += `</body>
+			htmlContent += `  <script>
+    async function startWebRTC() {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = ` + resWidth + `;
+        canvas.height = ` + resHeight + `;
+        document.body.appendChild(canvas);
+        const ctx = canvas.getContext('2d', { alpha: true });
+
+        function draw() {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          const elements = document.querySelectorAll('iframe, video, img');
+          elements.forEach(el => {
+            if (el.tagName === 'VIDEO' || el.tagName === 'IMG') {
+               try { ctx.drawImage(el, parseInt(el.style.left)||0, parseInt(el.style.top)||0, parseInt(el.style.width)||canvas.width, parseInt(el.style.height)||canvas.height); } catch(e){}
+            }
+          });
+          requestAnimationFrame(draw);
+        }
+        draw();
+
+        const stream = canvas.captureStream(30);
+        const audioCtx = new AudioContext();
+        const dest = audioCtx.createMediaStreamDestination();
+        const audios = document.querySelectorAll('video, audio');
+        audios.forEach(a => {
+            const source = audioCtx.createMediaElementSource(a);
+            source.connect(dest);
+            source.connect(audioCtx.destination);
+        });
+        dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
+
+        const pc = new RTCPeerConnection({ iceServers: [] });
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        const response = await fetch('http://localhost:50000/webrtc/offer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/sdp' },
+          body: offer.sdp
+        });
+        const answerSdp = await response.text();
+        await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
+      } catch (e) {
+        console.error('WebRTC error:', e);
+      }
+    }
+    window.onload = startWebRTC;
+  </script>
+</body>
 </html>`
 
 			htmlPath := "/opt/VLX_VisionBridge/var/overlay.html"
@@ -317,11 +369,10 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				"--disable-renderer-backgrounding",
 				"--unthrottled-timer-nested-iframes",
 				"--disable-frame-rate-limit",
-				"--use-gl=swiftshader",
 				fileURL,
 			)
 
-			cmd.Env = append(os.Environ(), "DISPLAY=:99", "PULSE_SINK=vlx_chromium_sink")
+			cmd.Env = os.Environ()
 
 			err = cmd.Start()
 			if err != nil {
@@ -371,9 +422,9 @@ func (pm *ProcessManager) UpdateFilter(config *models.Config) {
 	pm.config = config
 	pm.mu.Unlock()
 
-	if config != nil && config.Input.FFmpegSource.Active {
+	if config != nil && config.Input.MediaSource.Active {
 		var validLayers []models.Layer
-		for _, layer := range config.Input.FFmpegSource.Layers {
+		for _, layer := range config.Input.MediaSource.Layers {
 			if layer.ID >= 0 && layer.ID <= 2 {
 				validLayers = append(validLayers, layer)
 			}
@@ -381,7 +432,7 @@ func (pm *ProcessManager) UpdateFilter(config *models.Config) {
 		if len(validLayers) > 3 {
 			validLayers = validLayers[:3]
 		}
-		config.Input.FFmpegSource.Layers = validLayers
+		config.Input.MediaSource.Layers = validLayers
 	}
 
 	req := zmq4.NewReq(context.Background())
@@ -392,8 +443,8 @@ func (pm *ProcessManager) UpdateFilter(config *models.Config) {
 		return
 	}
 
-	if config.Input.FFmpegSource.Active {
-		for _, layer := range config.Input.FFmpegSource.Layers {
+	if config.Input.MediaSource.Active {
+		for _, layer := range config.Input.MediaSource.Layers {
 			if layer.ID == 99 {
 				continue
 			}
@@ -448,9 +499,9 @@ func (pm *ProcessManager) UpdateConfig(config *models.Config) {
 	pm.mu.Lock()
 	pm.config = config
 
-	if pm.config != nil && pm.config.Input.FFmpegSource.Active {
+	if pm.config != nil && pm.config.Input.MediaSource.Active {
 		var validLayers []models.Layer
-		for _, layer := range pm.config.Input.FFmpegSource.Layers {
+		for _, layer := range pm.config.Input.MediaSource.Layers {
 			if layer.ID >= 0 && layer.ID <= 2 {
 				validLayers = append(validLayers, layer)
 			}
@@ -458,7 +509,7 @@ func (pm *ProcessManager) UpdateConfig(config *models.Config) {
 		if len(validLayers) > 3 {
 			validLayers = validLayers[:3]
 		}
-		pm.config.Input.FFmpegSource.Layers = validLayers
+		pm.config.Input.MediaSource.Layers = validLayers
 	}
 
 	if cmd, exists := pm.overlayCmds[99]; exists && cmd != nil && cmd.Process != nil {
@@ -579,16 +630,16 @@ func (pm *ProcessManager) disableModule(module string) {
 		if len(parts) > 0 {
 			idStr := strings.TrimPrefix(parts[0], "[layer ")
 			if id, err := strconv.Atoi(idStr); err == nil {
-				for i, layer := range pm.config.Input.FFmpegSource.Layers {
+				for i, layer := range pm.config.Input.MediaSource.Layers {
 					if layer.ID == id {
-						pm.config.Input.FFmpegSource.Layers[i].Active = false
+						pm.config.Input.MediaSource.Layers[i].Active = false
 						break
 					}
 				}
 			}
 		}
-	} else if module == "[ffmpeg_source]" {
-		pm.config.Input.FFmpegSource.Active = false
+	} else if module == "[media_source]" {
+		pm.config.Input.MediaSource.Active = false
 	}
 }
 
@@ -597,8 +648,8 @@ func identifyErrorModule(stderr string, cfg *models.Config) string {
 		return ""
 	}
 
-	if cfg.Input.FFmpegSource.Active {
-		for _, layer := range cfg.Input.FFmpegSource.Layers {
+	if cfg.Input.MediaSource.Active {
+		for _, layer := range cfg.Input.MediaSource.Layers {
 			if !layer.Active || layer.InputPath == "" {
 				continue
 			}
@@ -730,7 +781,7 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 }
 
 func (pm *ProcessManager) runProcess(ctx context.Context, args []string) (bool, error, string) {
-	cmd := exec.Command("ffmpeg", args...)
+	cmd := exec.Command("gst-launch-1.0", args...)
 
 	tb := &tailBuffer{}
 	cmd.Stderr = tb

@@ -20,7 +20,7 @@ output:
     - "rtmp://a.rtmp.youtube.com/live2/xyz"
 input:
   resolution: "1920x1080"
-  ffmpeg_source:
+  media_source:
     active: true
     layers:
       - id: 1
@@ -81,12 +81,12 @@ input:
 	}
 
 	// Verify Layers
-	if len(cfg.Input.FFmpegSource.Layers) != 2 {
-		t.Fatalf("Expected 2 layers, got %d", len(cfg.Input.FFmpegSource.Layers))
+	if len(cfg.Input.MediaSource.Layers) != 2 {
+		t.Fatalf("Expected 2 layers, got %d", len(cfg.Input.MediaSource.Layers))
 	}
 
 	// Layer 1
-	layer1 := cfg.Input.FFmpegSource.Layers[0]
+	layer1 := cfg.Input.MediaSource.Layers[0]
 	if layer1.ID != 1 {
 		t.Errorf("Expected Layer 1 ID to be 1, got %d", layer1.ID)
 	}
@@ -113,7 +113,7 @@ input:
 	}
 
 	// Layer 2
-	layer2 := cfg.Input.FFmpegSource.Layers[1]
+	layer2 := cfg.Input.MediaSource.Layers[1]
 	if layer2.ID != 2 {
 		t.Errorf("Expected Layer 2 ID to be 2, got %d", layer2.ID)
 	}

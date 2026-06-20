@@ -8,12 +8,13 @@ The service is designed for professional 24/7 broadcasting environments where co
 
 ## Requirements Note
 
-- **Hardware**: Multi-core CPU for FFmpeg processing, adequate RAM for media buffering.
-- **Software**: Modern Linux distribution (e.g., Ubuntu 20.04/22.04), FFmpeg installed and accessible. Xvfb and Chromium (optional, if using overlay HTML sources).
+- **Hardware**: Multi-core CPU for GStreamer processing, adequate RAM for media buffering.
+- **Software**: Modern Linux distribution (e.g., Ubuntu 20.04/22.04), GStreamer 1.0 (with good/bad/ugly plugins) installed and accessible, Chromium (optional, if using overlay HTML sources), and `pion/webrtc`.
 - **Network**: High-bandwidth, low-latency network connection to handle multiple SRT/WebRTC streams and simultaneous broadcasting to multiple CDNs.
 
 ## Core Principles
 
+- **Zero-Latency Hybrid Pipeline**: Utilizes a highly optimized WebRTC/GStreamer Hybrid architecture.
 - **Headless First**: Managed entirely via configuration files or DB entries.
 - **Dynamic Reconfiguration**: Hot-reloading of layouts and sources without dropping the output stream (where technically possible).
 - **Resource Optimization**: Sources marked as "OFF" are completely excluded from the processing pipeline.

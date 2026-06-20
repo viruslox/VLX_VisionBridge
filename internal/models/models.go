@@ -9,7 +9,7 @@ type OutputSettings struct {
 	Destinations []string `yaml:"destinations"`
 }
 
-type FFmpegSource struct {
+type MediaSource struct {
 	Active bool    `yaml:"active"`
 	Layers []Layer `yaml:"layers"`
 }
@@ -85,7 +85,9 @@ type InputSettings struct {
 	BgColor        string         `yaml:"bg_color" json:"bg_color"`
 	Resolution     string         `yaml:"resolution"`
 	Framerate      int            `yaml:"framerate" json:"framerate"`
-	FFmpegSource   FFmpegSource   `yaml:"ffmpeg_source"`
+	WebrtcPortMin  int            `yaml:"webrtc_port_min"`
+	WebrtcPortMax  int            `yaml:"webrtc_port_max"`
+	MediaSource    MediaSource    `yaml:"media_source"`
 	ChromiumSource ChromiumSource `yaml:"chromium_source"`
 }
 
