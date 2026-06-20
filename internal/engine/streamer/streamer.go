@@ -36,16 +36,16 @@ func IsValidDestination(dest string) bool {
 func BuildOutputArgs(cfg *models.Config) ([]string, error) {
 	var args []string
 	
-	args = append(args, "!", "x264enc", "tune=zerolatency", "speed-preset=ultrafast", "!", "video/x-h264,profile=high")
+	args = append(args, "!", "x264enc", "tune=zerolatency", "speed-preset=ultrafast", "!", "h264parse")
 
 	if len(cfg.Output.Destinations) > 0 {
 		args = append(args, "!", "tee", "name=t")
 		for _, dest := range cfg.Output.Destinations {
 			escaped := strings.ReplaceAll(dest, "\\", "\\\\")
 			if strings.HasPrefix(strings.ToLower(dest), "srt://") {
-				args = append(args, fmt.Sprintf("t. ! queue ! srtsink uri=%s", escaped))
+				args = append(args, fmt.Sprintf("t. ! queue ! mpegtsmux ! srtsink uri=%s", escaped))
 			} else {
-				args = append(args, fmt.Sprintf("t. ! queue ! rtmpsink location=%s", escaped))
+				args = append(args, fmt.Sprintf("t. ! queue ! flvmux ! rtmpsink location=%s", escaped))
 			}
 		}
 	}

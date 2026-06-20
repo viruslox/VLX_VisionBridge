@@ -312,10 +312,20 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
+        await new Promise(resolve => {
+          if (pc.iceGatheringState === 'complete') {
+            resolve();
+          } else {
+            pc.onicegatheringstatechange = () => {
+              if (pc.iceGatheringState === 'complete') resolve();
+            };
+          }
+        });
+
         const response = await fetch('http://localhost:50000/webrtc/offer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/sdp' },
-          body: offer.sdp
+          body: pc.localDescription.sdp
         });
         const answerSdp = await response.text();
         await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
@@ -353,6 +363,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 
 			// OPTIMIZATION: Aggiunti flag per disattivare qualsiasi throttling grafico ed energetico di Chromium headless
 			cmd := exec.Command(chromeBin, 
+				"--headless=new",
 				"--kiosk", 
 				"--disable-infobars", 
 				"--disable-extensions", 
