@@ -8,46 +8,55 @@ import (
 	"github.com/user/VLX_VisionBridge/internal/models"
 )
 
-var destReplacer = strings.NewReplacer("\\", "\\\\", "|", "\\|")
-
-// IsValidDestination strictly validates the destination URL to prevent FFmpeg tee muxer injection.
 func IsValidDestination(dest string) bool {
 	u, err := url.ParseRequestURI(dest)
 	if err != nil {
 		return false
 	}
-
 	scheme := strings.ToLower(u.Scheme)
 	if scheme != "rtmp" && scheme != "rtmps" && scheme != "srt" {
 		return false
 	}
-
 	if u.Host == "" {
 		return false
 	}
-
 	if strings.ContainsAny(dest, "|\\\"'[]") {
 		return false
 	}
-
 	return true
 }
 
 func BuildOutputArgs(cfg *models.Config) ([]string, error) {
 	var args []string
-	
-	args = append(args, "!", "x264enc", "tune=zerolatency", "speed-preset=ultrafast", "!", "h264parse")
 
-	if len(cfg.Output.Destinations) > 0 {
-		args = append(args, "!", "tee", "name=t")
-		for _, dest := range cfg.Output.Destinations {
-			escaped := strings.ReplaceAll(dest, "\\", "\\\\")
-			if strings.HasPrefix(strings.ToLower(dest), "srt://") {
-				args = append(args, fmt.Sprintf("t. ! queue ! mpegtsmux ! srtsink uri=%s", escaped))
-			} else {
-				args = append(args, fmt.Sprintf("t. ! queue ! flvmux ! rtmpsink location=%s", escaped))
-			}
+	if len(cfg.Output.Destinations) == 0 {
+		// Evita crash se l'utente non ha impostato destinazioni
+		args = append(args, "vtee.", "!", "fakesink", "atee.", "!", "fakesink")
+		return args, nil
+	}
+
+	for i, dest := range cfg.Output.Destinations {
+		if !IsValidDestination(dest) {
+			return nil, fmt.Errorf("invalid destination URL: %s", dest)
+		}
+		
+		escaped := strings.ReplaceAll(dest, "\\", "\\\\")
+		muxName := fmt.Sprintf("mux%d", i)
+
+		if strings.HasPrefix(strings.ToLower(dest), "srt://") {
+			// Muxer SRT (MPEG-TS)
+			args = append(args, "mpegtsmux", "name="+muxName)
+			args = append(args, "vtee.", "!", "queue", "!", muxName+".")
+			args = append(args, "atee.", "!", "queue", "!", muxName+".")
+			args = append(args, muxName+".", "!", "srtsink", "uri="+escaped)
+		} else {
+			// Muxer RTMP (FLV)
+			args = append(args, "flvmux", "name="+muxName, "streamable=true")
+			args = append(args, "vtee.", "!", "queue", "!", muxName+".video")
+			args = append(args, "atee.", "!", "queue", "!", muxName+".audio")
+			args = append(args, muxName+".", "!", "rtmpsink", "location="+escaped)
 		}
 	}
+
 	return args, nil
 }
