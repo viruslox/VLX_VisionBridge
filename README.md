@@ -12,6 +12,10 @@ The service is designed for professional 24/7 broadcasting environments where co
 - **Software**: Modern Linux distribution (e.g., Ubuntu 20.04/22.04), GStreamer 1.0 (with good/bad/ugly plugins) installed and accessible, Chromium (optional, if using overlay HTML sources), and `pion/webrtc`.
 - **Network**: High-bandwidth, low-latency network connection to handle multiple SRT/WebRTC streams and simultaneous broadcasting to multiple CDNs.
 
+```bash
+apt-get install gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav
+```
+
 ## Core Principles
 
 - **Zero-Latency Hybrid Pipeline**: Utilizes a highly optimized WebRTC/GStreamer Hybrid architecture.
