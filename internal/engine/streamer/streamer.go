@@ -13,14 +13,9 @@ func IsValidDestination(dest string) bool {
 	if err != nil {
 		return false
 	}
+	// Ora accetteremo principalmente URL locali semplici come rtmp://127.0.0.1:1935/live/...
 	scheme := strings.ToLower(u.Scheme)
 	if scheme != "rtmp" && scheme != "rtmps" && scheme != "srt" {
-		return false
-	}
-	if u.Host == "" {
-		return false
-	}
-	if strings.ContainsAny(dest, "|\\\"'[]") {
 		return false
 	}
 	return true
@@ -30,7 +25,6 @@ func BuildOutputArgs(cfg *models.Config) ([]string, error) {
 	var args []string
 
 	if len(cfg.Output.Destinations) == 0 {
-		// Prevent crash if no destinations are configured
 		args = append(args, "vtee.", "!", "fakesink", "atee.", "!", "fakesink")
 		return args, nil
 	}
@@ -44,13 +38,12 @@ func BuildOutputArgs(cfg *models.Config) ([]string, error) {
 		muxName := fmt.Sprintf("mux%d", i)
 
 		if strings.HasPrefix(strings.ToLower(dest), "srt://") {
-			// SRT (MPEG-TS) Muxer
 			args = append(args, "mpegtsmux", "name="+muxName)
 			args = append(args, "vtee.", "!", "queue", "!", muxName+".")
 			args = append(args, "atee.", "!", "queue", "!", muxName+".")
 			args = append(args, muxName+".", "!", "srtsink", "uri="+escaped)
 		} else {
-			// RTMP (FLV) Muxer
+			// Output RTMP standard. Il nodo rtmpsink ora punterà al MediaMTX locale in chiaro.
 			args = append(args, "flvmux", "name="+muxName, "streamable=true")
 			args = append(args, "vtee.", "!", "queue", "!", muxName+".video")
 			args = append(args, "atee.", "!", "queue", "!", muxName+".audio")
