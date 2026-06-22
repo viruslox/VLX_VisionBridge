@@ -15,7 +15,7 @@ func BuildFFmpegArgs(cfg *models.Config) ([]string, error) {
 		return nil, fmt.Errorf("config cannot be nil")
 	}
 
-	// Parsing risoluzione
+	// Parse input resolution
 	inputResParts := strings.Split(cfg.Input.Resolution, "x")
 	if len(inputResParts) != 2 {
 		return nil, fmt.Errorf("invalid input resolution format, expected WxH: %s", cfg.Input.Resolution)
@@ -45,11 +45,11 @@ func BuildFFmpegArgs(cfg *models.Config) ([]string, error) {
 
 	var args []string
 
-	// 1. Costruisce la pipeline di mixaggio (Sorgenti -> Encoder -> TEE)
+	// 1. Build mixing pipeline (Sources -> Encoder -> TEE)
 	argsFilter, _, _, _ := mixer.BuildFilterComplex(cfg)
 	args = append(args, argsFilter...)
 
-	// 2. Costruisce l'output (TEE -> Muxer -> Sink RTMP/SRT)
+	// 2. Build output pipeline (TEE -> Muxer -> Sinks)
 	outArgs, err := streamer.BuildOutputArgs(cfg)
 	if err != nil {
 		return nil, err
