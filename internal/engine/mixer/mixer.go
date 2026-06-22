@@ -28,7 +28,7 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 		"compositor", "name=comp", "background=black", "!",
 		fmt.Sprintf("video/x-raw,width=%s,height=%s,framerate=%s", resWidth, resHeight, framerate), "!",
 		"videoconvert", "!",
-		"x264enc", "tune=zerolatency", "speed-preset=ultrafast", "bitrate=8000", "key-int-max=60", "!",
+		"x264enc", "tune=zerolatency", "speed-preset=ultrafast", "bitrate=8000", "key-int-max=30", "!",
 		"h264parse", "!", "tee", "name=vtee",
 	)
 
