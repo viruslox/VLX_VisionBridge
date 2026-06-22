@@ -30,7 +30,7 @@ func BuildOutputArgs(cfg *models.Config) ([]string, error) {
 	var args []string
 
 	if len(cfg.Output.Destinations) == 0 {
-		// Evita crash se l'utente non ha impostato destinazioni
+		// Prevent crash if no destinations are configured
 		args = append(args, "vtee.", "!", "fakesink", "atee.", "!", "fakesink")
 		return args, nil
 	}
@@ -44,13 +44,13 @@ func BuildOutputArgs(cfg *models.Config) ([]string, error) {
 		muxName := fmt.Sprintf("mux%d", i)
 
 		if strings.HasPrefix(strings.ToLower(dest), "srt://") {
-			// Muxer SRT (MPEG-TS)
+			// SRT (MPEG-TS) Muxer
 			args = append(args, "mpegtsmux", "name="+muxName)
 			args = append(args, "vtee.", "!", "queue", "!", muxName+".")
 			args = append(args, "atee.", "!", "queue", "!", muxName+".")
 			args = append(args, muxName+".", "!", "srtsink", "uri="+escaped)
 		} else {
-			// Muxer RTMP (FLV)
+			// RTMP (FLV) Muxer
 			args = append(args, "flvmux", "name="+muxName, "streamable=true")
 			args = append(args, "vtee.", "!", "queue", "!", muxName+".video")
 			args = append(args, "atee.", "!", "queue", "!", muxName+".audio")
