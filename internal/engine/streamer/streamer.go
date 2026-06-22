@@ -13,7 +13,16 @@ func IsValidDestination(dest string) bool {
 	if err != nil {
 		return false
 	}
-	// Ora accetteremo principalmente URL locali semplici come rtmp://127.0.0.1:1935/live/...
+
+	if u.Host == "" {
+		return false
+	}
+
+	if strings.ContainsAny(dest, "|\\\"'[]") {
+		return false
+	}
+
+	// We now primarily accept simple local URLs like rtmp://127.0.0.1:1935/live/...
 	scheme := strings.ToLower(u.Scheme)
 	if scheme != "rtmp" && scheme != "rtmps" && scheme != "srt" {
 		return false
@@ -43,7 +52,7 @@ func BuildOutputArgs(cfg *models.Config) ([]string, error) {
 			args = append(args, "atee.", "!", "queue", "!", muxName+".")
 			args = append(args, muxName+".", "!", "srtsink", "uri="+escaped)
 		} else {
-			// Output RTMP standard. Il nodo rtmpsink ora punterà al MediaMTX locale in chiaro.
+			// Standard RTMP output. The rtmpsink node will now point to the local cleartext MediaMTX.
 			args = append(args, "flvmux", "name="+muxName, "streamable=true")
 			args = append(args, "vtee.", "!", "queue", "!", muxName+".video")
 			args = append(args, "atee.", "!", "queue", "!", muxName+".audio")

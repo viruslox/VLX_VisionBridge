@@ -13,18 +13,18 @@ connector:
 
 # Global output settings for the stream
 output:
-  active: false           # Keeps FFmpeg dormant (0% CPU) until a [ZMQ_CONTROL] Target=stream Enabled=true IPC command wakes it up
+  active: false           # Keeps GStreamer dormant (0% CPU) until a [ZMQ_CONTROL] Target=stream Enabled=true IPC command wakes it up
   resolution: "1920x1080" # Target output resolution
   fps: 30                 # Target output framerate
   video_bitrate: "6000k"  # Output video bitrate
   audio_bitrate: "160k"   # Output audio bitrate
   destinations:           # List of RTMP endpoints to stream to
-    - "rtmp://localhost/live/test"
+    - "rtmp://127.0.0.1:1935/live/internal"
 
 input:
   bg_color: "black"       # Global canvas background color
   resolution: "1920x1080" # Layer's canvas size
-  framerate: "30"
+  framerate: 30
   webrtc_port_min: 50000
   webrtc_port_max: 50050
   chromium_source:

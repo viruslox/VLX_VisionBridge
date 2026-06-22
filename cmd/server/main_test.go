@@ -34,21 +34,21 @@ func TestCheckEUID(t *testing.T) {
 	}
 }
 
-func TestCheckFFmpeg(t *testing.T) {
+func TestCheckGStreamer(t *testing.T) {
 	mockLookPathFound := func(file string) (string, error) {
-		return "/usr/bin/ffmpeg", nil
+		return "/usr/bin/gst-launch-1.0", nil
 	}
 
-	if err := CheckFFmpeg(mockLookPathFound); err != nil {
-		t.Errorf("Expected no error when ffmpeg is found, got %v", err)
+	if err := CheckGStreamer(mockLookPathFound); err != nil {
+		t.Errorf("Expected no error when gst-launch-1.0 is found, got %v", err)
 	}
 
 	mockLookPathNotFound := func(file string) (string, error) {
 		return "", errors.New("not found")
 	}
 
-	if err := CheckFFmpeg(mockLookPathNotFound); err == nil {
-		t.Errorf("Expected error when ffmpeg is not found, got nil")
+	if err := CheckGStreamer(mockLookPathNotFound); err == nil {
+		t.Errorf("Expected error when gst-launch-1.0 is not found, got nil")
 	}
 }
 

@@ -138,13 +138,13 @@ func promptChromiumInstall() {
 	choice := strings.TrimSpace(strings.ToLower(scanner.Text()))
 
 	if choice == "y" || choice == "yes" {
-		fmt.Println("Installing Chromium and Xvfb dependencies...")
+		fmt.Println("Installing Chromium and GStreamer dependencies...")
 		// update apt first
 		if err := exec.Command("apt-get", "update").Run(); err != nil {
 			log.Printf("Warning: Failed to run apt-get update: %v", err)
 		}
 
-		cmd := exec.Command("apt-get", "install", "-y", "xvfb", "chromium-common", "chromium", "chromium-headless-shell", "chromium-driver", "chromium-lwn4chrome", "chromium-sandbox", "chromium-shell", "pulseaudio", "pulseaudio-utils", "dbus-x11")
+		cmd := exec.Command("apt-get", "install", "-y", "chromium-common", "chromium", "chromium-headless-shell", "chromium-driver", "chromium-lwn4chrome", "chromium-sandbox", "chromium-shell", "gstreamer1.0-tools", "gstreamer1.0-plugins-base", "gstreamer1.0-plugins-good", "gstreamer1.0-plugins-bad", "gstreamer1.0-plugins-ugly", "gstreamer1.0-libav")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
