@@ -376,7 +376,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				}
 			}
 
-			cmd := exec.Command(chromeBin,
+cmd := exec.Command(chromeBin,
 				"--headless=new",
 				"--kiosk",
 				"--disable-infobars",
@@ -394,6 +394,9 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				"--disable-renderer-backgrounding",
 				"--unthrottled-timer-nested-iframes",
 				"--disable-frame-rate-limit",
+				"--disable-web-security",
+				"--allow-file-access-from-files",
+				"--allow-loopback-in-peer-connection",
 				fileURL,
 			)
 
@@ -819,6 +822,8 @@ func (pm *ProcessManager) runProcess(ctx context.Context, gstArgs []string) (boo
 		pm.mu.Unlock()
 	}()
 
+	log.Println("Starting GStreamer process... (Streaming to MediaMTX)")
+	
 	err := gstCmd.Start()
 	if err != nil {
 		return false, err, tb.String()
