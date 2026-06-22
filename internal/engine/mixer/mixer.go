@@ -23,46 +23,22 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 		framerate = fmt.Sprintf("%d/1", cfg.Input.Framerate)
 	}
 
-	// RAMO VIDEO
+	// STATIC VIDEO PIPELINE: Capture Xvfb display :99
 	args = append(args,
-		"compositor", "name=comp", "background=black", "!",
+		"ximagesrc", "display-name=:99", "use-damage=0", "show-pointer=false", "!",
+		"videoscale", "!", "videorate", "!",
 		fmt.Sprintf("video/x-raw,width=%s,height=%s,framerate=%s", resWidth, resHeight, framerate), "!",
 		"videoconvert", "!",
 		"x264enc", "tune=zerolatency", "speed-preset=ultrafast", "bitrate=8000", "key-int-max=30", "!",
 		"h264parse", "!", "tee", "name=vtee",
 	)
 
-	// RAMO AUDIO
+	// STATIC AUDIO PIPELINE: Capture isolated PulseAudio server
 	args = append(args,
-		"audiomixer", "name=acomp", "!",
+		"pulsesrc", "device=VisionBridgeSink.monitor", "!",
 		"audioconvert", "!", "audioresample", "!",
 		"avenc_aac", "bitrate=160000", "!", "aacparse", "!", "tee", "name=atee",
 	)
-
-	// MASTER CLOCKS
-	args = append(args,
-		"videotestsrc", "pattern=black", "is-live=true", "!",
-		fmt.Sprintf("video/x-raw,width=%s,height=%s,framerate=%s", resWidth, resHeight, framerate), "!", "comp.sink_0",
-	)
-	args = append(args,
-		"audiotestsrc", "wave=silence", "is-live=true", "!",
-		"audio/x-raw,rate=48000,channels=2", "!", "acomp.sink_0",
-	)
-
-	if cfg.Input.ChromiumSource.Active {
-		// X11 NATIVE CAPTURE: Perfetto per Chromium Headless
-		args = append(args,
-			"ximagesrc", "display-name=:99", "use-damage=0", "show-pointer=false", "!",
-			"videoscale", "!", "videorate", "!",
-			fmt.Sprintf("video/x-raw,width=%s,height=%s,framerate=%s", resWidth, resHeight, framerate), "!",
-			"videoconvert", "!", "comp.sink_1",
-		)
-		// PULSEAUDIO NATIVE CAPTURE: Dal server virtuale isolato
-		args = append(args,
-			"pulsesrc", "device=VisionBridgeSink.monitor", "!",
-			"audioconvert", "!", "audioresample", "!", "acomp.sink_1",
-		)
-	}
 
 	return args, "", "", ""
 }
