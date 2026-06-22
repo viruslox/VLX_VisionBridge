@@ -3,10 +3,13 @@ package engine
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -75,7 +78,7 @@ func (pm *ProcessManager) Start(ctx context.Context, config *models.Config) erro
 	pm.mu.Lock()
 	if pm.isRunning {
 		pm.mu.Unlock()
-		return fmt.Errorf("process already running")
+		return fmt.Errorf("process manager is already running")
 	}
 
 	pm.config = config
@@ -97,7 +100,7 @@ func (pm *ProcessManager) Stop() {
 	pm.isRunning = false
 
 	if pm.cmd != nil && pm.cmd.Process != nil {
-		log.Println("Signaling GStreamer process to stop gracefully...")
+		log.Println("Signaling GStreamer process to terminate gracefully...")
 		_ = pm.cmd.Process.Signal(syscall.SIGTERM)
 	}
 
@@ -110,7 +113,7 @@ func (pm *ProcessManager) Stop() {
 
 	for id, overlayCmd := range pm.overlayCmds {
 		if overlayCmd != nil && overlayCmd.Process != nil {
-			log.Printf("Signaling background process %d to stop...", id)
+			log.Printf("Signaling background process %d to terminate...", id)
 			_ = overlayCmd.Process.Signal(syscall.SIGTERM)
 		}
 	}
@@ -118,13 +121,40 @@ func (pm *ProcessManager) Stop() {
 	pm.mu.Unlock()
 }
 
-// buildOverlayElement: Generates DOM tags with proper absolute positioning
-func buildOverlayElement(id string, zIndex int, path string, width, height, x, y, volume *int) (string, string, string) {
-	if path == "" {
-		return "", "", ""
+// ResolvePath determines whether the provided target is a single file or a directory.
+// If it is a directory, it retrieves all valid media files to populate the carousel array.
+func (pm *ProcessManager) ResolvePath(basePath string) []string {
+	if basePath == "" {
+		return nil
+	}
+	if strings.HasPrefix(basePath, "http://") || strings.HasPrefix(basePath, "https://") {
+		return []string{basePath}
 	}
 
-	style := fmt.Sprintf("  #%s { z-index: %d; position: absolute; ", id, zIndex)
+	info, err := os.Stat(basePath)
+	if err != nil || !info.IsDir() {
+		return []string{basePath}
+	}
+
+	var files []string
+	entries, err := os.ReadDir(basePath)
+	if err == nil {
+		for _, e := range entries {
+			if !e.IsDir() {
+				lower := strings.ToLower(e.Name())
+				if strings.HasSuffix(lower, ".mp4") || strings.HasSuffix(lower, ".webm") ||
+					strings.HasSuffix(lower, ".png") || strings.HasSuffix(lower, ".jpg") || strings.HasSuffix(lower, ".jpeg") {
+					files = append(files, filepath.Join(basePath, e.Name()))
+				}
+			}
+		}
+	}
+	return files
+}
+
+// buildLayerStyle constructs absolute CSS positioning strings for the DOM elements based on configuration constraints.
+func buildLayerStyle(zIndex int, width, height, x, y *int) string {
+	style := fmt.Sprintf("z-index: %d; position: absolute; ", zIndex)
 	if x != nil {
 		style += fmt.Sprintf("left: %dpx; ", *x)
 	} else {
@@ -137,70 +167,42 @@ func buildOverlayElement(id string, zIndex int, path string, width, height, x, y
 	}
 	if width != nil {
 		style += fmt.Sprintf("width: %dpx; ", *width)
+	} else {
+		style += "width: 100%; "
 	}
 	if height != nil {
 		style += fmt.Sprintf("height: %dpx; ", *height)
-	}
-	style += "}\n"
-
-	var element string
-	lowerPath := strings.ToLower(path)
-
-	srcURL := path
-	if strings.HasPrefix(path, "/") {
-		srcURL = "file://" + path
-	}
-
-	vol := 1.0
-	if volume != nil {
-		vol = float64(*volume) / 100.0
-	}
-	script := fmt.Sprintf("      var e_%s = document.getElementById('%s'); if (e_%s && e_%s.volume !== undefined) e_%s.volume = %f;\n", id, id, id, id, id, vol)
-
-	if strings.HasSuffix(lowerPath, ".mp4") || strings.HasSuffix(lowerPath, ".webm") {
-		element = fmt.Sprintf(`  <video id="%s" src="%s" autoplay loop playsinline></video>`+"\n", id, srcURL)
-	} else if strings.HasSuffix(lowerPath, ".png") || strings.HasSuffix(lowerPath, ".jpg") || strings.HasSuffix(lowerPath, ".jpeg") {
-		element = fmt.Sprintf(`  <img id="%s" src="%s" />`+"\n", id, srcURL)
-		script = ""
-	} else if strings.HasPrefix(lowerPath, "http://") || strings.HasPrefix(lowerPath, "https://") || strings.HasSuffix(lowerPath, ".html") {
-		// For alerts or external web pages, fallback to iframe
-		element = fmt.Sprintf(`  <iframe id="%s" src="%s" allow="autoplay; camera; microphone; display-capture" allowtransparency="true" frameborder="0"></iframe>`+"\n", id, srcURL)
-		script = ""
 	} else {
-		// Generic fallback: empty video tag, can be manipulated by WS later
-		element = fmt.Sprintf(`  <video id="%s" autoplay loop playsinline></video>`+"\n", id)
+		style += "height: 100%; "
 	}
-
-	return style, element, script
+	return style
 }
 
-// startEnvironment: Starts Virtual Desplay and Virtual Audio
+// startEnvironment initializes the Xvfb virtual display and the PulseAudio loopback daemon.
 func (pm *ProcessManager) startEnvironment(resWidth, resHeight string) {
-	// 1. Start Xvfb (Display :99)
 	if _, exists := pm.overlayCmds[100]; !exists {
 		xvfbCmd := exec.Command("Xvfb", ":99", "-screen", "0", fmt.Sprintf("%sx%sx24", resWidth, resHeight), "-ac", "-nolisten", "tcp")
 		if err := xvfbCmd.Start(); err != nil {
-			log.Printf("Xvfb might already be running: %v", err)
+			log.Printf("Xvfb daemon may already be running: %v", err)
 		} else {
-			log.Printf("Started Xvfb on display :99 (%sx%s)", resWidth, resHeight)
+			log.Printf("Initialized Xvfb on display :99 (%sx%s)", resWidth, resHeight)
 			pm.overlayCmds[100] = xvfbCmd
-			// Give X server 1 second to start, avoiding GStreamer or Chromium crashes
+			// Enforce a startup delay to prevent Chromium rendering failures
 			time.Sleep(1 * time.Second)
 		}
 	}
 
-	// 2. Start Isolated PulseAudio (with Null Sink Module)
 	os.MkdirAll("/tmp/pulse-visionbridge", 0755)
 	pulseCmd := exec.Command("pulseaudio", 
 		"-D", 
 		"--exit-idle-time=-1", 
-		"-n", // Ignore hardware system configuration
+		"-n", 
 		"--load=module-native-protocol-unix auth-anonymous=1 socket=/tmp/pulse-visionbridge/native",
 		"--load=module-null-sink sink_name=VisionBridgeSink",
 	)
 	
 	if err := pulseCmd.Run(); err != nil {
-		log.Printf("Isolated PulseAudio instance might already be running: %v", err)
+		log.Printf("Isolated PulseAudio instance is currently active.")
 	} else {
 		log.Println("Isolated PulseAudio instance successfully initialized for software loopback.")
 	}
@@ -211,7 +213,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 	defer pm.mu.Unlock()
 
 	activeOverlays := make(map[int]bool)
-	activeOverlays[100] = true // Keep Xvfb active
+	activeOverlays[100] = true // Preserve Xvfb execution state
 
 	if cfg.Input.ChromiumSource.Active {
 		activeOverlays[99] = true
@@ -224,7 +226,6 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 		}
 
 		if shouldStart {
-			cs := cfg.Input.ChromiumSource
 			bgColor := cfg.Input.BgColor
 			if bgColor == "" {
 				bgColor = "black"
@@ -238,7 +239,6 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				resHeight = resParts[1]
 			}
 
-			// Headless (Xvfb + PulseAudio)
 			pm.startEnvironment(resWidth, resHeight)
 
 			htmlContent := `<!DOCTYPE html>
@@ -246,121 +246,144 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 <head>
 <title>VisionBridge</title>
 <style>
-  * { margin: 0; padding: 0; overflow: hidden; }
-  body { margin: 0; padding: 0; overflow: hidden; background: ` + bgColor + `; width: ` + resWidth + `px; height: ` + resHeight + `px; position: relative; }
-  iframe, video, img { border: none; }
-`
-			var elements string
-			var scripts string
-
-			if cs.Z1Active {
-				s, e, sc := buildOverlayElement("z1", 1, cs.Z1Path, cs.Z1Width, cs.Z1Height, cs.Z1X, cs.Z1Y, cs.Z1Volume)
-				htmlContent += s
-				elements += e
-				scripts += sc
-			}
-			if cs.Z2Active {
-				s, e, sc := buildOverlayElement("z2", 2, cs.Z2Path, cs.Z2Width, cs.Z2Height, cs.Z2X, cs.Z2Y, cs.Z2Volume)
-				htmlContent += s
-				elements += e
-				scripts += sc
-			}
-			if cs.Z3Active {
-				s, e, sc := buildOverlayElement("z3", 3, cs.Z3Path, cs.Z3Width, cs.Z3Height, cs.Z3X, cs.Z3Y, cs.Z3Volume)
-				htmlContent += s
-				elements += e
-				scripts += sc
-			}
-			if cs.Z4Active {
-				s, e, sc := buildOverlayElement("z4", 4, cs.Z4Path, cs.Z4Width, cs.Z4Height, cs.Z4X, cs.Z4Y, cs.Z4Volume)
-				htmlContent += s
-				elements += e
-				scripts += sc
-			}
-			if cs.Z5Active {
-				s, e, sc := buildOverlayElement("z5", 5, cs.Z5Path, cs.Z5Width, cs.Z5Height, cs.Z5X, cs.Z5Y, cs.Z5Volume)
-				htmlContent += s
-				elements += e
-				scripts += sc
-			}
-			if cs.Z6Active {
-				s, e, sc := buildOverlayElement("z6", 6, cs.Z6Path, cs.Z6Width, cs.Z6Height, cs.Z6X, cs.Z6Y, cs.Z6Volume)
-				htmlContent += s
-				elements += e
-				scripts += sc
-			}
-			if cs.Z7Active {
-				s, e, sc := buildOverlayElement("z7", 7, cs.Z7Path, cs.Z7Width, cs.Z7Height, cs.Z7X, cs.Z7Y, cs.Z7Volume)
-				htmlContent += s
-				elements += e
-				scripts += sc
-			}
-			if cs.Z8Active {
-				s, e, sc := buildOverlayElement("z8", 8, cs.Z8Path, cs.Z8Width, cs.Z8Height, cs.Z8X, cs.Z8Y, cs.Z8Volume)
-				htmlContent += s
-				elements += e
-				scripts += sc
-			}
-
-			htmlContent += `</style>
+  * { margin: 0; padding: 0; overflow: hidden; box-sizing: border-box; }
+  body { margin: 0; padding: 0; overflow: hidden; background: ` + bgColor + `; width: 100vw; height: 100vh; position: relative; }
+</style>
 </head>
 <body>
-`
-			htmlContent += elements
+  <div id="z1"></div><div id="z2"></div><div id="z3"></div><div id="z4"></div>
+  <div id="z5"></div><div id="z6"></div><div id="z7"></div><div id="z8"></div>
 
-			// Add WebSocket script to listen for JSON control commands
-			wsScript := `
-	var ws = new WebSocket('ws://127.0.0.1:50001/ws');
-	ws.onmessage = function(event) {
-		try {
-			var msg = JSON.parse(event.data);
-			if (!msg.layer || !msg.action) return;
-			var el = document.getElementById(msg.layer);
-			if (!el) return;
+  <script>
+    var carousels = {};
 
-			if (msg.action === "play" && msg.path) {
-				el.style.display = 'block';
+    function createMediaElement(path, volume) {
+        var lower = path.toLowerCase();
+        var isVideo = lower.endsWith('.mp4') || lower.endsWith('.webm');
+        var isImg = lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg');
+        var el;
 
-				// Handle both local files and web URLs natively
-				if (msg.path.startsWith('http://') || msg.path.startsWith('https://')) {
-					el.src = msg.path;
-				} else {
-					el.src = msg.path.startsWith('/') ? 'file://' + msg.path : msg.path;
-				}
+        if (isVideo) {
+            el = document.createElement('video');
+            el.autoplay = true;
+            el.playsInline = true;
+            if (volume !== undefined && volume !== null) el.volume = parseFloat(volume) / 100.0;
+        } else if (isImg) {
+            el = document.createElement('img');
+        } else {
+            el = document.createElement('iframe');
+            el.allow = "autoplay; camera; microphone; display-capture";
+            el.setAttribute("allowtransparency", "true");
+            el.frameBorder = "0";
+        }
+        
+        el.src = (path.startsWith('http://') || path.startsWith('https://')) ? path : 'file://' + path;
+        el.style.width = '100%';
+        el.style.height = '100%';
+        el.style.border = 'none';
+        el.style.objectFit = 'fill';
+        el.style.position = 'absolute';
+        
+        return el;
+    }
 
-				if (el.tagName.toLowerCase() === 'video') {
-					el.play().catch(e => console.log('play error', e));
-				}
-			} else if (msg.action === "hide") {
-				el.style.display = 'none';
-				if (el.tagName.toLowerCase() === 'video') {
-					el.pause();
-				}
-			} else if (msg.action === "volume" && msg.volume !== undefined) {
-				if (el.volume !== undefined) {
-					el.volume = parseFloat(msg.volume) / 100.0;
-				}
-			}
-		} catch(e) {
-			console.log('WS message parsing error:', e);
-		}
-	};
-	ws.onclose = function() {
-		setTimeout(function() { window.location.reload(); }, 5000);
-	};
-`
-			htmlContent += "  <script>\n" + wsScript + "\n" + scripts + "  </script>\n"
+    function stopLayer(layerId) {
+        var container = document.getElementById(layerId);
+        if (!container) return;
+        container.style.display = 'none';
+        container.innerHTML = '';
+        if (carousels[layerId]) {
+            clearTimeout(carousels[layerId].timer);
+            delete carousels[layerId];
+        }
+    }
 
-			htmlContent += `</body></html>`
+    function playLayer(layerId, files, volume) {
+        stopLayer(layerId);
+        var container = document.getElementById(layerId);
+        if (!container || !files || files.length === 0) return;
+        container.style.display = 'block';
+
+        if (files.length === 1) {
+            var el = createMediaElement(files[0], volume);
+            if (el.tagName === 'VIDEO') el.loop = true;
+            container.appendChild(el);
+        } else {
+            carousels[layerId] = { files: files, index: 0, timer: null, volume: volume };
+            playNextCarousel(layerId);
+        }
+    }
+
+    function playNextCarousel(layerId) {
+        var c = carousels[layerId];
+        if (!c) return;
+        var container = document.getElementById(layerId);
+        container.innerHTML = ''; 
+
+        var path = c.files[c.index];
+        var el = createMediaElement(path, c.volume);
+        container.appendChild(el);
+
+        if (el.tagName === 'VIDEO') {
+            el.onended = function() {
+                c.index = (c.index + 1) % c.files.length;
+                playNextCarousel(layerId);
+            };
+        } else {
+            c.timer = setTimeout(function() {
+                c.index = (c.index + 1) % c.files.length;
+                playNextCarousel(layerId);
+            }, 5000);
+        }
+    }
+
+    var ws = new WebSocket('ws://127.0.0.1:50001/ws');
+    ws.onopen = function() {
+        ws.send(JSON.stringify({action: "hello"}));
+    };
+    ws.onmessage = function(event) {
+        try {
+            var msg = JSON.parse(event.data);
+            if (msg.action === 'sync') {
+                document.body.style.backgroundColor = msg.bgColor;
+                msg.layers.forEach(function(l) {
+                    var container = document.getElementById(l.id);
+                    if (container) {
+                        container.style.cssText = l.style;
+                    }
+                    if (l.active) playLayer(l.id, l.files, l.volume);
+                    else stopLayer(l.id);
+                });
+            } else if (msg.action === "play" && msg.files) {
+                playLayer(msg.layer, msg.files, msg.volume);
+            } else if (msg.action === "hide") {
+                stopLayer(msg.layer);
+            } else if (msg.action === "volume" && msg.volume !== undefined) {
+                var container = document.getElementById(msg.layer);
+                if (container && container.firstElementChild) {
+                    container.firstElementChild.volume = parseFloat(msg.volume) / 100.0;
+                }
+            }
+        } catch(e) {
+            console.error('WebSocket payload parsing error:', e);
+        }
+    };
+    ws.onclose = function() {
+        // Retry connection logic without executing DOM reload
+        setTimeout(function() { window.location.reload(); }, 5000);
+    };
+  </script>
+</body>
+</html>`
 
 			htmlPath := "/opt/VLX_VisionBridge/var/overlay.html"
 			if err := os.MkdirAll("/opt/VLX_VisionBridge/var", 0755); err == nil {
 				if writeErr := os.WriteFile(htmlPath, []byte(htmlContent), 0644); writeErr != nil {
-					log.Printf("Failed to write overlay html: %v", writeErr)
+					log.Printf("Failed to generate overlay HTML artifact: %v", writeErr)
 				}
 			}
 
-			log.Printf("Starting Chromium browser natively on Xvfb Display :99")
+			log.Printf("Initializing Chromium browser natively on Xvfb Display :99")
 
 			fileURL := htmlPath
 			if strings.HasPrefix(htmlPath, "/") {
@@ -371,7 +394,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 			if err != nil {
 				chromeBin, err = exec.LookPath("chromium-browser")
 				if err != nil {
-					log.Printf("Failed to start Chromium overlay browser: chromium/chromium-browser not found")
+					log.Printf("Chromium browser executable not found in system path.")
 					return
 				}
 			}
@@ -388,12 +411,11 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				fileURL,
 			)
 
-			// Connect Chromium to Xvfb and the isolated PulseAudio socket
 			cmd.Env = append(os.Environ(), "DISPLAY=:99", "PULSE_SERVER=unix:/tmp/pulse-visionbridge/native")
 
 			err = cmd.Start()
 			if err != nil {
-				log.Printf("Failed to start Chromium overlay browser: %v", err)
+				log.Printf("Failed to execute Chromium browser: %v", err)
 			} else {
 				pm.overlayCmds[99] = cmd
 				go pm.monitorChromium(cmd)
@@ -404,7 +426,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 	for id, cmd := range pm.overlayCmds {
 		if !activeOverlays[id] {
 			if cmd != nil && cmd.Process != nil {
-				log.Printf("Stopping overlay browser for layer %d...", id)
+				log.Printf("Terminating overlay process for layer ID %d...", id)
 				_ = cmd.Process.Signal(syscall.SIGTERM)
 			}
 			delete(pm.overlayCmds, id)
@@ -428,7 +450,7 @@ func (pm *ProcessManager) monitorChromium(cmd *exec.Cmd) {
 	delete(pm.overlayCmds, 99)
 	pm.mu.Unlock()
 
-	log.Printf("Chromium overlay browser exited unexpectedly: %v", err)
+	log.Printf("Chromium browser process exited unexpectedly: %v", err)
 	if pm.db != nil {
 		_ = db.LogStreamEvent(pm.db, "crash", fmt.Sprintf("Chromium browser crashed: %v", err))
 	}
@@ -440,16 +462,53 @@ func (pm *ProcessManager) UpdateFilter(config *models.Config) {
 	pm.mu.Unlock()
 }
 
+// buildSyncMessage constructs a comprehensive snapshot of the active DOM state.
+func (pm *ProcessManager) buildSyncMessage(cfg *models.Config) map[string]interface{} {
+	type LayerState struct {
+		ID     string   `json:"id"`
+		Active bool     `json:"active"`
+		Files  []string `json:"files"`
+		Volume *int     `json:"volume"`
+		Style  string   `json:"style"`
+	}
+
+	cs := cfg.Input.ChromiumSource
+	bgColor := cfg.Input.BgColor
+	if bgColor == "" {
+		bgColor = "black"
+	}
+
+	return map[string]interface{}{
+		"action":  "sync",
+		"bgColor": bgColor,
+		"layers": []LayerState{
+			{ID: "z1", Active: cs.Z1Active, Files: pm.ResolvePath(cs.Z1Path), Volume: cs.Z1Volume, Style: buildLayerStyle(1, cs.Z1Width, cs.Z1Height, cs.Z1X, cs.Z1Y)},
+			{ID: "z2", Active: cs.Z2Active, Files: pm.ResolvePath(cs.Z2Path), Volume: cs.Z2Volume, Style: buildLayerStyle(2, cs.Z2Width, cs.Z2Height, cs.Z2X, cs.Z2Y)},
+			{ID: "z3", Active: cs.Z3Active, Files: pm.ResolvePath(cs.Z3Path), Volume: cs.Z3Volume, Style: buildLayerStyle(3, cs.Z3Width, cs.Z3Height, cs.Z3X, cs.Z3Y)},
+			{ID: "z4", Active: cs.Z4Active, Files: pm.ResolvePath(cs.Z4Path), Volume: cs.Z4Volume, Style: buildLayerStyle(4, cs.Z4Width, cs.Z4Height, cs.Z4X, cs.Z4Y)},
+			{ID: "z5", Active: cs.Z5Active, Files: pm.ResolvePath(cs.Z5Path), Volume: cs.Z5Volume, Style: buildLayerStyle(5, cs.Z5Width, cs.Z5Height, cs.Z5X, cs.Z5Y)},
+			{ID: "z6", Active: cs.Z6Active, Files: pm.ResolvePath(cs.Z6Path), Volume: cs.Z6Volume, Style: buildLayerStyle(6, cs.Z6Width, cs.Z6Height, cs.Z6X, cs.Z6Y)},
+			{ID: "z7", Active: cs.Z7Active, Files: pm.ResolvePath(cs.Z7Path), Volume: cs.Z7Volume, Style: buildLayerStyle(7, cs.Z7Width, cs.Z7Height, cs.Z7X, cs.Z7Y)},
+			{ID: "z8", Active: cs.Z8Active, Files: pm.ResolvePath(cs.Z8Path), Volume: cs.Z8Volume, Style: buildLayerStyle(8, cs.Z8Width, cs.Z8Height, cs.Z8X, cs.Z8Y)},
+		},
+	}
+}
+
+// UpdateConfig synchronizes the configuration state in memory and delegates UI updates to the WebSocket plane.
+// Crucially, it does NOT dispatch SIGTERM signals, ensuring pipeline continuity and preventing animation disruption.
 func (pm *ProcessManager) UpdateConfig(config *models.Config) {
 	pm.mu.Lock()
 	pm.config = config
-	
+
 	if pm.cond != nil {
 		pm.cond.Broadcast()
 	}
 	pm.mu.Unlock()
 
-	log.Println("Config updated in memory. Background processes (GStreamer/Chromium) are kept strictly alive. Overlays are now managed dynamically via WebSocket.")
+	syncMsg := pm.buildSyncMessage(config)
+	pm.broadcastWSMessage(syncMsg)
+
+	log.Println("Configuration successfully updated. Overlay layers synchronized dynamically via WebSocket.")
 }
 
 type monitorAction int
@@ -481,7 +540,7 @@ func (pm *ProcessManager) monitor() {
 		action, finalModule, isMisconfig := pm.executeSingleRun(&lastBuildErr)
 
 		if isMisconfig && finalModule != "" {
-			log.Printf("Misconfiguration detected for module %s, disabling it.", finalModule)
+			log.Printf("Misconfiguration detected for module %s. Disabling the module.", finalModule)
 			pm.disableModule(finalModule)
 			continue
 		}
@@ -502,15 +561,15 @@ func (pm *ProcessManager) monitor() {
 			pm.mu.Unlock()
 
 			if crashes <= 5 {
-				log.Printf("Module %s crashed %d times (quick retry in 1s)...", finalModule, crashes)
+				log.Printf("Module %s crashed %d times (executing quick retry in 1s).", finalModule, crashes)
 				time.Sleep(1 * time.Second)
 				continue
 			} else if crashes <= 7 {
-				log.Printf("Module %s crashed %d times (wait retry in 10s)...", finalModule, crashes)
+				log.Printf("Module %s crashed %d times (executing delayed retry in 10s).", finalModule, crashes)
 				time.Sleep(10 * time.Second)
 				continue
 			} else {
-				log.Printf("Module %s crashed %d times. Max retries exceeded, disabling it.", finalModule, crashes)
+				log.Printf("Module %s crashed %d times. Maximum retry threshold exceeded. Disabling module.", finalModule, crashes)
 				pm.disableModule(finalModule)
 				continue
 			}
@@ -525,7 +584,7 @@ func (pm *ProcessManager) monitor() {
 			time.Sleep(backoff)
 			continue
 		case monitorActionSleepExponential:
-			log.Printf("Restarting GStreamer in %v...", backoff)
+			log.Printf("Restarting GStreamer pipeline in %v...", backoff)
 			time.Sleep(backoff)
 
 			backoff *= 2
@@ -602,7 +661,7 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 		return monitorActionStop, "", false
 	}
 
-	errMsg := "GStreamer exited unexpectedly"
+	errMsg := "GStreamer pipeline exited unexpectedly."
 	var finalModule string
 	var isMisconfig bool
 
@@ -613,7 +672,7 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 				isMisconfig = true
 			}
 		}
-		errMsg = fmt.Sprintf("GStreamer crashed: %v", runErr)
+		errMsg = fmt.Sprintf("GStreamer crash detected: %v", runErr)
 	}
 	log.Println(errMsg)
 
@@ -626,7 +685,6 @@ func (pm *ProcessManager) runProcess(ctx context.Context, gstArgs []string) (boo
 	tb := &tailBuffer{}
 	gstCmd.Stderr = tb
 
-	// Essential: Pass DISPLAY and PULSE_SERVER to GStreamer so it can read from Xvfb and PulseAudio
 	gstCmd.Env = append(os.Environ(), "DISPLAY=:99", "PULSE_SERVER=unix:/tmp/pulse-visionbridge/native")
 
 	pm.mu.Lock()
@@ -639,7 +697,7 @@ func (pm *ProcessManager) runProcess(ctx context.Context, gstArgs []string) (boo
 		pm.mu.Unlock()
 	}()
 
-	log.Println("Starting GStreamer native X11 pipeline... (Streaming to MediaMTX)")
+	log.Println("Starting GStreamer native X11 pipeline... (Transmitting stream to MediaMTX)")
 
 	err := gstCmd.Start()
 	if err != nil {
@@ -674,10 +732,10 @@ func (pm *ProcessManager) waitForProcess(ctx context.Context, cmd *exec.Cmd) (er
 	return runErr, stderrStr
 }
 
+// ReloadChromium provides a manual override to force a browser restart in case of critical rendering failures.
 func (pm *ProcessManager) ReloadChromium() {
 	pm.mu.Lock()
 	if cmd, exists := pm.overlayCmds[99]; exists && cmd != nil && cmd.Process != nil {
-		// Emergency ReloadChromium
 		_ = cmd.Process.Signal(syscall.SIGTERM)
 		delete(pm.overlayCmds, 99)
 	}
@@ -686,5 +744,16 @@ func (pm *ProcessManager) ReloadChromium() {
 
 	if cfg != nil {
 		pm.manageOverlays(cfg)
+	}
+}
+
+func (pm *ProcessManager) broadcastWSMessage(msg interface{}) {
+	pm.wsMutex.Lock()
+	defer pm.wsMutex.Unlock()
+	for client := range pm.wsClients {
+		if err := client.WriteJSON(msg); err != nil {
+			client.Close()
+			delete(pm.wsClients, client)
+		}
 	}
 }
