@@ -155,7 +155,7 @@ func buildOverlayElement(id string, zIndex int, path string, width, height, x, y
 	script := fmt.Sprintf("      var e_%s = document.getElementById('%s'); if (e_%s) e_%s.volume = %f;\n", id, id, id, id, vol)
 
 	if strings.HasSuffix(lowerPath, ".mp4") || strings.HasSuffix(lowerPath, ".webm") {
-		element = fmt.Sprintf(`  <video id="%s" src="%s" autoplay loop></video>`+"\n", id, srcURL)
+		element = fmt.Sprintf(`  <video id="%s" src="%s" autoplay loop playsinline></video>`+"\n", id, srcURL)
 	} else if strings.HasSuffix(lowerPath, ".png") || strings.HasSuffix(lowerPath, ".jpg") || strings.HasSuffix(lowerPath, ".jpeg") {
 		element = fmt.Sprintf(`  <img id="%s" src="%s" />`+"\n", id, srcURL)
 		script = ""
@@ -283,12 +283,21 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
         document.body.appendChild(canvas);
         const ctx = canvas.getContext('2d', { alpha: true });
 
+        // FIX "BG COLOR E FUORI SCALA": Vernicia il background e rispetta le dimensioni esatte di stile
         function draw() {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = "` + bgColor + `";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
           const elements = document.querySelectorAll('iframe, video, img');
           elements.forEach(el => {
             if (el.tagName === 'VIDEO' || el.tagName === 'IMG') {
-               try { ctx.drawImage(el, parseInt(el.style.left)||0, parseInt(el.style.top)||0, parseInt(el.style.width)||canvas.width, parseInt(el.style.height)||canvas.height); } catch(e){}
+               try { 
+                   let x = parseInt(el.style.left) || 0;
+                   let y = parseInt(el.style.top) || 0;
+                   let w = parseInt(el.style.width) || canvas.width;
+                   let h = parseInt(el.style.height) || canvas.height;
+                   ctx.drawImage(el, x, y, w, h); 
+               } catch(e){}
             }
           });
           requestAnimationFrame(draw);
@@ -308,9 +317,12 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 
         const pc = new RTCPeerConnection({ iceServers: [] });
         
-        // Force VP8 codec preference for GStreamer compatibility
+        // FIX WEBRTC DOWNSCALE: Ordina esplicitamente a Chromium di non rimpicciolire il video e usare massima banda
         stream.getTracks().forEach(track => {
-          const transceiver = pc.addTransceiver(track, { streams: [stream] });
+          const transceiver = pc.addTransceiver(track, { 
+              streams: [stream],
+              sendEncodings: [{ active: true, scaleResolutionDownBy: 1.0, maxBitrate: 15000000 }]
+          });
           
           if (track.kind === 'video' && typeof RTCRtpReceiver !== 'undefined' && RTCRtpReceiver.getCapabilities) {
              const codecs = RTCRtpReceiver.getCapabilities('video').codecs;
@@ -322,14 +334,10 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
         });
 
         let offer = await pc.createOffer();
-        
-        // --- SDP MANGLING: FORCE CHROMIUM TO PUSH 15 Mbps VIDEO BANDWIDTH ---
         offer.sdp = offer.sdp.replace(/a=mid:(.*)\r\n/g, 'a=mid:$1\r\nb=AS:15000\r\n');
-        // --------------------------------------------------------------------
         
         await pc.setLocalDescription(offer);
 
-        // Wait for ICE gathering to complete before sending SDP offer
         await new Promise(resolve => {
           if (pc.iceGatheringState === 'complete') {
             resolve();
@@ -397,7 +405,6 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				"--disable-renderer-backgrounding",
 				"--unthrottled-timer-nested-iframes",
 				"--disable-frame-rate-limit",
-				// --- SECURITY OVERRIDES FOR LOCALHOST WEBRTC ---
 				"--disable-web-security",
 				"--allow-file-access-from-files",
 				"--allow-loopback-in-peer-connection",
@@ -454,10 +461,6 @@ func (pm *ProcessManager) UpdateFilter(config *models.Config) {
 	pm.config = config
 	pm.mu.Unlock()
 
-	// ZeroMQ removal: Live dynamic filters via ZMQ were built for FFmpeg.
-	// Since the architecture migrated to GStreamer, dialing TCP 5555 would cause 
-	// a fatal deadlock. Chromium layout changes are now handled automatically via the DOM.
-	// MediaSource changes require an UpdateConfig() trigger to restart the pipeline cleanly.
 	log.Println("Note: Live filter updates via ZMQ are deprecated in the GStreamer Sidecar architecture.")
 	log.Println("Layer layout changes inside Chromium are handled automatically. For other layers, use a full reload.")
 }
@@ -761,7 +764,6 @@ func (pm *ProcessManager) runProcess(ctx context.Context, gstArgs []string) (boo
 		pm.mu.Unlock()
 	}()
 
-	// Re-enabled logging to visually confirm the Sidecar push
 	log.Println("Starting GStreamer process... (Streaming to local MediaMTX)")
 
 	err := gstCmd.Start()
