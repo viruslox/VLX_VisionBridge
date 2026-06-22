@@ -85,14 +85,14 @@ func handleWebRTCOffer(w http.ResponseWriter, r *http.Request) {
 		}
 		defer conn.Close()
 
-		// FIX 1: Lettura del pacchetto RTP integro e ricostruzione dell'header
+		// Read raw RTP packet to preserve header for GStreamer depay logic
 		for {
 			rtpPkt, _, readErr := track.ReadRTP()
 			if readErr != nil {
 				return
 			}
 			
-			// Marshalizza il pacchetto completo per darlo in pasto a udpsrc/rtpdepay in GStreamer
+			// Marshal full packet for UDP transmission
 			b, marshalErr := rtpPkt.Marshal()
 			if marshalErr != nil {
 				return
