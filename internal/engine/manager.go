@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
@@ -17,8 +16,6 @@ import (
 	"github.com/user/VLX_VisionBridge/internal/db"
 	"github.com/user/VLX_VisionBridge/internal/models"
 )
-
-var overlayRouteOnce sync.Once
 
 type tailBuffer struct {
 	buf []byte
@@ -82,7 +79,6 @@ func (pm *ProcessManager) Start(ctx context.Context, config *models.Config) erro
 	pm.isRunning = true
 	pm.mu.Unlock()
 
-	go startWebRTCServer()
 	go pm.monitor()
 
 	return nil
@@ -110,7 +106,7 @@ func (pm *ProcessManager) Stop() {
 
 	for id, overlayCmd := range pm.overlayCmds {
 		if overlayCmd != nil && overlayCmd.Process != nil {
-			log.Printf("Signaling overlay process for layer %d to stop gracefully...", id)
+			log.Printf("Signaling background process %d to stop...", id)
 			_ = overlayCmd.Process.Signal(syscall.SIGTERM)
 		}
 	}
@@ -171,11 +167,32 @@ func buildOverlayElement(id string, zIndex int, path string, width, height, x, y
 	return style, element, script
 }
 
+// startEnvironment Inizializza Xvfb e PulseAudio prima del browser
+func (pm *ProcessManager) startEnvironment(resWidth, resHeight string) {
+	// Xvfb Process (ID 100)
+	if _, exists := pm.overlayCmds[100]; !exists {
+		xvfbCmd := exec.Command("Xvfb", ":99", "-screen", "0", fmt.Sprintf("%sx%sx24", resWidth, resHeight), "-ac", "-nolisten", "tcp")
+		if err := xvfbCmd.Start(); err != nil {
+			log.Printf("Xvfb might already be running: %v", err)
+		} else {
+			log.Printf("Started Xvfb on display :99 (%sx%s)", resWidth, resHeight)
+			pm.overlayCmds[100] = xvfbCmd
+		}
+	}
+
+	// PulseAudio Daemon
+	pulseCmd := exec.Command("pulseaudio", "-D", "--exit-idle-time=-1")
+	if err := pulseCmd.Run(); err == nil {
+		log.Println("PulseAudio server initialized for software loopback audio.")
+	}
+}
+
 func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
 	activeOverlays := make(map[int]bool)
+	activeOverlays[100] = true // Mantieni attivo Xvfb
 
 	if cfg.Input.ChromiumSource.Active {
 		activeOverlays[99] = true
@@ -202,7 +219,10 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				resHeight = resParts[1]
 			}
 
-			// NATIVE DOM CAPTURE: Rimosso il Canvas. Lasciamo che Chromium renderizzi CSS e iframes nativamente.
+			// Prepara Xvfb e PulseAudio
+			pm.startEnvironment(resWidth, resHeight)
+
+			// HTML Puro: Nessun Javascript astruso, nessun Canvas, nessun WebRTC.
 			htmlContent := `<!DOCTYPE html>
 <html>
 <head>
@@ -272,77 +292,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 			if scripts != "" {
 				htmlContent += "  <script>\n" + scripts + "  </script>\n"
 			}
-			
-			framerateStr := "30"
-			if cfg.Input.Framerate > 0 {
-				framerateStr = strconv.Itoa(cfg.Input.Framerate)
-			}
-
-			htmlContent += `  <script>
-    async function startWebRTC() {
-      try {
-        // CATTURA NATIVA DELLO SCHERMO: Preserva CSS, dimensioni, iframes e audio nativo.
-        const stream = await navigator.mediaDevices.getDisplayMedia({
-          video: {
-            width: { ideal: parseInt(` + resWidth + `) },
-            height: { ideal: parseInt(` + resHeight + `) },
-            frameRate: { ideal: parseInt(` + framerateStr + `) }
-          },
-          audio: {
-            autoGainControl: false,
-            echoCancellation: false,
-            noiseSuppression: false
-          }
-        });
-
-        const pc = new RTCPeerConnection({ iceServers: [] });
-        
-        stream.getTracks().forEach(track => {
-          const transceiver = pc.addTransceiver(track, { 
-              streams: [stream],
-              sendEncodings: [{ active: true, scaleResolutionDownBy: 1.0, maxBitrate: 15000000 }]
-          });
-          
-          if (track.kind === 'video' && typeof RTCRtpReceiver !== 'undefined' && RTCRtpReceiver.getCapabilities) {
-             const codecs = RTCRtpReceiver.getCapabilities('video').codecs;
-             const vp8Codecs = codecs.filter(c => c.mimeType === 'video/VP8');
-             if (vp8Codecs.length > 0) {
-                 try { transceiver.setCodecPreferences(vp8Codecs); } catch(e){}
-             }
-          }
-        });
-
-        let offer = await pc.createOffer();
-        offer.sdp = offer.sdp.replace(/a=mid:(.*)\r\n/g, 'a=mid:$1\r\nb=AS:15000\r\n');
-        
-        await pc.setLocalDescription(offer);
-
-        await new Promise(resolve => {
-          if (pc.iceGatheringState === 'complete') {
-            resolve();
-          } else {
-            pc.onicegatheringstatechange = () => {
-              if (pc.iceGatheringState === 'complete') resolve();
-            };
-          }
-        });
-
-        const response = await fetch('http://127.0.0.1:50000/webrtc/offer', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/sdp' },
-          body: pc.localDescription.sdp
-        });
-        const answerSdp = await response.text();
-        await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
-      } catch (e) {
-        console.error('WebRTC error:', e);
-      }
-    }
-    // Ritardo di 500ms per permettere il caricamento degli iframe (alerts) prima di catturare
-    window.onload = () => setTimeout(startWebRTC, 500);
-  </script>
-</body>
-</html>`
+			htmlContent += `</body></html>`
 
 			htmlPath := "/opt/VLX_VisionBridge/var/overlay.html"
 			if err := os.MkdirAll("/opt/VLX_VisionBridge/var", 0755); err == nil {
@@ -351,15 +301,12 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				}
 			}
 
-			// ESPONE L'HTML TRAMITE SERVER HTTP LOCALE PER SBLOCCARE LE API WEBRTC/DISPLAYMEDIA
-			overlayRouteOnce.Do(func() {
-				http.HandleFunc("/overlay", func(w http.ResponseWriter, r *http.Request) {
-					w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
-					http.ServeFile(w, r, htmlPath)
-				})
-			})
+			log.Printf("Starting Chromium browser natively on Xvfb Display :99")
 
-			log.Printf("Starting Chromium overlay browser natively with DOM Capture")
+			fileURL := htmlPath
+			if strings.HasPrefix(htmlPath, "/") {
+				fileURL = "file://" + htmlPath
+			}
 
 			chromeBin, err := exec.LookPath("chromium")
 			if err != nil {
@@ -370,36 +317,21 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				}
 			}
 
+			// RIMOSSO L'HEADLESS MODE. Lo facciamo girare fisicamente su Xvfb (:99)
 			cmd := exec.Command(chromeBin,
-				"--headless=new",
 				"--kiosk",
 				"--disable-infobars",
 				"--disable-extensions",
-				"--test-type",
-				fmt.Sprintf("--window-size=%s,%s", resWidth, resHeight),
 				"--window-position=0,0",
-				"--hide-scrollbars",
-				"--no-sandbox",
-				"--disable-dev-shm-usage",
+				fmt.Sprintf("--window-size=%s,%s", resWidth, resHeight),
 				"--autoplay-policy=no-user-gesture-required",
-				"--force-device-scale-factor=1",
-				"--disable-background-timer-throttling",
-				"--disable-backgrounding-occluded-windows",
-				"--disable-renderer-backgrounding",
-				"--unthrottled-timer-nested-iframes",
-				"--disable-frame-rate-limit",
-				"--disable-web-security",
-				"--allow-file-access-from-files",
-				"--allow-loopback-in-peer-connection",
-				// FLAG FONDAMENTALI PER BYPASSARE LE FINESTRE DI CONFERMA CONDIVISIONE SCHERMO
-				"--use-fake-ui-for-media-stream",
-				"--auto-select-desktop-capture-source=VisionBridge",
-				"--auto-select-tab-capture-source-by-title=VisionBridge",
-				"--enable-usermedia-screen-capturing",
-				"http://127.0.0.1:50000/overlay", // Caricato via HTTP per garantire contesto sicuro
+				"--disable-dev-shm-usage",
+				"--no-sandbox",
+				fileURL,
 			)
 
-			cmd.Env = os.Environ()
+			// Agganciamo Chromium al display virtuale e all'audio
+			cmd.Env = append(os.Environ(), "DISPLAY=:99", "PULSE_SERVER=unix:/tmp/pulse-visionbridge/native")
 
 			err = cmd.Start()
 			if err != nil {
@@ -448,9 +380,6 @@ func (pm *ProcessManager) UpdateFilter(config *models.Config) {
 	pm.mu.Lock()
 	pm.config = config
 	pm.mu.Unlock()
-
-	log.Println("Note: Live filter updates via ZMQ are deprecated in the GStreamer Sidecar architecture.")
-	log.Println("Layer layout changes inside Chromium are handled automatically. For other layers, use a full reload.")
 }
 
 func (pm *ProcessManager) UpdateConfig(config *models.Config) {
@@ -579,8 +508,6 @@ func (pm *ProcessManager) disableModule(module string) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
-	log.Printf("Disabling misconfigured/failing module: %s", module)
-
 	if module == "[chromium]" {
 		pm.config.Input.ChromiumSource.Active = false
 	} else if strings.HasPrefix(module, "[layer ") {
@@ -625,12 +552,6 @@ func identifyErrorModule(stderr string, cfg *models.Config) string {
 			return "[output]"
 		}
 	}
-
-	lowerStderr := strings.ToLower(stderr)
-	if strings.Contains(lowerStderr, "compositor") || strings.Contains(lowerStderr, "audiomixer") {
-		return "[mixer]"
-	}
-
 	return ""
 }
 
@@ -641,13 +562,7 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 	isRunning := pm.isRunning
 	pm.mu.Unlock()
 
-	if !isRunning {
-		log.Println("Process manager shutting down gracefully")
-		return monitorActionStop, "", false
-	}
-
-	if ctx.Err() != nil {
-		log.Println("Process manager shutting down gracefully (context canceled)")
+	if !isRunning || ctx.Err() != nil {
 		return monitorActionStop, "", false
 	}
 
@@ -655,19 +570,10 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 
 	args, err := BuildPipelineArgs(cfg)
 	if err != nil {
-		errMsg := fmt.Sprintf("Build args failed: %v", err)
-		log.Printf("Failed to build GStreamer args: %v", err)
-		if pm.db != nil && *lastBuildErr != errMsg {
-			_ = db.LogStreamEvent(pm.db, "error", errMsg)
-			*lastBuildErr = errMsg
-		}
 		return monitorActionSleepConstant, "", false
 	}
-	*lastBuildErr = ""
 
 	if len(args) == 0 {
-		log.Println("No active layers, not starting GStreamer.")
-
 		pm.mu.Lock()
 		if pm.isRunning && pm.ctx.Err() == nil {
 			pm.cond.Wait()
@@ -678,14 +584,10 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 
 	started, runErr, stderrStr := pm.runProcess(ctx, args)
 	if !started {
-		log.Printf("Failed to start GStreamer: %v", runErr)
 		return monitorActionSleepConstant, "", false
 	}
 
 	if ctx.Err() != nil {
-		if pm.db != nil {
-			_ = db.LogStreamEvent(pm.db, "stop", "GStreamer process stopped gracefully")
-		}
 		return monitorActionStop, "", false
 	}
 
@@ -694,44 +596,15 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 	var isMisconfig bool
 
 	if runErr != nil {
-		reason := ""
 		if stderrStr != "" {
 			lines := strings.Split(strings.TrimSpace(stderrStr), "\n")
 			if len(lines) > 0 {
-				reason = lines[len(lines)-1]
-				
-				if len(lines) > 10 {
-					startIdx := len(lines) - 30
-					if startIdx < 0 {
-						startIdx = 0
-					}
-					log.Printf("GStreamer stderr tail:\n%s", strings.Join(lines[startIdx:], "\n"))
-				} else {
-					log.Printf("GStreamer stderr tail:\n%s", stderrStr)
-				}
-
-				modulePrefix := identifyErrorModule(stderrStr, cfg)
-				finalModule = modulePrefix
-				if modulePrefix != "" {
-					reason = modulePrefix + " " + reason
-				}
-
-				lowerStderr := strings.ToLower(stderrStr)
-				if strings.Contains(lowerStderr, "no such file or directory") || strings.Contains(lowerStderr, "syntax error") || strings.Contains(lowerStderr, "could not link") || strings.Contains(lowerStderr, "not found") {
-					isMisconfig = true
-				}
+				isMisconfig = true // GStreamer crashes are typically pipeline config errors
 			}
 		}
-		if reason != "" {
-			errMsg = fmt.Sprintf("GStreamer crashed: %v, reason: %s", runErr, reason)
-		} else {
-			errMsg = fmt.Sprintf("GStreamer crashed: %v", runErr)
-		}
+		errMsg = fmt.Sprintf("GStreamer crashed: %v", runErr)
 	}
 	log.Println(errMsg)
-	if pm.db != nil {
-		_ = db.LogStreamEvent(pm.db, "crash", errMsg)
-	}
 
 	return monitorActionSleepExponential, finalModule, isMisconfig
 }
@@ -752,7 +625,7 @@ func (pm *ProcessManager) runProcess(ctx context.Context, gstArgs []string) (boo
 		pm.mu.Unlock()
 	}()
 
-	log.Println("Starting GStreamer process... (Streaming to local MediaMTX)")
+	log.Println("Starting GStreamer native X11 pipeline... (Streaming to MediaMTX)")
 
 	err := gstCmd.Start()
 	if err != nil {
@@ -772,17 +645,10 @@ func (pm *ProcessManager) waitForProcess(ctx context.Context, cmd *exec.Cmd) (er
 	var runErr error
 	select {
 	case <-ctx.Done():
-		log.Println("Context cancelled, waiting for GStreamer to stop...")
-		select {
-		case <-time.After(5 * time.Second):
-			log.Println("GStreamer process did not stop gracefully, killing it...")
-			if cmd.Process != nil {
-				_ = cmd.Process.Kill()
-			}
-			runErr = <-done
-		case runErr = <-done:
-			log.Println("GStreamer process stopped gracefully.")
+		if cmd.Process != nil {
+			_ = cmd.Process.Kill()
 		}
+		runErr = <-done
 	case runErr = <-done:
 	}
 
@@ -797,7 +663,6 @@ func (pm *ProcessManager) waitForProcess(ctx context.Context, cmd *exec.Cmd) (er
 func (pm *ProcessManager) ReloadChromium() {
 	pm.mu.Lock()
 	if cmd, exists := pm.overlayCmds[99]; exists && cmd != nil && cmd.Process != nil {
-		log.Println("Signaling Chromium overlay process to stop gracefully for manual reload...")
 		_ = cmd.Process.Signal(syscall.SIGTERM)
 		delete(pm.overlayCmds, 99)
 	}
