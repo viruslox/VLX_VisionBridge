@@ -167,9 +167,9 @@ func buildOverlayElement(id string, zIndex int, path string, width, height, x, y
 	return style, element, script
 }
 
-// startEnvironment Inizializza Xvfb e PulseAudio prima del browser
+// startEnvironment: Avvia Display Virtuale e Audio Virtuale in modo sicuro
 func (pm *ProcessManager) startEnvironment(resWidth, resHeight string) {
-	// Xvfb Process (ID 100)
+	// 1. Avvia Xvfb (Display :99)
 	if _, exists := pm.overlayCmds[100]; !exists {
 		xvfbCmd := exec.Command("Xvfb", ":99", "-screen", "0", fmt.Sprintf("%sx%sx24", resWidth, resHeight), "-ac", "-nolisten", "tcp")
 		if err := xvfbCmd.Start(); err != nil {
@@ -177,13 +177,25 @@ func (pm *ProcessManager) startEnvironment(resWidth, resHeight string) {
 		} else {
 			log.Printf("Started Xvfb on display :99 (%sx%s)", resWidth, resHeight)
 			pm.overlayCmds[100] = xvfbCmd
+			// Diamo 1 secondo al server X per avviarsi, evitando che GStreamer o Chromium crashino
+			time.Sleep(1 * time.Second)
 		}
 	}
 
-	// PulseAudio Daemon
-	pulseCmd := exec.Command("pulseaudio", "-D", "--exit-idle-time=-1")
-	if err := pulseCmd.Run(); err == nil {
-		log.Println("PulseAudio server initialized for software loopback audio.")
+	// 2. Avvia PulseAudio Isolato (con Moduli Null Sink)
+	os.MkdirAll("/tmp/pulse-visionbridge", 0755)
+	pulseCmd := exec.Command("pulseaudio", 
+		"-D", 
+		"--exit-idle-time=-1", 
+		"-n", // Ignora la configurazione di sistema hardware
+		"--load=module-native-protocol-unix auth-anonymous=1 socket=/tmp/pulse-visionbridge/native",
+		"--load=module-null-sink sink_name=VisionBridgeSink",
+	)
+	
+	if err := pulseCmd.Run(); err != nil {
+		log.Printf("Isolated PulseAudio instance might already be running: %v", err)
+	} else {
+		log.Println("Isolated PulseAudio instance successfully initialized for software loopback.")
 	}
 }
 
@@ -192,7 +204,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 	defer pm.mu.Unlock()
 
 	activeOverlays := make(map[int]bool)
-	activeOverlays[100] = true // Mantieni attivo Xvfb
+	activeOverlays[100] = true // Mantieni Xvfb attivo
 
 	if cfg.Input.ChromiumSource.Active {
 		activeOverlays[99] = true
@@ -219,10 +231,9 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				resHeight = resParts[1]
 			}
 
-			// Prepara Xvfb e PulseAudio
+			// Prepara l'ambiente Headless (Xvfb + PulseAudio)
 			pm.startEnvironment(resWidth, resHeight)
 
-			// HTML Puro: Nessun Javascript astruso, nessun Canvas, nessun WebRTC.
 			htmlContent := `<!DOCTYPE html>
 <html>
 <head>
@@ -317,7 +328,6 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				}
 			}
 
-			// RIMOSSO L'HEADLESS MODE. Lo facciamo girare fisicamente su Xvfb (:99)
 			cmd := exec.Command(chromeBin,
 				"--kiosk",
 				"--disable-infobars",
@@ -330,7 +340,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				fileURL,
 			)
 
-			// Agganciamo Chromium al display virtuale e all'audio
+			// Collega Chromium a Xvfb e al PulseAudio socket isolato
 			cmd.Env = append(os.Environ(), "DISPLAY=:99", "PULSE_SERVER=unix:/tmp/pulse-visionbridge/native")
 
 			err = cmd.Start()
@@ -599,7 +609,7 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 		if stderrStr != "" {
 			lines := strings.Split(strings.TrimSpace(stderrStr), "\n")
 			if len(lines) > 0 {
-				isMisconfig = true // GStreamer crashes are typically pipeline config errors
+				isMisconfig = true
 			}
 		}
 		errMsg = fmt.Sprintf("GStreamer crashed: %v", runErr)
@@ -614,6 +624,9 @@ func (pm *ProcessManager) runProcess(ctx context.Context, gstArgs []string) (boo
 
 	tb := &tailBuffer{}
 	gstCmd.Stderr = tb
+
+	// Fondamentale: Passiamo DISPLAY e PULSE_SERVER a GStreamer affinché possa leggere da Xvfb e PulseAudio
+	gstCmd.Env = append(os.Environ(), "DISPLAY=:99", "PULSE_SERVER=unix:/tmp/pulse-visionbridge/native")
 
 	pm.mu.Lock()
 	pm.cmd = gstCmd
