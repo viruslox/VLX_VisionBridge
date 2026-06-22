@@ -9,7 +9,6 @@ import (
 func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 	var args []string
 
-	// 1. VIDEO BRANCH: Compositor to encoder and tee
 	args = append(args,
 		"compositor", "name=comp", "background=black", "!",
 		"video/x-raw", "!", "videoconvert", "!",
@@ -17,20 +16,22 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 		"h264parse", "!", "tee", "name=vtee",
 	)
 
-	// 2. AUDIO BRANCH: Audiomixer to encoder and tee
 	args = append(args,
 		"audiomixer", "name=acomp", "!",
 		"audioconvert", "!", "audioresample", "!",
 		"avenc_aac", "!", "aacparse", "!", "tee", "name=atee",
 	)
 
-	// 3. MASTER CLOCK: Continuous heartbeat to prevent GStreamer freeze
 	args = append(args,
 		"videotestsrc", "pattern=black", "is-live=true", "!",
 		"video/x-raw,width=1920,height=1080,framerate=30/1", "!", "comp.sink_0",
 	)
+	args = append(args,
+		"audiotestsrc", "wave=silence", "is-live=true", "!",
+		"audio/x-raw,rate=48000,channels=2", "!", "acomp.sink_0",
+	)
 
-	// 4. MEDIA SOURCES
+	// Sources
 	if cfg.Input.ChromiumSource.Active {
 		// WebRTC Video
 		args = append(args,
@@ -51,7 +52,6 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 			if layer.Active {
 				srcName := fmt.Sprintf("src_%d", i)
 				args = append(args, "uridecodebin", "uri="+layer.InputPath, "name="+srcName)
-				// Dynamically link source outputs to compositor/audiomixer
 				args = append(args, srcName+".", "!", "queue", "leaky=downstream", "max-size-buffers=1", "!", "videoconvert", "!", fmt.Sprintf("comp.sink_%d", i+1))
 				args = append(args, srcName+".", "!", "queue", "leaky=downstream", "max-size-buffers=1", "!", "audioconvert", "!", "audioresample", "!", fmt.Sprintf("acomp.sink_%d", i+1))
 			}
