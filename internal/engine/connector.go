@@ -4,10 +4,14 @@ import (
 	"encoding/json"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/gorilla/websocket"
 )
 
 type ControlPayload struct {
@@ -23,7 +27,74 @@ type ControlCommand struct {
 	Payload   ControlPayload `json:"payload"`
 }
 
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool { return true },
+}
+
 func (pm *ProcessManager) StartConnectorListener() {
+	// Avvia il server HTTP / WebSocket locale per Chromium DOM
+	go func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+			conn, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				log.Println("WS upgrade failed:", err)
+				return
+			}
+			pm.wsMutex.Lock()
+			if pm.wsClients == nil {
+				pm.wsClients = make(map[*websocket.Conn]bool)
+			}
+			pm.wsClients[conn] = true
+			pm.wsMutex.Unlock()
+
+			defer func() {
+				pm.wsMutex.Lock()
+				delete(pm.wsClients, conn)
+				pm.wsMutex.Unlock()
+				conn.Close()
+			}()
+
+			for {
+				if _, _, err := conn.ReadMessage(); err != nil {
+					break
+				}
+			}
+		})
+
+		mux.HandleFunc("/api/list-dir", func(w http.ResponseWriter, r *http.Request) {
+			dirPath := r.URL.Query().Get("path")
+			if dirPath == "" {
+				http.Error(w, "missing path", http.StatusBadRequest)
+				return
+			}
+			files, err := os.ReadDir(dirPath)
+			if err != nil {
+				http.Error(w, "read dir error", http.StatusInternalServerError)
+				return
+			}
+
+			var mediaFiles []string
+			for _, f := range files {
+				if f.IsDir() {
+					continue
+				}
+				ext := strings.ToLower(filepath.Ext(f.Name()))
+				if ext == ".mp4" || ext == ".webm" || ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".mp3" {
+					mediaFiles = append(mediaFiles, f.Name())
+				}
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(mediaFiles)
+		})
+
+		log.Println("Starting local HTTP/WS server on 127.0.0.1:50001")
+		if err := http.ListenAndServe("127.0.0.1:50001", mux); err != nil {
+			log.Printf("Local HTTP/WS server failed: %v", err)
+		}
+	}()
+
 	if pm.config != nil && !pm.config.Connector.IPCControlIn {
 		log.Println("IPC Control In is disabled in configuration. Skipping connector listener.")
 		return
@@ -134,38 +205,29 @@ func (pm *ProcessManager) handleControlCommand(cmd ControlCommand) {
 	}
 
 	if cmd.Action == "set_input_state" {
-		if strings.HasPrefix(cmd.Target, "layer") {
-			idStr := strings.TrimPrefix(cmd.Target, "layer")
-			id, err := strconv.Atoi(idStr)
-			if err != nil {
-				log.Printf("Invalid target layer ID in control command: %s", cmd.Target)
-				return
+		if strings.HasPrefix(cmd.Target, "overlay@layer") {
+			idStr := strings.TrimPrefix(cmd.Target, "overlay@layer")
+			zLayer := "z" + idStr
+			wsCmd := map[string]interface{}{
+				"layer": zLayer,
 			}
-
-			pm.mu.Lock() // UPDATE STATE IN MEMORY WITHOUT RESTARTING FFMPEG
-			if pm.config != nil && pm.config.Input.MediaSource.Active {
-				for i, layer := range pm.config.Input.MediaSource.Layers {
-					if layer.ID == id {
-						if pm.config.Input.MediaSource.Layers[i].Active != cmd.Payload.Enabled {
-							log.Printf("Setting layer %d Active to %v via control command", id, cmd.Payload.Enabled)
-							pm.config.Input.MediaSource.Layers[i].Active = cmd.Payload.Enabled
-
-							// Copy config
-							newCfg := *pm.config
-							pm.mu.Unlock()
-
-							pm.mu.Lock() // UPDATE STATE IN MEMORY WITHOUT RESTARTING FFMPEG
-							pm.config = &newCfg
-							pm.mu.Unlock()
-
-							pm.UpdateFilter(&newCfg)
-							return
-						}
-						break
-					}
-				}
+			if cmd.Payload.Enabled {
+				wsCmd["action"] = "play"
+				wsCmd["path"] = cmd.Payload.Text
+			} else {
+				wsCmd["action"] = "hide"
 			}
-			pm.mu.Unlock()
+			pm.broadcastWSMessage(wsCmd)
+		} else if strings.HasPrefix(cmd.Target, "volume@layer") {
+			idStr := strings.TrimPrefix(cmd.Target, "volume@layer")
+			zLayer := "z" + idStr
+			vol, _ := strconv.Atoi(cmd.Payload.Text)
+			wsCmd := map[string]interface{}{
+				"layer":  zLayer,
+				"action": "volume",
+				"volume": vol,
+			}
+			pm.broadcastWSMessage(wsCmd)
 		}
 	} else if cmd.Action == "trigger_alert" {
 		log.Printf("trigger_alert action received for target %s, text: %s", cmd.Target, cmd.Payload.Text)
@@ -175,5 +237,16 @@ func (pm *ProcessManager) handleControlCommand(cmd ControlCommand) {
 		pm.ReloadChromium()
 	} else {
 		log.Printf("Unknown action received: %s", cmd.Action)
+	}
+}
+
+func (pm *ProcessManager) broadcastWSMessage(msg interface{}) {
+	pm.wsMutex.Lock()
+	defer pm.wsMutex.Unlock()
+	for client := range pm.wsClients {
+		if err := client.WriteJSON(msg); err != nil {
+			client.Close()
+			delete(pm.wsClients, client)
+		}
 	}
 }

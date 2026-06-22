@@ -45,12 +45,6 @@ input:
 	if cfg.Output.Resolution != "1920x1080" {
 		t.Errorf("Expected resolution '1920x1080', got '%s'", cfg.Output.Resolution)
 	}
-	if len(cfg.Input.MediaSource.Layers) != 1 {
-		t.Fatalf("Expected 1 layer, got %d", len(cfg.Input.MediaSource.Layers))
-	}
-	if cfg.Input.MediaSource.Layers[0].ID != 1 {
-		t.Errorf("Expected layer ID 1, got %d", cfg.Input.MediaSource.Layers[0].ID)
-	}
 }
 
 func TestLoadConfig_FileNotFound(t *testing.T) {
@@ -83,11 +77,8 @@ func TestDiffConfigs(t *testing.T) {
 	oldCfg := &models.Config{
 		Input: models.InputSettings{
 			Resolution: "1920x1080",
-			MediaSource: models.MediaSource{
-				Layers: []models.Layer{
-					{ID: 1, Active: true, InputType: "loop", InputPath: "test.mp4", Size: 1920},
-					{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
-				},
+			ChromiumSource: models.ChromiumSource{
+				Active: true,
 			},
 		},
 		Output: models.OutputSettings{Resolution: "1920x1080", FPS: 30},
@@ -97,11 +88,8 @@ func TestDiffConfigs(t *testing.T) {
 	newCfg1 := &models.Config{
 		Input: models.InputSettings{
 			Resolution: "1920x1080",
-			MediaSource: models.MediaSource{
-				Layers: []models.Layer{
-					{ID: 1, Active: true, InputType: "loop", InputPath: "test.mp4", Size: 1920},
-					{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
-				},
+			ChromiumSource: models.ChromiumSource{
+				Active: true,
 			},
 		},
 		Output: models.OutputSettings{Resolution: "1920x1080", FPS: 30},
@@ -120,42 +108,6 @@ func TestDiffConfigs(t *testing.T) {
 	if !diff2.RequiresRestart {
 		t.Errorf("Expected requiresRestart=true for output change")
 	}
-
-	// Test case 3: Filter update (change active state)
-	newCfg3 := &models.Config{
-		Input: models.InputSettings{
-			Resolution: "1920x1080",
-			MediaSource: models.MediaSource{
-				Layers: []models.Layer{
-					{ID: 1, Active: false, InputType: "loop", InputPath: "test.mp4", Size: 1920},
-					{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
-				},
-			},
-		},
-		Output: oldCfg.Output,
-	}
-	diff3 := DiffConfigs(oldCfg, newCfg3)
-	if !diff3.RequiresRestart || diff3.RequiresFilterUpdate {
-		t.Errorf("Expected requiresRestart=true and requiresFilterUpdate=false for active state change")
-	}
-
-	// Test case 4: Input path change -> requires restart
-	newCfg4 := &models.Config{
-		Input: models.InputSettings{
-			Resolution: "1920x1080",
-			MediaSource: models.MediaSource{
-				Layers: []models.Layer{
-					{ID: 1, Active: true, InputType: "loop", InputPath: "new.mp4", Size: 1920},
-					{ID: 2, Active: false, InputType: "srt", InputPath: "srt://...", Size: 960},
-				},
-			},
-		},
-		Output: oldCfg.Output,
-	}
-	diff4 := DiffConfigs(oldCfg, newCfg4)
-	if !diff4.RequiresRestart {
-		t.Errorf("Expected requiresRestart=true for input path change")
-	}
 }
 
 func TestWatcher(t *testing.T) {
@@ -164,24 +116,16 @@ output:
   resolution: "1920x1080"
   fps: 60
 input:
-  media_source:
-    layers:
-      - id: 1
-        active: true
-        input_type: "folder"
-        input_path: "/path1"
+  chromium_source:
+    active: true
 `
 	yamlContent2 := `
 output:
   resolution: "1920x1080"
   fps: 60
 input:
-  media_source:
-    layers:
-      - id: 1
-        active: false
-        input_type: "folder"
-        input_path: "/path1"
+  chromium_source:
+    active: false
 `
 
 	tmpDir := t.TempDir()
@@ -221,125 +165,5 @@ input:
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatalf("Timed out waiting for watcher callback")
-	}
-}
-
-func BenchmarkLayersDiff(b *testing.B) {
-	oldLayers := []models.Layer{
-		{ID: 1, Active: true, InputType: "loop", InputPath: "test1.mp4", Size: 1920},
-		{ID: 2, Active: false, InputType: "srt", InputPath: "srt://1", Size: 960},
-		{ID: 3, Active: true, InputType: "folder", InputPath: "fld1", Size: 1920},
-		{ID: 4, Active: true, InputType: "loop", InputPath: "test2.mp4", Size: 1920},
-	}
-	newLayers := []models.Layer{
-		{ID: 1, Active: true, InputType: "loop", InputPath: "test1.mp4", Size: 1920},
-		{ID: 2, Active: true, InputType: "srt", InputPath: "srt://1", Size: 960},
-		{ID: 3, Active: true, InputType: "folder", InputPath: "fld1", Size: 1920},
-		{ID: 5, Active: true, InputType: "loop", InputPath: "test3.mp4", Size: 1920},
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		layersDiff(oldLayers, newLayers)
-	}
-}
-
-func TestLayersDiff(t *testing.T) {
-	tests := []struct {
-		name                     string
-		old                      []models.Layer
-		new                      []models.Layer
-		wantRequiresRestart      bool
-		wantRequiresFilterUpdate bool
-	}{
-		{
-			name:                     "No changes",
-			old:                      []models.Layer{{ID: 1, InputType: "loop", InputPath: "test.mp4", Media: "video", Active: true, Size: 1920, X: 0, Y: 0}},
-			new:                      []models.Layer{{ID: 1, InputType: "loop", InputPath: "test.mp4", Media: "video", Active: true, Size: 1920, X: 0, Y: 0}},
-			wantRequiresRestart:      false,
-			wantRequiresFilterUpdate: false,
-		},
-		{
-			name:                     "Layer added",
-			old:                      []models.Layer{},
-			new:                      []models.Layer{{ID: 1}},
-			wantRequiresRestart:      true,
-			wantRequiresFilterUpdate: false,
-		},
-		{
-			name:                     "Layer removed",
-			old:                      []models.Layer{{ID: 1}},
-			new:                      []models.Layer{},
-			wantRequiresRestart:      true,
-			wantRequiresFilterUpdate: false,
-		},
-		{
-			name:                     "InputType changed",
-			old:                      []models.Layer{{ID: 1, InputType: "loop"}},
-			new:                      []models.Layer{{ID: 1, InputType: "srt"}},
-			wantRequiresRestart:      true,
-			wantRequiresFilterUpdate: false,
-		},
-		{
-			name:                     "InputPath changed",
-			old:                      []models.Layer{{ID: 1, InputPath: "test1.mp4"}},
-			new:                      []models.Layer{{ID: 1, InputPath: "test2.mp4"}},
-			wantRequiresRestart:      true,
-			wantRequiresFilterUpdate: false,
-		},
-		{
-			name:                     "Media changed",
-			old:                      []models.Layer{{ID: 1, Media: "video"}},
-			new:                      []models.Layer{{ID: 1, Media: "audio"}},
-			wantRequiresRestart:      true,
-			wantRequiresFilterUpdate: false,
-		},
-		{
-			name:                     "Active changed",
-			old:                      []models.Layer{{ID: 1, Active: true}},
-			new:                      []models.Layer{{ID: 1, Active: false}},
-			wantRequiresRestart:      true,
-			wantRequiresFilterUpdate: false,
-		},
-		{
-			name:                     "Size changed",
-			old:                      []models.Layer{{ID: 1, Size: 1920}},
-			new:                      []models.Layer{{ID: 1, Size: 960}},
-			wantRequiresRestart:      true,
-			wantRequiresFilterUpdate: false,
-		},
-		{
-			name:                     "X changed",
-			old:                      []models.Layer{{ID: 1, X: 0}},
-			new:                      []models.Layer{{ID: 1, X: 100}},
-			wantRequiresRestart:      false,
-			wantRequiresFilterUpdate: true,
-		},
-		{
-			name:                     "Y changed",
-			old:                      []models.Layer{{ID: 1, Y: 0}},
-			new:                      []models.Layer{{ID: 1, Y: 100}},
-			wantRequiresRestart:      false,
-			wantRequiresFilterUpdate: true,
-		},
-		{
-			name:                     "Multiple changes including restart and filter update",
-			old:                      []models.Layer{{ID: 1, InputType: "loop", Active: true}},
-			new:                      []models.Layer{{ID: 1, InputType: "srt", Active: false}},
-			wantRequiresRestart:      true,
-			wantRequiresFilterUpdate: false, // Restart takes precedence in effect, but logic sets RequiresRestart=true and may leave RequiresFilterUpdate=false depending on if-else.
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := layersDiff(tt.old, tt.new)
-			if got.RequiresRestart != tt.wantRequiresRestart {
-				t.Errorf("RequiresRestart = %v, want %v", got.RequiresRestart, tt.wantRequiresRestart)
-			}
-			if got.RequiresFilterUpdate != tt.wantRequiresFilterUpdate {
-				t.Errorf("RequiresFilterUpdate = %v, want %v", got.RequiresFilterUpdate, tt.wantRequiresFilterUpdate)
-			}
-		})
 	}
 }
