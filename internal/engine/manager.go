@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
@@ -16,6 +17,8 @@ import (
 	"github.com/user/VLX_VisionBridge/internal/db"
 	"github.com/user/VLX_VisionBridge/internal/models"
 )
+
+var overlayRouteOnce sync.Once
 
 type tailBuffer struct {
 	buf []byte
@@ -80,7 +83,6 @@ func (pm *ProcessManager) Start(ctx context.Context, config *models.Config) erro
 	pm.mu.Unlock()
 
 	go startWebRTCServer()
-	go pm.StartConnectorListener()
 	go pm.monitor()
 
 	return nil
@@ -200,13 +202,15 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				resHeight = resParts[1]
 			}
 
+			// NATIVE DOM CAPTURE: Rimosso il Canvas. Lasciamo che Chromium renderizzi CSS e iframes nativamente.
 			htmlContent := `<!DOCTYPE html>
 <html>
 <head>
+<title>VisionBridge</title>
 <style>
   * { margin: 0; padding: 0; overflow: hidden; }
-  body { margin: 0; padding: 0; overflow: hidden; background: ` + bgColor + `; }
-  iframe, video { margin: 0; padding: 0; border: none; }
+  body { margin: 0; padding: 0; overflow: hidden; background: ` + bgColor + `; width: ` + resWidth + `px; height: ` + resHeight + `px; position: relative; }
+  iframe, video, img { border: none; }
 `
 			var elements string
 			var scripts string
@@ -262,7 +266,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 
 			htmlContent += `</style>
 </head>
-<body style="margin: 0; padding: 0; width: ` + resWidth + `px; height: ` + resHeight + `px;">
+<body>
 `
 			htmlContent += elements
 			if scripts != "" {
@@ -277,47 +281,22 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 			htmlContent += `  <script>
     async function startWebRTC() {
       try {
-        const canvas = document.createElement('canvas');
-        canvas.width = ` + resWidth + `;
-        canvas.height = ` + resHeight + `;
-        document.body.appendChild(canvas);
-        const ctx = canvas.getContext('2d', { alpha: true });
-
-        // FIX "BG COLOR E FUORI SCALA": Vernicia il background e rispetta le dimensioni esatte di stile
-        function draw() {
-          ctx.fillStyle = "` + bgColor + `";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          
-          const elements = document.querySelectorAll('iframe, video, img');
-          elements.forEach(el => {
-            if (el.tagName === 'VIDEO' || el.tagName === 'IMG') {
-               try { 
-                   let x = parseInt(el.style.left) || 0;
-                   let y = parseInt(el.style.top) || 0;
-                   let w = parseInt(el.style.width) || canvas.width;
-                   let h = parseInt(el.style.height) || canvas.height;
-                   ctx.drawImage(el, x, y, w, h); 
-               } catch(e){}
-            }
-          });
-          requestAnimationFrame(draw);
-        }
-        draw();
-
-        const stream = canvas.captureStream(` + framerateStr + `);
-        const audioCtx = new AudioContext();
-        const dest = audioCtx.createMediaStreamDestination();
-        const audios = document.querySelectorAll('video, audio');
-        audios.forEach(a => {
-            const source = audioCtx.createMediaElementSource(a);
-            source.connect(dest);
-            source.connect(audioCtx.destination);
+        // CATTURA NATIVA DELLO SCHERMO: Preserva CSS, dimensioni, iframes e audio nativo.
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            width: { ideal: parseInt(` + resWidth + `) },
+            height: { ideal: parseInt(` + resHeight + `) },
+            frameRate: { ideal: parseInt(` + framerateStr + `) }
+          },
+          audio: {
+            autoGainControl: false,
+            echoCancellation: false,
+            noiseSuppression: false
+          }
         });
-        dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
 
         const pc = new RTCPeerConnection({ iceServers: [] });
         
-        // FIX WEBRTC DOWNSCALE: Ordina esplicitamente a Chromium di non rimpicciolire il video e usare massima banda
         stream.getTracks().forEach(track => {
           const transceiver = pc.addTransceiver(track, { 
               streams: [stream],
@@ -348,7 +327,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
           }
         });
 
-        const response = await fetch('http://localhost:50000/webrtc/offer', {
+        const response = await fetch('http://127.0.0.1:50000/webrtc/offer', {
           method: 'POST',
           headers: { 'Content-Type': 'application/sdp' },
           body: pc.localDescription.sdp
@@ -359,7 +338,8 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
         console.error('WebRTC error:', e);
       }
     }
-    window.onload = startWebRTC;
+    // Ritardo di 500ms per permettere il caricamento degli iframe (alerts) prima di catturare
+    window.onload = () => setTimeout(startWebRTC, 500);
   </script>
 </body>
 </html>`
@@ -371,12 +351,15 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				}
 			}
 
-			log.Printf("Starting Chromium overlay browser with generated HTML")
+			// ESPONE L'HTML TRAMITE SERVER HTTP LOCALE PER SBLOCCARE LE API WEBRTC/DISPLAYMEDIA
+			overlayRouteOnce.Do(func() {
+				http.HandleFunc("/overlay", func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+					http.ServeFile(w, r, htmlPath)
+				})
+			})
 
-			fileURL := htmlPath
-			if strings.HasPrefix(htmlPath, "/") {
-				fileURL = "file://" + htmlPath
-			}
+			log.Printf("Starting Chromium overlay browser natively with DOM Capture")
 
 			chromeBin, err := exec.LookPath("chromium")
 			if err != nil {
@@ -408,7 +391,12 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				"--disable-web-security",
 				"--allow-file-access-from-files",
 				"--allow-loopback-in-peer-connection",
-				fileURL,
+				// FLAG FONDAMENTALI PER BYPASSARE LE FINESTRE DI CONFERMA CONDIVISIONE SCHERMO
+				"--use-fake-ui-for-media-stream",
+				"--auto-select-desktop-capture-source=VisionBridge",
+				"--auto-select-tab-capture-source-by-title=VisionBridge",
+				"--enable-usermedia-screen-capturing",
+				"http://127.0.0.1:50000/overlay", // Caricato via HTTP per garantire contesto sicuro
 			)
 
 			cmd.Env = os.Environ()
