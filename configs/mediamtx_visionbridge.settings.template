@@ -1,0 +1,89 @@
+###############################################
+# VLX VisionBridge - MediaMTX Configuration Template
+# Note: This node operates inside a System-Space Systemd unit (/etc/systemd/system/).
+# Privilege Dropping (User=, Group=) is enforced inside the generated unit to limit blast radius.
+###############################################
+logLevel: info
+logDestinations: [syslog]
+#logDestinations: [file]
+#logFile: /opt/mediamtx/visionbridge_mediamtx.log
+sysLogPrefix: visionbridge_mediamtx
+readTimeout: 10s
+writeTimeout: 10s
+writeQueueSize: 512
+udpMaxPayloadSize: 1472
+
+runOnConnect:
+runOnConnectRestart: no
+runOnDisconnect:
+
+authMethod: internal
+authInternalUsers:
+  - user: visionbridge
+    pass: []
+    ips:
+      - '127.0.0.1'
+      - '::1'
+    permissions:
+      - action: publish
+        path: ~^(streamout)
+      - action: read
+        path: ~^(streamout)
+
+  - user: any
+    pass:
+    ips:
+      - '127.0.0.1'
+      - '::1'
+    permissions:
+      - action: api
+      - action: metrics
+      - action: pprof
+
+api: yes
+apiAddress: 127.0.0.1:9999
+metrics: no
+pprof: no
+playback: no
+rtsp: no
+rtmp: yes
+rtmpAddress: :1999
+rtmpEncryption: "no"
+rtmpsAddress: :1936
+rtmpServerKey:
+rtmpServerCert:
+hls: no
+webrtc: no
+srt: no
+srtAddress: :8890
+
+pathDefaults:
+  source: publisher
+  sourceFingerprint:
+  sourceOnDemand: no
+  maxReaders: 0
+  srtReadPassphrase:
+  fallback:
+  useAbsoluteTimestamp: false
+  overridePublisher: yes
+  srtPublishPassphrase:
+  # Hooks & Scripts
+  runOnInit:
+  runOnInitRestart: no
+  runOnDemand:
+  runOnDemandRestart: no
+  runOnDemandStartTimeout: 10s
+  runOnDemandCloseAfter: 10s
+  runOnUnDemand:
+  # Dynamic Relay Injection Point
+  runOnReady:
+  runOnReadyRestart: no
+  runOnNotReady:
+  runOnRead:
+  runOnReadRestart: no
+  runOnUnread:
+  runOnRecordSegmentCreate:
+  runOnRecordSegmentComplete:
+
+paths:
+  ~^streamout:
