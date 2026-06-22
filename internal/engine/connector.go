@@ -4,13 +4,10 @@ import (
 	"encoding/json"
 	"log"
 	"net"
-	"net/http"
 	"os"
 	"os/user"
 	"strconv"
 	"strings"
-
-	"github.com/gorilla/websocket"
 )
 
 type ControlPayload struct {
@@ -26,59 +23,7 @@ type ControlCommand struct {
 	Payload   ControlPayload `json:"payload"`
 }
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
-}
-
 func (pm *ProcessManager) StartConnectorListener() {
-	// Start local HTTP / WebSocket server for Chromium DOM control plane
-	go func() {
-		mux := http.NewServeMux()
-		mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-			conn, err := upgrader.Upgrade(w, r, nil)
-			if err != nil {
-				log.Println("WebSocket upgrade protocol failed:", err)
-				return
-			}
-			pm.wsMutex.Lock()
-			if pm.wsClients == nil {
-				pm.wsClients = make(map[*websocket.Conn]bool)
-			}
-			pm.wsClients[conn] = true
-			pm.wsMutex.Unlock()
-
-			defer func() {
-				pm.wsMutex.Lock()
-				delete(pm.wsClients, conn)
-				pm.wsMutex.Unlock()
-				conn.Close()
-			}()
-
-			for {
-				if _, msg, err := conn.ReadMessage(); err != nil {
-					break
-				} else {
-					var req map[string]string
-					if json.Unmarshal(msg, &req) == nil && req["action"] == "hello" {
-						// Synchronize DOM state upon initial client connection
-						pm.mu.Lock()
-						cfg := pm.config
-						pm.mu.Unlock()
-						if cfg != nil {
-							syncMsg := pm.buildSyncMessage(cfg)
-							_ = conn.WriteJSON(syncMsg)
-						}
-					}
-				}
-			}
-		})
-
-		log.Println("Initializing local HTTP/WS control server on 127.0.0.1:50001")
-		if err := http.ListenAndServe("127.0.0.1:50001", mux); err != nil {
-			log.Printf("Local HTTP/WS server initialization failed: %v", err)
-		}
-	}()
-
 	if pm.config != nil && !pm.config.Connector.IPCControlIn {
 		log.Println("IPC Control Inbound directive is disabled in configuration. Bypassing connector listener.")
 		return
