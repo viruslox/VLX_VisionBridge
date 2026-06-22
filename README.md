@@ -6,14 +6,21 @@ VLX VisionBridge is a headless, high-performance Linux service written in Go. It
 
 The service is designed for professional 24/7 broadcasting environments where configuration must be dynamic and resource efficiency is paramount. We are basically building a sort of obs-studio for remote VMs.
 
+## How it Works
+
+VisionBridge employs a highly optimized, Cloud-Native "Sidecar" Architecture based on three pillars:
+1. **WebRTC Overlay**: Chromium runs Headless, captures its own canvas (preserving Alpha channel), and pushes VP8/Opus via WebRTC (Pion) to local UDP ports.
+2. **GStreamer Core**: A native GStreamer pipeline mixes WebRTC and external media with zero latency.
+3. **Local Proxy (Sidecar)**: GStreamer muxes the output and pushes it unencrypted to a local MediaMTX server (`rtmp://127.0.0.1:1935/live/internal`). External routing and TLS are handled dynamically by Chatbridge invoking MediaMTX REST APIs.
+
 ## Requirements Note
 
 - **Hardware**: Multi-core CPU for GStreamer processing, adequate RAM for media buffering.
-- **Software**: Modern Linux distribution (e.g., Ubuntu 20.04/22.04), GStreamer 1.0 (with good/bad/ugly plugins) installed and accessible, Chromium (optional, if using overlay HTML sources), and `pion/webrtc`.
-- **Network**: High-bandwidth, low-latency network connection to handle multiple SRT/WebRTC streams and simultaneous broadcasting to multiple CDNs.
+- **Software**: Modern Linux distribution (e.g., Ubuntu 20.04/22.04), GStreamer 1.0 (with good/bad/ugly plugins and libav) installed and accessible, Chromium (optional, if using overlay HTML sources), and `pion/webrtc`.
+- **Network**: High-bandwidth, low-latency network connection to handle multiple SRT/WebRTC streams and simultaneous broadcasting.
 
 ```bash
-apt-get install gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav
+apt-get install gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav
 ```
 
 ## Core Principles
@@ -27,22 +34,22 @@ apt-get install gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0
 ## Best Practices
 
 - **Top-Most Overlay**: The `chromium_source` overlay should be kept as the top-most layer in the filter chain to avoid performance issues associated with complex layering. It is automatically rendered on top of all other sources.
-- **Layer Conventions**: To ensure a stable and performance-oriented configuration, `ffmpeg_source` is limited to a maximum of 3 layers (IDs 0, 1, 2) which share identical capabilities. The recommended convention is:
+- **Layer Conventions**: To ensure a stable and performance-oriented configuration, `media_source` is limited to a maximum of 3 layers (IDs 0, 1, 2) which share identical capabilities. The recommended convention is:
   - **Layer 1**: Primary Input (e.g., GoPro).
   - **Layer 0**: Fallback/Placeholder (e.g., VODs).
   - **Layer 2**: Secondary Input / Guest.
 
 ## Layer Configuration Examples
 
-VisionBridge operates alongside MediaMTX and ChatBridge on the same localhost. It handles low-latency video ingestion and real-time scene switching via ZeroMQ without restarting FFmpeg.
+VisionBridge operates alongside MediaMTX and ChatBridge on the same localhost. It handles low-latency video ingestion and real-time scene switching via ZeroMQ without restarting GStreamer.
 
 ### Folder Playlist Input
 When the input path is a directory and the layer configuration includes `folder_options` with `is_folder: true`, VisionBridge treats it as a playlist. It plays all valid video files (e.g., MP4, WebM) found in the directory. You can shuffle the playlist, loop it, and insert a delay (customizable delay spacer (color or image-based)) between videos.
 ```yaml
-id: 3
+id: 0
 active: true
 input_type: "local"
-input_path: "/opt/VLX_VisionBridge/data/layer3"
+input_path: "/opt/VLX_VisionBridge/data/layer0"
 media: "Video+Audio"
 size: 1920
 x: 0
@@ -62,7 +69,7 @@ folder_options:
 ```
 
 ### Network Input
-Optimized for MediaMTX via RTSP/SRT. The `network` input_type automatically injects `-fflags nobuffer -flags low_delay` for true zero-latency ingestion from MediaMTX (SRT/RTSP).
+Optimized for MediaMTX via RTSP/SRT. The `network` input_type is suitable for true zero-latency ingestion from MediaMTX (SRT/RTSP).
 ```json
 {
   "id": 2,
@@ -79,12 +86,12 @@ Optimized for MediaMTX via RTSP/SRT. The `network` input_type automatically inje
 
 ## Layer Control Rules ##
 
-- **Rule 1:** ZMQ commands MUST ONLY target `ffmpeg_source` layers (hardware cameras, local videos).
-- **Rule 2:** `chromium_source` layers (Overlays, Alerts, Maps) MUST be kept `active: true` constantly. Show/Hide logic for web layers must be handled via WebSockets/JavaScript, NOT via ZMQ, to avoid FFmpeg restarts and stream drops.
+- **Rule 1:** ZMQ commands MUST ONLY target `media_source` layers (hardware cameras, local videos).
+- **Rule 2:** `chromium_source` layers (Overlays, Alerts, Maps) MUST be kept `active: true` constantly. Show/Hide logic for web layers must be handled via WebSockets/JavaScript, NOT via ZMQ, to avoid GStreamer restarts and stream drops.
 
 ## Dynamic Regia
 
-Scenes are toggled on/off screen by moving them to `x -9999` and setting `volume 0.0` via ZMQ. This mechanism guarantees zero frame drops when switching scenes since FFmpeg doesn't have to restart or reload inputs.
+Scenes are toggled on/off screen by moving them to `x -9999` and setting `volume 0.0` via ZMQ. This mechanism guarantees zero frame drops when switching scenes since GStreamer doesn't have to restart or reload inputs.
 
 ## Configuration Concepts
 
@@ -93,8 +100,8 @@ Scenes are toggled on/off screen by moving them to `x -9999` and setting `volume
 ## Technology Stack
 
 - **Language**: Go (Golang)
-- **Processing Engine**: FFmpeg (via os/exec)
+- **Processing Engine**: GStreamer (via os/exec)
 - **Database**: SQLite (State persistence, Logs, Metadata)
-- **Messaging**: ZMQ is a mandatory dependency for real-time filter communication with FFmpeg.
+- **Messaging**: ZMQ is a mandatory dependency for real-time filter communication with GStreamer.
 
 See [Architecture](ARCHITECTURE.md) for High-Level Design details.

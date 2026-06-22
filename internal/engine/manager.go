@@ -720,7 +720,7 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 
 	pm.manageOverlays(cfg)
 
-	args, err := BuildFFmpegArgs(cfg)
+	args, err := BuildPipelineArgs(cfg)
 	if err != nil {
 		errMsg := fmt.Sprintf("Build args failed: %v", err)
 		log.Printf("Failed to build GStreamer args: %v", err)
