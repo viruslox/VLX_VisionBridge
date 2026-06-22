@@ -13,9 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-zeromq/zmq4"
 	"github.com/user/VLX_VisionBridge/internal/db"
-	"github.com/user/VLX_VisionBridge/internal/engine/source"
 	"github.com/user/VLX_VisionBridge/internal/models"
 )
 
@@ -323,7 +321,12 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
           }
         });
 
-        const offer = await pc.createOffer();
+        let offer = await pc.createOffer();
+        
+        // --- SDP MANGLING: FORCE CHROMIUM TO PUSH 15 Mbps VIDEO BANDWIDTH ---
+        offer.sdp = offer.sdp.replace(/a=mid:(.*)\r\n/g, 'a=mid:$1\r\nb=AS:15000\r\n');
+        // --------------------------------------------------------------------
+        
         await pc.setLocalDescription(offer);
 
         // Wait for ICE gathering to complete before sending SDP offer
@@ -376,7 +379,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				}
 			}
 
-cmd := exec.Command(chromeBin,
+			cmd := exec.Command(chromeBin,
 				"--headless=new",
 				"--kiosk",
 				"--disable-infobars",
@@ -394,6 +397,7 @@ cmd := exec.Command(chromeBin,
 				"--disable-renderer-backgrounding",
 				"--unthrottled-timer-nested-iframes",
 				"--disable-frame-rate-limit",
+				// --- SECURITY OVERRIDES FOR LOCALHOST WEBRTC ---
 				"--disable-web-security",
 				"--allow-file-access-from-files",
 				"--allow-loopback-in-peer-connection",
@@ -450,77 +454,12 @@ func (pm *ProcessManager) UpdateFilter(config *models.Config) {
 	pm.config = config
 	pm.mu.Unlock()
 
-	if config != nil && config.Input.MediaSource.Active {
-		var validLayers []models.Layer
-		for _, layer := range config.Input.MediaSource.Layers {
-			if layer.ID >= 0 && layer.ID <= 2 {
-				validLayers = append(validLayers, layer)
-			}
-		}
-		if len(validLayers) > 3 {
-			validLayers = validLayers[:3]
-		}
-		config.Input.MediaSource.Layers = validLayers
-	}
-
-	req := zmq4.NewReq(context.Background())
-	defer req.Close()
-	err := req.Dial("tcp://127.0.0.1:5555")
-	if err != nil {
-		log.Printf("ZMQ dial error: %v", err)
-		return
-	}
-
-	if config.Input.MediaSource.Active {
-		for _, layer := range config.Input.MediaSource.Layers {
-			if layer.ID == 99 {
-				continue
-			}
-
-			res := source.BuildInputArgs(layer)
-			media := layer.Media
-			if media == "" {
-				media = "Video+Audio"
-			}
-
-			if !layer.Active {
-				if (media == "Video" || media == "Video+Audio") && res.HasVideo {
-					sendZMQCommand(req, fmt.Sprintf("overlay@layer%d x -9999", layer.ID))
-				}
-				if (media == "Audio" || media == "Video+Audio") && res.HasAudio {
-					sendZMQCommand(req, fmt.Sprintf("volume@layer%d volume 0.0", layer.ID))
-				}
-				continue
-			}
-
-			if (media == "Video" || media == "Video+Audio") && res.HasVideo {
-				sendZMQCommand(req, fmt.Sprintf("overlay@layer%d x %d", layer.ID, layer.X))
-				sendZMQCommand(req, fmt.Sprintf("overlay@layer%d y %d", layer.ID, layer.Y))
-			}
-
-			if (media == "Audio" || media == "Video+Audio") && res.HasAudio {
-				vol := 1.0
-				if layer.Volume != nil {
-					vol = float64(*layer.Volume) / 100.0
-				}
-				sendZMQCommand(req, fmt.Sprintf("volume@layer%d volume %f", layer.ID, vol))
-			}
-		}
-	}
-}
-
-func sendZMQCommand(req zmq4.Socket, cmd string) {
-	err := req.Send(zmq4.NewMsgString(cmd))
-	if err != nil {
-		log.Printf("ZMQ send error for '%s': %v", cmd, err)
-		return
-	}
-	reply, err := req.Recv()
-	if err != nil {
-		log.Printf("ZMQ recv error for '%s': %v", cmd, err)
-		return
-	}
-	log.Printf("ZMQ reply for '%s': %s", cmd, string(reply.Frames[0]))
+	// ZeroMQ removal: Live dynamic filters via ZMQ were built for FFmpeg.
+	// Since the architecture migrated to GStreamer, dialing TCP 5555 would cause 
+	// a fatal deadlock. Chromium layout changes are now handled automatically via the DOM.
+	// MediaSource changes require an UpdateConfig() trigger to restart the pipeline cleanly.
+	log.Println("Note: Live filter updates via ZMQ are deprecated in the GStreamer Sidecar architecture.")
+	log.Println("Layer layout changes inside Chromium are handled automatically. For other layers, use a full reload.")
 }
 
 func (pm *ProcessManager) UpdateConfig(config *models.Config) {
@@ -822,8 +761,9 @@ func (pm *ProcessManager) runProcess(ctx context.Context, gstArgs []string) (boo
 		pm.mu.Unlock()
 	}()
 
-	log.Println("Starting GStreamer process... (Streaming to MediaMTX)")
-	
+	// Re-enabled logging to visually confirm the Sidecar push
+	log.Println("Starting GStreamer process... (Streaming to local MediaMTX)")
+
 	err := gstCmd.Start()
 	if err != nil {
 		return false, err, tb.String()
