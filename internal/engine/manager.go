@@ -306,8 +306,40 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
         });
         dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
 
-        const pc = new RTCPeerConnection({ iceServers: [] });
-        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+		const pc = new RTCPeerConnection({ iceServers: [] });
+        
+        stream.getTracks().forEach(track => {
+          const transceiver = pc.addTransceiver(track, { streams: [stream] });
+          
+          if (track.kind === 'video' && typeof RTCRtpReceiver !== 'undefined' && RTCRtpReceiver.getCapabilities) {
+             const codecs = RTCRtpReceiver.getCapabilities('video').codecs;
+             const vp8Codecs = codecs.filter(c => c.mimeType === 'video/VP8');
+             if (vp8Codecs.length > 0) {
+                 try { transceiver.setCodecPreferences(vp8Codecs); } catch(e){}
+             }
+          }
+        });
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        await new Promise(resolve => {
+          if (pc.iceGatheringState === 'complete') {
+            resolve();
+          } else {
+            pc.onicegatheringstatechange = () => {
+              if (pc.iceGatheringState === 'complete') resolve();
+            };
+          }
+        });
+
+        const response = await fetch('http://localhost:50000/webrtc/offer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/sdp' },
+          body: pc.localDescription.sdp
+        });
+        const answerSdp = await response.text();
+        await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
