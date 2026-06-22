@@ -803,14 +803,14 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 	return monitorActionSleepExponential, finalModule, isMisconfig
 }
 
-func (pm *ProcessManager) runProcess(ctx context.Context, args []string) (bool, error, string) {
-	cmd := exec.Command("gst-launch-1.0", args...)
+func (pm *ProcessManager) runProcess(ctx context.Context, gstArgs []string) (bool, error, string) {
+	gstCmd := exec.Command("gst-launch-1.0", gstArgs...)
 
 	tb := &tailBuffer{}
-	cmd.Stderr = tb
+	gstCmd.Stderr = tb
 
 	pm.mu.Lock()
-	pm.cmd = cmd
+	pm.cmd = gstCmd
 	pm.mu.Unlock()
 
 	defer func() {
@@ -819,17 +819,12 @@ func (pm *ProcessManager) runProcess(ctx context.Context, args []string) (bool, 
 		pm.mu.Unlock()
 	}()
 
-	if pm.db != nil {
-		_ = db.LogStreamEvent(pm.db, "start", "Starting GStreamer process")
-	}
-	log.Println("Starting GStreamer process...")
-
-	err := cmd.Start()
+	err := gstCmd.Start()
 	if err != nil {
 		return false, err, tb.String()
 	}
 
-	errWait, stderrStr := pm.waitForProcess(ctx, cmd)
+	errWait, stderrStr := pm.waitForProcess(ctx, gstCmd)
 	return true, errWait, stderrStr
 }
 
