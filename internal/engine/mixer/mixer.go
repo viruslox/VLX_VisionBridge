@@ -23,7 +23,7 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 		framerate = fmt.Sprintf("%d/1", cfg.Input.Framerate)
 	}
 
-	// RAMO VIDEO: Alta qualità (8 Mbps) e Keyframes fluidi
+	// RAMO VIDEO
 	args = append(args,
 		"compositor", "name=comp", "background=black", "!",
 		fmt.Sprintf("video/x-raw,width=%s,height=%s,framerate=%s", resWidth, resHeight, framerate), "!",
@@ -39,7 +39,7 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 		"avenc_aac", "bitrate=160000", "!", "aacparse", "!", "tee", "name=atee",
 	)
 
-	// MASTER CLOCKS: Evitano lo stallo di GStreamer
+	// MASTER CLOCKS
 	args = append(args,
 		"videotestsrc", "pattern=black", "is-live=true", "!",
 		fmt.Sprintf("video/x-raw,width=%s,height=%s,framerate=%s", resWidth, resHeight, framerate), "!", "comp.sink_0",
@@ -50,16 +50,16 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 	)
 
 	if cfg.Input.ChromiumSource.Active {
-		// X11 NATIVE CAPTURE: Zero latenza, perfetto rendering CSS e Iframes
+		// X11 NATIVE CAPTURE: Perfetto per Chromium Headless
 		args = append(args,
 			"ximagesrc", "display-name=:99", "use-damage=0", "show-pointer=false", "!",
 			"videoscale", "!", "videorate", "!",
 			fmt.Sprintf("video/x-raw,width=%s,height=%s,framerate=%s", resWidth, resHeight, framerate), "!",
 			"videoconvert", "!", "comp.sink_1",
 		)
-		// PULSEAUDIO NATIVE CAPTURE: Audio perfetto dal server virtuale
+		// PULSEAUDIO NATIVE CAPTURE: Dal server virtuale isolato
 		args = append(args,
-			"pulsesrc", "!",
+			"pulsesrc", "device=VisionBridgeSink.monitor", "!",
 			"audioconvert", "!", "audioresample", "!", "acomp.sink_1",
 		)
 	} else if cfg.Input.MediaSource.Active {
