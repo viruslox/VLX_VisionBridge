@@ -41,7 +41,6 @@ func (t *tailBuffer) String() string {
 	return string(t.buf)
 }
 
-// ProcessManager manages the FFmpeg process.
 type RetryTracker struct {
 	ConsecutiveCrashes int
 	LastCrash          time.Time
@@ -60,7 +59,6 @@ type ProcessManager struct {
 	retries     map[string]*RetryTracker
 }
 
-// NewProcessManager creates a new ProcessManager.
 func NewProcessManager(dbConn *sql.DB) *ProcessManager {
 	pm := &ProcessManager{
 		db:          dbConn,
@@ -71,7 +69,6 @@ func NewProcessManager(dbConn *sql.DB) *ProcessManager {
 	return pm
 }
 
-// Start starts the FFmpeg process and monitors it.
 func (pm *ProcessManager) Start(ctx context.Context, config *models.Config) error {
 	pm.mu.Lock()
 	if pm.isRunning {
@@ -91,7 +88,6 @@ func (pm *ProcessManager) Start(ctx context.Context, config *models.Config) erro
 	return nil
 }
 
-// Stop gracefully stops the FFmpeg process.
 func (pm *ProcessManager) Stop() {
 	pm.mu.Lock()
 	if !pm.isRunning {
@@ -101,7 +97,7 @@ func (pm *ProcessManager) Stop() {
 	pm.isRunning = false
 
 	if pm.cmd != nil && pm.cmd.Process != nil {
-		log.Println("Signaling FFmpeg process to stop gracefully...")
+		log.Println("Signaling GStreamer process to stop gracefully...")
 		_ = pm.cmd.Process.Signal(syscall.SIGTERM)
 	}
 
@@ -274,6 +270,12 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 			if scripts != "" {
 				htmlContent += "  <script>\n" + scripts + "  </script>\n"
 			}
+			
+			framerateStr := "30"
+			if cfg.Input.Framerate > 0 {
+				framerateStr = strconv.Itoa(cfg.Input.Framerate)
+			}
+
 			htmlContent += `  <script>
     async function startWebRTC() {
       try {
@@ -295,7 +297,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
         }
         draw();
 
-        const stream = canvas.captureStream(30);
+        const stream = canvas.captureStream(` + framerateStr + `);
         const audioCtx = new AudioContext();
         const dest = audioCtx.createMediaStreamDestination();
         const audios = document.querySelectorAll('video, audio');
@@ -306,8 +308,9 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
         });
         dest.stream.getAudioTracks().forEach(t => stream.addTrack(t));
 
-		const pc = new RTCPeerConnection({ iceServers: [] });
+        const pc = new RTCPeerConnection({ iceServers: [] });
         
+        // Force VP8 codec preference for GStreamer compatibility
         stream.getTracks().forEach(track => {
           const transceiver = pc.addTransceiver(track, { streams: [stream] });
           
@@ -323,27 +326,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
-        await new Promise(resolve => {
-          if (pc.iceGatheringState === 'complete') {
-            resolve();
-          } else {
-            pc.onicegatheringstatechange = () => {
-              if (pc.iceGatheringState === 'complete') resolve();
-            };
-          }
-        });
-
-        const response = await fetch('http://localhost:50000/webrtc/offer', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/sdp' },
-          body: pc.localDescription.sdp
-        });
-        const answerSdp = await response.text();
-        await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
-
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-
+        // Wait for ICE gathering to complete before sending SDP offer
         await new Promise(resolve => {
           if (pc.iceGatheringState === 'complete') {
             resolve();
@@ -393,19 +376,18 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				}
 			}
 
-			// OPTIMIZATION: Aggiunti flag per disattivare qualsiasi throttling grafico ed energetico di Chromium headless
-			cmd := exec.Command(chromeBin, 
+			cmd := exec.Command(chromeBin,
 				"--headless=new",
-				"--kiosk", 
-				"--disable-infobars", 
-				"--disable-extensions", 
+				"--kiosk",
+				"--disable-infobars",
+				"--disable-extensions",
 				"--test-type",
-				fmt.Sprintf("--window-size=%s,%s", resWidth, resHeight), 
-				"--window-position=0,0", 
-				"--hide-scrollbars", 
-				"--no-sandbox", 
+				fmt.Sprintf("--window-size=%s,%s", resWidth, resHeight),
+				"--window-position=0,0",
+				"--hide-scrollbars",
+				"--no-sandbox",
 				"--disable-dev-shm-usage",
-				"--autoplay-policy=no-user-gesture-required", 
+				"--autoplay-policy=no-user-gesture-required",
 				"--force-device-scale-factor=1",
 				"--disable-background-timer-throttling",
 				"--disable-backgrounding-occluded-windows",
@@ -562,7 +544,7 @@ func (pm *ProcessManager) UpdateConfig(config *models.Config) {
 	}
 
 	if pm.cmd != nil && pm.cmd.Process != nil {
-		log.Println("Signaling FFmpeg process to stop gracefully for config update...")
+		log.Println("Signaling GStreamer process to stop gracefully for config update...")
 		_ = pm.cmd.Process.Signal(syscall.SIGTERM)
 	}
 	if pm.cond != nil {
@@ -644,7 +626,7 @@ func (pm *ProcessManager) monitor() {
 			time.Sleep(backoff)
 			continue
 		case monitorActionSleepExponential:
-			log.Printf("Restarting FFmpeg in %v...", backoff)
+			log.Printf("Restarting GStreamer in %v...", backoff)
 			time.Sleep(backoff)
 
 			backoff *= 2
@@ -712,7 +694,7 @@ func identifyErrorModule(stderr string, cfg *models.Config) string {
 	}
 
 	lowerStderr := strings.ToLower(stderr)
-	if strings.Contains(lowerStderr, "filter") || strings.Contains(lowerStderr, "parsed_") || strings.Contains(lowerStderr, "overlay") || strings.Contains(lowerStderr, "scale=") {
+	if strings.Contains(lowerStderr, "compositor") || strings.Contains(lowerStderr, "audiomixer") {
 		return "[mixer]"
 	}
 
@@ -741,7 +723,7 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 	args, err := BuildFFmpegArgs(cfg)
 	if err != nil {
 		errMsg := fmt.Sprintf("Build args failed: %v", err)
-		log.Printf("Failed to build FFmpeg args: %v", err)
+		log.Printf("Failed to build GStreamer args: %v", err)
 		if pm.db != nil && *lastBuildErr != errMsg {
 			_ = db.LogStreamEvent(pm.db, "error", errMsg)
 			*lastBuildErr = errMsg
@@ -751,7 +733,7 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 	*lastBuildErr = ""
 
 	if len(args) == 0 {
-		log.Println("No active layers, not starting FFmpeg.")
+		log.Println("No active layers, not starting GStreamer.")
 
 		pm.mu.Lock()
 		if pm.isRunning && pm.ctx.Err() == nil {
@@ -763,18 +745,18 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 
 	started, runErr, stderrStr := pm.runProcess(ctx, args)
 	if !started {
-		log.Printf("Failed to start FFmpeg: %v", runErr)
+		log.Printf("Failed to start GStreamer: %v", runErr)
 		return monitorActionSleepConstant, "", false
 	}
 
 	if ctx.Err() != nil {
 		if pm.db != nil {
-			_ = db.LogStreamEvent(pm.db, "stop", "FFmpeg process stopped gracefully")
+			_ = db.LogStreamEvent(pm.db, "stop", "GStreamer process stopped gracefully")
 		}
 		return monitorActionStop, "", false
 	}
 
-	errMsg := "FFmpeg exited unexpectedly"
+	errMsg := "GStreamer exited unexpectedly"
 	var finalModule string
 	var isMisconfig bool
 
@@ -784,17 +766,15 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 			lines := strings.Split(strings.TrimSpace(stderrStr), "\n")
 			if len(lines) > 0 {
 				reason = lines[len(lines)-1]
-				if reason == "Conversion failed!" && len(lines) > 1 {
-					reason = lines[len(lines)-2] + " | " + reason
-				}
+				
 				if len(lines) > 10 {
 					startIdx := len(lines) - 30
 					if startIdx < 0 {
 						startIdx = 0
 					}
-					log.Printf("FFmpeg stderr tail:\n%s", strings.Join(lines[startIdx:], "\n"))
+					log.Printf("GStreamer stderr tail:\n%s", strings.Join(lines[startIdx:], "\n"))
 				} else {
-					log.Printf("FFmpeg stderr tail:\n%s", stderrStr)
+					log.Printf("GStreamer stderr tail:\n%s", stderrStr)
 				}
 
 				modulePrefix := identifyErrorModule(stderrStr, cfg)
@@ -804,15 +784,15 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 				}
 
 				lowerStderr := strings.ToLower(stderrStr)
-				if strings.Contains(lowerStderr, "no such file or directory") || strings.Contains(lowerStderr, "invalid argument") || strings.Contains(lowerStderr, "could not find codec parameters") || strings.Contains(lowerStderr, "not found") {
+				if strings.Contains(lowerStderr, "no such file or directory") || strings.Contains(lowerStderr, "syntax error") || strings.Contains(lowerStderr, "could not link") || strings.Contains(lowerStderr, "not found") {
 					isMisconfig = true
 				}
 			}
 		}
 		if reason != "" {
-			errMsg = fmt.Sprintf("FFmpeg crashed: %v, reason: %s", runErr, reason)
+			errMsg = fmt.Sprintf("GStreamer crashed: %v, reason: %s", runErr, reason)
 		} else {
-			errMsg = fmt.Sprintf("FFmpeg crashed: %v", runErr)
+			errMsg = fmt.Sprintf("GStreamer crashed: %v", runErr)
 		}
 	}
 	log.Println(errMsg)
@@ -840,9 +820,9 @@ func (pm *ProcessManager) runProcess(ctx context.Context, args []string) (bool, 
 	}()
 
 	if pm.db != nil {
-		_ = db.LogStreamEvent(pm.db, "start", "Starting FFmpeg process")
+		_ = db.LogStreamEvent(pm.db, "start", "Starting GStreamer process")
 	}
-	log.Println("Starting FFmpeg process...")
+	log.Println("Starting GStreamer process...")
 
 	err := cmd.Start()
 	if err != nil {
@@ -862,16 +842,16 @@ func (pm *ProcessManager) waitForProcess(ctx context.Context, cmd *exec.Cmd) (er
 	var runErr error
 	select {
 	case <-ctx.Done():
-		log.Println("Context cancelled, waiting for FFmpeg to stop...")
+		log.Println("Context cancelled, waiting for GStreamer to stop...")
 		select {
 		case <-time.After(5 * time.Second):
-			log.Println("FFmpeg process did not stop gracefully, killing it...")
+			log.Println("GStreamer process did not stop gracefully, killing it...")
 			if cmd.Process != nil {
 				_ = cmd.Process.Kill()
 			}
 			runErr = <-done
 		case runErr = <-done:
-			log.Println("FFmpeg process stopped gracefully.")
+			log.Println("GStreamer process stopped gracefully.")
 		}
 	case runErr = <-done:
 	}
@@ -884,7 +864,6 @@ func (pm *ProcessManager) waitForProcess(ctx context.Context, cmd *exec.Cmd) (er
 	return runErr, stderrStr
 }
 
-// ReloadChromium safely restarts the Chromium headless process.
 func (pm *ProcessManager) ReloadChromium() {
 	pm.mu.Lock()
 	if cmd, exists := pm.overlayCmds[99]; exists && cmd != nil && cmd.Process != nil {
