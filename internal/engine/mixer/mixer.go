@@ -2,6 +2,7 @@ package mixer
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/user/VLX_VisionBridge/internal/models"
 )
@@ -9,41 +10,56 @@ import (
 func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 	var args []string
 
-	// 1. VIDEO BRANCH: From compositor to encoder, ending in "vtee"
-	// High Quality Broadcast Settings: 8000 kbps (8 Mbps), 2-second keyframes (key-int-max=60)
+	// 1. SINCRONIZZAZIONE PARAMETRI: Estrae i valori reali dal file settings JSON
+	resParts := strings.Split(cfg.Input.Resolution, "x")
+	resWidth := "1920"
+	resHeight := "1080"
+	if len(resParts) == 2 {
+		resWidth = resParts[0]
+		resHeight = resParts[1]
+	}
+
+	framerate := "30/1"
+	if cfg.Input.Framerate > 0 {
+		framerate = fmt.Sprintf("%d/1", cfg.Input.Framerate)
+	}
+
+	// 2. RAMO VIDEO: Applica la risoluzione e gli FPS scelti all'output principale
 	args = append(args,
 		"compositor", "name=comp", "background=black", "!",
-		"video/x-raw", "!", "videoconvert", "!",
+		fmt.Sprintf("video/x-raw,width=%s,height=%s,framerate=%s", resWidth, resHeight, framerate), "!",
+		"videoconvert", "!",
 		"x264enc", "tune=zerolatency", "speed-preset=ultrafast", "bitrate=8000", "key-int-max=60", "!",
 		"h264parse", "!", "tee", "name=vtee",
 	)
 
-	// 2. AUDIO BRANCH: From audiomixer to AAC encoder, ending in "atee"
-	// High Quality Audio Settings: 160 kbps
+	// 3. RAMO AUDIO
 	args = append(args,
 		"audiomixer", "name=acomp", "!",
 		"audioconvert", "!", "audioresample", "!",
 		"avenc_aac", "bitrate=160000", "!", "aacparse", "!", "tee", "name=atee",
 	)
 
-	// 3. MASTER CLOCKS: Prevents GStreamer from stalling if live streams are delayed
+	// 4. MASTER CLOCKS: Generati dinamicamente in base alle tue configurazioni
 	args = append(args,
 		"videotestsrc", "pattern=black", "is-live=true", "!",
-		"video/x-raw,width=1920,height=1080,framerate=30/1", "!", "comp.sink_0",
+		fmt.Sprintf("video/x-raw,width=%s,height=%s,framerate=%s", resWidth, resHeight, framerate), "!", "comp.sink_0",
 	)
 	args = append(args,
 		"audiotestsrc", "wave=silence", "is-live=true", "!",
 		"audio/x-raw,rate=48000,channels=2", "!", "acomp.sink_0",
 	)
 
-	// 4. MEDIA SOURCES
+	// 5. SORGENTI MULTIMEDIALI
 	if cfg.Input.ChromiumSource.Active {
 		// WebRTC Video
-		// Removed 'leaky=downstream' and 'max-size-buffers=1' to prevent frame dropping and visual glitches
 		args = append(args,
 			"udpsrc", "port=50002", "caps=application/x-rtp,media=video,clock-rate=90000,encoding-name=VP8", "!",
 			"rtpjitterbuffer", "latency=50", "!",
 			"rtpvp8depay", "!", "vp8dec", "!", "queue", "!",
+			// FIX "FUORI SCALA": Forza il resize alla risoluzione del config prima del compositor
+			"videoscale", "!", "videorate", "!",
+			fmt.Sprintf("video/x-raw,width=%s,height=%s,framerate=%s", resWidth, resHeight, framerate), "!",
 			"videoconvert", "!", "comp.sink_1",
 		)
 		// WebRTC Audio
@@ -59,8 +75,11 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 				srcName := fmt.Sprintf("src_%d", i)
 				args = append(args, "uridecodebin", "uri="+layer.InputPath, "name="+srcName)
 				
-				// Dynamic routing with safe queues
-				args = append(args, srcName+".", "!", "queue", "!", "videoconvert", "!", fmt.Sprintf("comp.sink_%d", i+1))
+				args = append(args, srcName+".", "!", "queue", "!", 
+					"videoscale", "!", "videorate", "!",
+					fmt.Sprintf("video/x-raw,width=%s,height=%s,framerate=%s", resWidth, resHeight, framerate), "!",
+					"videoconvert", "!", fmt.Sprintf("comp.sink_%d", i+1))
+				
 				args = append(args, srcName+".", "!", "queue", "!", "audioconvert", "!", "audioresample", "!", fmt.Sprintf("acomp.sink_%d", i+1))
 			}
 		}
