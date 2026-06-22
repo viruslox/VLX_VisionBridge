@@ -1,5 +1,7 @@
+// Package models defines the core data structures used for configuring and tracking the engine.
 package models
 
+// OutputSettings defines the streaming output configuration for MediaMTX/FFmpeg.
 type OutputSettings struct {
 	Active       bool     `yaml:"active" json:"active"`
 	Resolution   string   `yaml:"resolution"`
@@ -9,6 +11,7 @@ type OutputSettings struct {
 	Destinations []string `yaml:"destinations"`
 }
 
+// ChromiumSource defines the settings for up to 8 native DOM Z-layers.
 type ChromiumSource struct {
 	Active   bool   `yaml:"active"`
 	Z1Active bool   `yaml:"z1_active"`
@@ -76,6 +79,7 @@ type ChromiumSource struct {
 	Z8Y      *int   `yaml:"z8_y"`
 }
 
+// InputSettings defines the main engine inputs, including base resolution and background color.
 type InputSettings struct {
 	BgColor        string         `yaml:"bg_color" json:"bg_color"`
 	Resolution     string         `yaml:"resolution"`
@@ -85,6 +89,7 @@ type InputSettings struct {
 	ChromiumSource ChromiumSource `yaml:"chromium_source"`
 }
 
+// InputResult represents the generated GStreamer arguments and state flags.
 type InputResult struct {
 	Args       []string
 	InputCount int
@@ -92,16 +97,19 @@ type InputResult struct {
 	HasAudio   bool
 }
 
+// DatabaseConfig defines local SQLite logging parameters.
 type DatabaseConfig struct {
 	DSN string `yaml:"dsn"`
 }
 
+// ConnectorSettings defines the IPC/ZMQ socket configuration for local control commands.
 type ConnectorSettings struct {
 	IPCControlIn  bool   `yaml:"ipc_control_in" json:"ipc_control_in"`
 	Group         string `yaml:"group" json:"group"`
 	ControlSocket string `yaml:"control_socket" json:"control_socket"`
 }
 
+// Config is the root struct representing the config.yaml file.
 type Config struct {
 	Database  DatabaseConfig    `yaml:"database"`
 	Connector ConnectorSettings `yaml:"connector"`

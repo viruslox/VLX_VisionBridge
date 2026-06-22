@@ -118,6 +118,7 @@ func (pm *ProcessManager) Stop() {
 	pm.mu.Unlock()
 }
 
+// buildOverlayElement: Generates DOM tags with proper absolute positioning
 func buildOverlayElement(id string, zIndex int, path string, width, height, x, y, volume *int) (string, string, string) {
 	if path == "" {
 		return "", "", ""
@@ -154,18 +155,20 @@ func buildOverlayElement(id string, zIndex int, path string, width, height, x, y
 	if volume != nil {
 		vol = float64(*volume) / 100.0
 	}
-	script := fmt.Sprintf("      var e_%s = document.getElementById('%s'); if (e_%s) e_%s.volume = %f;\n", id, id, id, id, vol)
+	script := fmt.Sprintf("      var e_%s = document.getElementById('%s'); if (e_%s && e_%s.volume !== undefined) e_%s.volume = %f;\n", id, id, id, id, id, vol)
 
 	if strings.HasSuffix(lowerPath, ".mp4") || strings.HasSuffix(lowerPath, ".webm") {
 		element = fmt.Sprintf(`  <video id="%s" src="%s" autoplay loop playsinline></video>`+"\n", id, srcURL)
 	} else if strings.HasSuffix(lowerPath, ".png") || strings.HasSuffix(lowerPath, ".jpg") || strings.HasSuffix(lowerPath, ".jpeg") {
 		element = fmt.Sprintf(`  <img id="%s" src="%s" />`+"\n", id, srcURL)
 		script = ""
-	} else if strings.HasSuffix(lowerPath, ".mp3") {
-		element = fmt.Sprintf(`  <audio id="%s" src="%s" autoplay loop></audio>`+"\n", id, srcURL)
-	} else {
-		element = fmt.Sprintf(`  <iframe id="%s" src="%s" allow="camera; microphone; display-capture" allowtransparency="true" frameborder="0"></iframe>`+"\n", id, srcURL)
+	} else if strings.HasPrefix(lowerPath, "http://") || strings.HasPrefix(lowerPath, "https://") || strings.HasSuffix(lowerPath, ".html") {
+		// For alerts or external web pages, fallback to iframe
+		element = fmt.Sprintf(`  <iframe id="%s" src="%s" allow="autoplay; camera; microphone; display-capture" allowtransparency="true" frameborder="0"></iframe>`+"\n", id, srcURL)
 		script = ""
+	} else {
+		// Generic fallback: empty video tag, can be manipulated by WS later
+		element = fmt.Sprintf(`  <video id="%s" autoplay loop playsinline></video>`+"\n", id)
 	}
 
 	return style, element, script
@@ -173,7 +176,7 @@ func buildOverlayElement(id string, zIndex int, path string, width, height, x, y
 
 // startEnvironment: Avvia Display Virtuale e Audio Virtuale in modo sicuro
 func (pm *ProcessManager) startEnvironment(resWidth, resHeight string) {
-	// 1. Avvia Xvfb (Display :99)
+	// 1. Start Xvfb (Display :99)
 	if _, exists := pm.overlayCmds[100]; !exists {
 		xvfbCmd := exec.Command("Xvfb", ":99", "-screen", "0", fmt.Sprintf("%sx%sx24", resWidth, resHeight), "-ac", "-nolisten", "tcp")
 		if err := xvfbCmd.Start(); err != nil {
@@ -181,17 +184,17 @@ func (pm *ProcessManager) startEnvironment(resWidth, resHeight string) {
 		} else {
 			log.Printf("Started Xvfb on display :99 (%sx%s)", resWidth, resHeight)
 			pm.overlayCmds[100] = xvfbCmd
-			// Diamo 1 secondo al server X per avviarsi, evitando che GStreamer o Chromium crashino
+			// Give X server 1 second to start, avoiding GStreamer or Chromium crashes
 			time.Sleep(1 * time.Second)
 		}
 	}
 
-	// 2. Avvia PulseAudio Isolato (con Moduli Null Sink)
+	// 2. Start Isolated PulseAudio (with Null Sink Module)
 	os.MkdirAll("/tmp/pulse-visionbridge", 0755)
 	pulseCmd := exec.Command("pulseaudio", 
 		"-D", 
 		"--exit-idle-time=-1", 
-		"-n", // Ignora la configurazione di sistema hardware
+		"-n", // Ignore hardware system configuration
 		"--load=module-native-protocol-unix auth-anonymous=1 socket=/tmp/pulse-visionbridge/native",
 		"--load=module-null-sink sink_name=VisionBridgeSink",
 	)
@@ -208,7 +211,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 	defer pm.mu.Unlock()
 
 	activeOverlays := make(map[int]bool)
-	activeOverlays[100] = true // Mantieni Xvfb attivo
+	activeOverlays[100] = true // Keep Xvfb active
 
 	if cfg.Input.ChromiumSource.Active {
 		activeOverlays[99] = true
@@ -305,7 +308,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 `
 			htmlContent += elements
 
-			// Aggiungiamo lo script per il WebSocket
+			// Add WebSocket script to listen for JSON control commands
 			wsScript := `
 	var ws = new WebSocket('ws://127.0.0.1:50001/ws');
 	ws.onmessage = function(event) {
@@ -317,35 +320,16 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 
 			if (msg.action === "play" && msg.path) {
 				el.style.display = 'block';
-				// Check if it's a directory for carousel (simple detection)
-				if (msg.path.endsWith('/')) {
-					fetch('http://127.0.0.1:50001/api/list-dir?path=' + encodeURIComponent(msg.path))
-					.then(response => response.json())
-					.then(files => {
-						if (!files || files.length === 0) return;
-						let idx = 0;
-						function playNext() {
-							el.src = 'file://' + msg.path + files[idx];
-							if (el.tagName.toLowerCase() === 'video') {
-								el.play().catch(e => console.log('play error', e));
-								el.onended = function() {
-									idx = (idx + 1) % files.length;
-									playNext();
-								};
-							} else { // image interval
-								setTimeout(function() {
-									idx = (idx + 1) % files.length;
-									playNext();
-								}, 5000); // 5 sec per image
-							}
-						}
-						playNext();
-					}).catch(err => console.log('carousel fetch error', err));
+
+				// Handle both local files and web URLs natively
+				if (msg.path.startsWith('http://') || msg.path.startsWith('https://')) {
+					el.src = msg.path;
 				} else {
 					el.src = msg.path.startsWith('/') ? 'file://' + msg.path : msg.path;
-					if (el.tagName.toLowerCase() === 'video') {
-						el.play().catch(e => console.log('play error', e));
-					}
+				}
+
+				if (el.tagName.toLowerCase() === 'video') {
+					el.play().catch(e => console.log('play error', e));
 				}
 			} else if (msg.action === "hide") {
 				el.style.display = 'none';
@@ -404,7 +388,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				fileURL,
 			)
 
-			// Collega Chromium a Xvfb e al PulseAudio socket isolato
+			// Connect Chromium to Xvfb and the isolated PulseAudio socket
 			cmd.Env = append(os.Environ(), "DISPLAY=:99", "PULSE_SERVER=unix:/tmp/pulse-visionbridge/native")
 
 			err = cmd.Start()
@@ -650,7 +634,7 @@ func (pm *ProcessManager) runProcess(ctx context.Context, gstArgs []string) (boo
 	tb := &tailBuffer{}
 	gstCmd.Stderr = tb
 
-	// Fondamentale: Passiamo DISPLAY e PULSE_SERVER a GStreamer affinché possa leggere da Xvfb e PulseAudio
+	// Essential: Pass DISPLAY and PULSE_SERVER to GStreamer so it can read from Xvfb and PulseAudio
 	gstCmd.Env = append(os.Environ(), "DISPLAY=:99", "PULSE_SERVER=unix:/tmp/pulse-visionbridge/native")
 
 	pm.mu.Lock()

@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/user"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -32,7 +31,7 @@ var upgrader = websocket.Upgrader{
 }
 
 func (pm *ProcessManager) StartConnectorListener() {
-	// Avvia il server HTTP / WebSocket locale per Chromium DOM
+	// Start local HTTP / WebSocket server for Chromium DOM
 	go func() {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
@@ -62,32 +61,6 @@ func (pm *ProcessManager) StartConnectorListener() {
 			}
 		})
 
-		mux.HandleFunc("/api/list-dir", func(w http.ResponseWriter, r *http.Request) {
-			dirPath := r.URL.Query().Get("path")
-			if dirPath == "" {
-				http.Error(w, "missing path", http.StatusBadRequest)
-				return
-			}
-			files, err := os.ReadDir(dirPath)
-			if err != nil {
-				http.Error(w, "read dir error", http.StatusInternalServerError)
-				return
-			}
-
-			var mediaFiles []string
-			for _, f := range files {
-				if f.IsDir() {
-					continue
-				}
-				ext := strings.ToLower(filepath.Ext(f.Name()))
-				if ext == ".mp4" || ext == ".webm" || ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".mp3" {
-					mediaFiles = append(mediaFiles, f.Name())
-				}
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(mediaFiles)
-		})
 
 		log.Println("Starting local HTTP/WS server on 127.0.0.1:50001")
 		if err := http.ListenAndServe("127.0.0.1:50001", mux); err != nil {
