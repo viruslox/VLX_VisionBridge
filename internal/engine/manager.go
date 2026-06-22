@@ -174,7 +174,7 @@ func buildOverlayElement(id string, zIndex int, path string, width, height, x, y
 	return style, element, script
 }
 
-// startEnvironment: Avvia Display Virtuale e Audio Virtuale in modo sicuro
+// startEnvironment: Starts Virtual Desplay and Virtual Audio
 func (pm *ProcessManager) startEnvironment(resWidth, resHeight string) {
 	// 1. Start Xvfb (Display :99)
 	if _, exists := pm.overlayCmds[100]; !exists {
@@ -238,7 +238,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				resHeight = resParts[1]
 			}
 
-			// Prepara l'ambiente Headless (Xvfb + PulseAudio)
+			// Headless (Xvfb + PulseAudio)
 			pm.startEnvironment(resWidth, resHeight)
 
 			htmlContent := `<!DOCTYPE html>
@@ -443,21 +443,13 @@ func (pm *ProcessManager) UpdateFilter(config *models.Config) {
 func (pm *ProcessManager) UpdateConfig(config *models.Config) {
 	pm.mu.Lock()
 	pm.config = config
-
-	if cmd, exists := pm.overlayCmds[99]; exists && cmd != nil && cmd.Process != nil {
-		log.Println("Signaling Chromium overlay process to stop gracefully for config update...")
-		_ = cmd.Process.Signal(syscall.SIGTERM)
-		delete(pm.overlayCmds, 99)
-	}
-
-	if pm.cmd != nil && pm.cmd.Process != nil {
-		log.Println("Signaling GStreamer process to stop gracefully for config update...")
-		_ = pm.cmd.Process.Signal(syscall.SIGTERM)
-	}
+	
 	if pm.cond != nil {
 		pm.cond.Broadcast()
 	}
 	pm.mu.Unlock()
+
+	log.Println("Config updated in memory. Background processes (GStreamer/Chromium) are kept strictly alive. Overlays are now managed dynamically via WebSocket.")
 }
 
 type monitorAction int
@@ -685,6 +677,7 @@ func (pm *ProcessManager) waitForProcess(ctx context.Context, cmd *exec.Cmd) (er
 func (pm *ProcessManager) ReloadChromium() {
 	pm.mu.Lock()
 	if cmd, exists := pm.overlayCmds[99]; exists && cmd != nil && cmd.Process != nil {
+		// Emergency ReloadChromium
 		_ = cmd.Process.Signal(syscall.SIGTERM)
 		delete(pm.overlayCmds, 99)
 	}
