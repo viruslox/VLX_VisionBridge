@@ -62,18 +62,6 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 			"pulsesrc", "device=VisionBridgeSink.monitor", "!",
 			"audioconvert", "!", "audioresample", "!", "acomp.sink_1",
 		)
-	} else if cfg.Input.MediaSource.Active {
-		for i, layer := range cfg.Input.MediaSource.Layers {
-			if layer.Active {
-				srcName := fmt.Sprintf("src_%d", i)
-				args = append(args, "uridecodebin", "uri="+layer.InputPath, "name="+srcName)
-				args = append(args, srcName+".", "!", "queue", "!", 
-					"videoscale", "!", "videorate", "!",
-					fmt.Sprintf("video/x-raw,width=%s,height=%s,framerate=%s", resWidth, resHeight, framerate), "!",
-					"videoconvert", "!", fmt.Sprintf("comp.sink_%d", i+1))
-				args = append(args, srcName+".", "!", "queue", "!", "audioconvert", "!", "audioresample", "!", fmt.Sprintf("acomp.sink_%d", i+1))
-			}
-		}
 	}
 
 	return args, "", "", ""

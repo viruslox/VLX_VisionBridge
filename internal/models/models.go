@@ -9,11 +9,6 @@ type OutputSettings struct {
 	Destinations []string `yaml:"destinations"`
 }
 
-type MediaSource struct {
-	Active bool    `yaml:"active"`
-	Layers []Layer `yaml:"layers"`
-}
-
 type ChromiumSource struct {
 	Active   bool   `yaml:"active"`
 	Z1Active bool   `yaml:"z1_active"`
@@ -87,28 +82,7 @@ type InputSettings struct {
 	Framerate      int            `yaml:"framerate" json:"framerate"`
 	WebrtcPortMin  int            `yaml:"webrtc_port_min"`
 	WebrtcPortMax  int            `yaml:"webrtc_port_max"`
-	MediaSource    MediaSource    `yaml:"media_source"`
 	ChromiumSource ChromiumSource `yaml:"chromium_source"`
-}
-
-type FolderOptions struct {
-	IsFolder bool `yaml:"is_folder" json:"is_folder"`
-	Shuffle  bool `yaml:"shuffle" json:"shuffle"`
-	Loop     bool `yaml:"loop" json:"loop"`
-	DelaySec int  `yaml:"delay_sec" json:"delay_sec"`
-}
-
-type Layer struct {
-	ID            int           `yaml:"id"`
-	Active        bool          `yaml:"active"`
-	InputType     string        `yaml:"input_type"` // e.g., folder, loop, srt
-	InputPath     string        `yaml:"input_path"`
-	Media         string        `yaml:"media"` // Video+Audio, Video Only, Audio Only
-	Size          int           `yaml:"size"`
-	X             int           `yaml:"x"`
-	Y             int           `yaml:"y"`
-	Volume        *int          `yaml:"volume"`
-	FolderOptions FolderOptions `yaml:"folder_options"`
 }
 
 type InputResult struct {

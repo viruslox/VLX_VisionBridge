@@ -48,15 +48,11 @@ func DiffConfigs(oldConfig, newConfig *models.Config) DiffResult {
 		return DiffResult{RequiresRestart: true}
 	}
 
-	if oldConfig.Input.MediaSource.Active != newConfig.Input.MediaSource.Active {
-		return DiffResult{RequiresRestart: true}
-	}
-
 	if chromiumSourceDiff(oldConfig.Input.ChromiumSource, newConfig.Input.ChromiumSource) {
 		return DiffResult{RequiresRestart: true}
 	}
 
-	return layersDiff(oldConfig.Input.MediaSource.Layers, newConfig.Input.MediaSource.Layers)
+	return DiffResult{}
 }
 
 func chromiumSourceDiff(old, new models.ChromiumSource) bool {
@@ -125,61 +121,6 @@ func outputsRequireRestart(old, new models.OutputSettings) bool {
 	}
 
 	return !slices.Equal(old.Destinations, new.Destinations)
-}
-
-func layersDiff(old, new []models.Layer) DiffResult {
-	var result DiffResult
-
-	oldMap := make(map[int]models.Layer, len(old))
-	for _, oldL := range old {
-		oldMap[oldL.ID] = oldL
-	}
-
-	for _, newL := range new {
-		if oldL, found := oldMap[newL.ID]; found {
-			res := compareLayer(oldL, newL)
-			if res.RequiresRestart {
-				result.RequiresRestart = true
-			}
-			if res.RequiresFilterUpdate {
-				result.RequiresFilterUpdate = true
-			}
-			delete(oldMap, newL.ID)
-		} else {
-			result.RequiresRestart = true
-		}
-	}
-
-	if len(oldMap) > 0 {
-		result.RequiresRestart = true
-	}
-
-	return result
-}
-
-func compareLayer(oldL, newL models.Layer) DiffResult {
-	if oldL.InputType != newL.InputType || oldL.InputPath != newL.InputPath || oldL.Media != newL.Media {
-		return DiffResult{RequiresRestart: true}
-	}
-
-	volOld := -1
-	volNew := -1
-	if oldL.Volume != nil {
-		volOld = *oldL.Volume
-	}
-	if newL.Volume != nil {
-		volNew = *newL.Volume
-	}
-
-	if oldL.Active != newL.Active || oldL.Size != newL.Size {
-		return DiffResult{RequiresRestart: true}
-	}
-
-	if oldL.X != newL.X || oldL.Y != newL.Y || volOld != volNew {
-		return DiffResult{RequiresFilterUpdate: true}
-	}
-
-	return DiffResult{}
 }
 
 // Watcher handles watching the config file for changes

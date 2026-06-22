@@ -14,14 +14,6 @@ func BuildPipelineArgs(cfg *models.Config) ([]string, error) {
 	}
 
 	hasActiveLayer := cfg.Input.ChromiumSource.Active
-	if cfg.Input.MediaSource.Active {
-		for _, layer := range cfg.Input.MediaSource.Layers {
-			if layer.Active {
-				hasActiveLayer = true
-				break
-			}
-		}
-	}
 
 	if !hasActiveLayer {
 		return []string{}, nil

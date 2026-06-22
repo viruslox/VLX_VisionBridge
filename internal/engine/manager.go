@@ -7,11 +7,12 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/gorilla/websocket"
 
 	"github.com/user/VLX_VisionBridge/internal/db"
 	"github.com/user/VLX_VisionBridge/internal/models"
@@ -55,6 +56,8 @@ type ProcessManager struct {
 	isRunning   bool
 	overlayCmds map[int]*exec.Cmd
 	retries     map[string]*RetryTracker
+	wsClients   map[*websocket.Conn]bool
+	wsMutex     sync.Mutex
 }
 
 func NewProcessManager(dbConn *sql.DB) *ProcessManager {
@@ -62,6 +65,7 @@ func NewProcessManager(dbConn *sql.DB) *ProcessManager {
 		db:          dbConn,
 		overlayCmds: make(map[int]*exec.Cmd),
 		retries:     make(map[string]*RetryTracker),
+		wsClients:   make(map[*websocket.Conn]bool),
 	}
 	pm.cond = sync.NewCond(&pm.mu)
 	return pm
@@ -300,9 +304,69 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 <body>
 `
 			htmlContent += elements
-			if scripts != "" {
-				htmlContent += "  <script>\n" + scripts + "  </script>\n"
+
+			// Aggiungiamo lo script per il WebSocket
+			wsScript := `
+	var ws = new WebSocket('ws://127.0.0.1:50001/ws');
+	ws.onmessage = function(event) {
+		try {
+			var msg = JSON.parse(event.data);
+			if (!msg.layer || !msg.action) return;
+			var el = document.getElementById(msg.layer);
+			if (!el) return;
+
+			if (msg.action === "play" && msg.path) {
+				el.style.display = 'block';
+				// Check if it's a directory for carousel (simple detection)
+				if (msg.path.endsWith('/')) {
+					fetch('http://127.0.0.1:50001/api/list-dir?path=' + encodeURIComponent(msg.path))
+					.then(response => response.json())
+					.then(files => {
+						if (!files || files.length === 0) return;
+						let idx = 0;
+						function playNext() {
+							el.src = 'file://' + msg.path + files[idx];
+							if (el.tagName.toLowerCase() === 'video') {
+								el.play().catch(e => console.log('play error', e));
+								el.onended = function() {
+									idx = (idx + 1) % files.length;
+									playNext();
+								};
+							} else { // image interval
+								setTimeout(function() {
+									idx = (idx + 1) % files.length;
+									playNext();
+								}, 5000); // 5 sec per image
+							}
+						}
+						playNext();
+					}).catch(err => console.log('carousel fetch error', err));
+				} else {
+					el.src = msg.path.startsWith('/') ? 'file://' + msg.path : msg.path;
+					if (el.tagName.toLowerCase() === 'video') {
+						el.play().catch(e => console.log('play error', e));
+					}
+				}
+			} else if (msg.action === "hide") {
+				el.style.display = 'none';
+				if (el.tagName.toLowerCase() === 'video') {
+					el.pause();
+				}
+			} else if (msg.action === "volume" && msg.volume !== undefined) {
+				if (el.volume !== undefined) {
+					el.volume = parseFloat(msg.volume) / 100.0;
+				}
 			}
+		} catch(e) {
+			console.log('WS message parsing error:', e);
+		}
+	};
+	ws.onclose = function() {
+		setTimeout(function() { window.location.reload(); }, 5000);
+	};
+`
+			htmlContent += "  <script>\n" + wsScript + "\n" + scripts + "  </script>\n"
+
 			htmlContent += `</body></html>`
 
 			htmlPath := "/opt/VLX_VisionBridge/var/overlay.html"
@@ -395,19 +459,6 @@ func (pm *ProcessManager) UpdateFilter(config *models.Config) {
 func (pm *ProcessManager) UpdateConfig(config *models.Config) {
 	pm.mu.Lock()
 	pm.config = config
-
-	if pm.config != nil && pm.config.Input.MediaSource.Active {
-		var validLayers []models.Layer
-		for _, layer := range pm.config.Input.MediaSource.Layers {
-			if layer.ID >= 0 && layer.ID <= 2 {
-				validLayers = append(validLayers, layer)
-			}
-		}
-		if len(validLayers) > 3 {
-			validLayers = validLayers[:3]
-		}
-		pm.config.Input.MediaSource.Layers = validLayers
-	}
 
 	if cmd, exists := pm.overlayCmds[99]; exists && cmd != nil && cmd.Process != nil {
 		log.Println("Signaling Chromium overlay process to stop gracefully for config update...")
@@ -520,38 +571,12 @@ func (pm *ProcessManager) disableModule(module string) {
 
 	if module == "[chromium]" {
 		pm.config.Input.ChromiumSource.Active = false
-	} else if strings.HasPrefix(module, "[layer ") {
-		parts := strings.Split(module, "]")
-		if len(parts) > 0 {
-			idStr := strings.TrimPrefix(parts[0], "[layer ")
-			if id, err := strconv.Atoi(idStr); err == nil {
-				for i, layer := range pm.config.Input.MediaSource.Layers {
-					if layer.ID == id {
-						pm.config.Input.MediaSource.Layers[i].Active = false
-						break
-					}
-				}
-			}
-		}
-	} else if module == "[media_source]" {
-		pm.config.Input.MediaSource.Active = false
 	}
 }
 
 func identifyErrorModule(stderr string, cfg *models.Config) string {
 	if cfg == nil || stderr == "" {
 		return ""
-	}
-
-	if cfg.Input.MediaSource.Active {
-		for _, layer := range cfg.Input.MediaSource.Layers {
-			if !layer.Active || layer.InputPath == "" {
-				continue
-			}
-			if strings.Contains(stderr, layer.InputPath) {
-				return fmt.Sprintf("[layer %d] [input]", layer.ID)
-			}
-		}
 	}
 
 	for _, dest := range cfg.Output.Destinations {
