@@ -2,15 +2,15 @@
 
 ## Project Overview
 
-VLX VisionBridge is a headless, high-performance Linux service written in Go. It aggregates multiple finite SRT/WebRTC/Media streams into a single composite live stream, broadcasted simultaneously to multiple CDNs (YouTube, Twitch, VK).
+VLX VisionBridge is a headless, high-performance Linux service written in Go. VLX_VisionBridge utilizes a DOM-dominant Architecture: All media rendering (videos, images, carousels) happens exclusively in the Chromium DOM. GStreamer acts solely as a passive X11/PulseAudio screen recorder pushing to MediaMTX, while WebRTC captures internal chromium_source signaling.
 
 The service is designed for professional 24/7 broadcasting environments where configuration must be dynamic and resource efficiency is paramount. We are basically building a sort of obs-studio for remote VMs.
 
 ## How it Works
 
 VisionBridge employs a highly optimized, Cloud-Native "Sidecar" Architecture based on three pillars:
-1. **WebRTC Overlay**: Chromium runs Headless, captures its own canvas (preserving Alpha channel), and pushes VP8/Opus via WebRTC (Pion) to local UDP ports.
-2. **GStreamer Core**: A native GStreamer pipeline mixes WebRTC and external media with zero latency.
+1. **DOM-dominant Architecture**: All media rendering (videos, images, carousels) happens exclusively in the Chromium DOM.
+2. **GStreamer Core**: GStreamer acts solely as a passive X11/PulseAudio screen recorder pushing to MediaMTX, while WebRTC captures internal `chromium_source` signaling.
 3. **Local Proxy (Sidecar)**: GStreamer muxes the output and pushes it unencrypted to a local MediaMTX server (`rtmp://127.0.0.1:1935/live/internal`). External routing and TLS are handled dynamically by Chatbridge invoking MediaMTX REST APIs.
 
 ## Requirements Note
@@ -25,7 +25,7 @@ apt-get install gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugin
 
 ## Core Principles
 
-- **Zero-Latency Hybrid Pipeline**: Utilizes a highly optimized WebRTC/GStreamer Hybrid architecture.
+- **DOM-dominant Architecture**: All media rendering happens exclusively in the Chromium DOM. GStreamer acts solely as a passive X11/PulseAudio screen recorder.
 - **Headless First**: Managed entirely via configuration files or DB entries.
 - **Dynamic Reconfiguration**: Hot-reloading of layouts and sources without dropping the output stream (where technically possible).
 - **Resource Optimization**: Sources marked as "OFF" are completely excluded from the processing pipeline.
@@ -33,65 +33,30 @@ apt-get install gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugin
 
 ## Best Practices
 
-- **Top-Most Overlay**: The `chromium_source` overlay should be kept as the top-most layer in the filter chain to avoid performance issues associated with complex layering. It is automatically rendered on top of all other sources.
-- **Layer Conventions**: To ensure a stable and performance-oriented configuration, `media_source` is limited to a maximum of 3 layers (IDs 0, 1, 2) which share identical capabilities. The recommended convention is:
-  - **Layer 1**: Primary Input (e.g., GoPro).
-  - **Layer 0**: Fallback/Placeholder (e.g., VODs).
-  - **Layer 2**: Secondary Input / Guest.
+VisionBridge operates alongside MediaMTX and ChatBridge on the same localhost.
 
-## Layer Configuration Examples
+The `input` configuration revolves around `chromium_source`, which supports exactly 8 distinct Z-layers (`Z1` to `Z8`) with explicit `height`, `width`, `x`, `y`, `volume`, and `path` variables. It dynamically generates HTML tags (`<video autoplay loop>`, `<img>`) based on the content type inferred from the path.
 
-VisionBridge operates alongside MediaMTX and ChatBridge on the same localhost. It handles low-latency video ingestion and real-time scene switching via ZeroMQ without restarting GStreamer.
+For directory-based media playback in `chromium_source`, the Go backend provides an HTTP endpoint (`/api/list-dir?path=...`) that the Chromium WebSocket client fetches to automatically sequence and loop media as a carousel without GStreamer intervention.
 
-### Folder Playlist Input
-When the input path is a directory and the layer configuration includes `folder_options` with `is_folder: true`, VisionBridge treats it as a playlist. It plays all valid video files (e.g., MP4, WebM) found in the directory. You can shuffle the playlist, loop it, and insert a delay (customizable delay spacer (color or image-based)) between videos.
 ```yaml
-id: 0
-active: true
-input_type: "local"
-input_path: "/opt/VLX_VisionBridge/data/layer0"
-media: "Video+Audio"
-size: 1920
-x: 0
-y: 0
-volume: 100
-folder_options:
-  is_folder: true
-  shuffle: true
-  loop: true
-  delay_sec: 5
-  spacer_width: 1920
-  spacer_height: 1080
-  spacer_fps: 30
-  spacer_sample_rate: 48000
-  spacer_color: "black"
-  spacer_image: ""
+input:
+  resolution: "1920x1080"
+  chromium_source:
+    active: true
+    z1_active: true
+    z1_path: "/opt/VLX_VisionBridge/data/layer1.mp4"
+    z1_volume: 100
+    z1_width: 1920
+    z1_height: 1080
+    z1_x: 0
+    z1_y: 0
 ```
 
-### Network Input
-Optimized for MediaMTX via RTSP/SRT. The `network` input_type is suitable for true zero-latency ingestion from MediaMTX (SRT/RTSP).
-```json
-{
-  "id": 2,
-  "active": true,
-  "input_type": "network",
-  "input_path": "rtsp://localhost:8554/stream",
-  "media": "Video+Audio",
-  "size": 1920,
-  "x": 0,
-  "y": 0,
-  "volume": 1.0
-}
-```
+## Layer Control Rules
 
-## Layer Control Rules ##
-
-- **Rule 1:** ZMQ commands MUST ONLY target `media_source` layers (hardware cameras, local videos).
-- **Rule 2:** `chromium_source` layers (Overlays, Alerts, Maps) MUST be kept `active: true` constantly. Show/Hide logic for web layers must be handled via WebSockets/JavaScript, NOT via ZMQ, to avoid GStreamer restarts and stream drops.
-
-## Dynamic Regia
-
-Scenes are toggled on/off screen by moving them to `x -9999` and setting `volume 0.0` via ZMQ. This mechanism guarantees zero frame drops when switching scenes since GStreamer doesn't have to restart or reload inputs.
+- **Rule 1:** Incoming JSON control commands for overlays are parsed and broadcasted as WebSocket messages (e.g., `{"layer": "z1", "action": "play", "path": "..."}`) to Chromium clients for zero-CPU DOM manipulation.
+- **Rule 2:** `chromium_source` layers MUST be kept `active: true` constantly. Show/Hide logic for web layers must be handled via WebSockets/JavaScript to avoid stream drops. Setting the target stream to disabled (`Enabled: false`) triggers a process termination to halt the active stream.
 
 ## Configuration Concepts
 
@@ -102,6 +67,6 @@ Scenes are toggled on/off screen by moving them to `x -9999` and setting `volume
 - **Language**: Go (Golang)
 - **Processing Engine**: GStreamer (via os/exec)
 - **Database**: SQLite (State persistence, Logs, Metadata)
-- **Messaging**: ZMQ is a mandatory dependency for real-time filter communication with GStreamer.
+- **Messaging**: ZeroMQ JSON control commands are parsed and broadcasted as WebSocket messages to Chromium clients.
 
 See [Architecture](ARCHITECTURE.md) for High-Level Design details.
