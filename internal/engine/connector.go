@@ -31,13 +31,13 @@ var upgrader = websocket.Upgrader{
 }
 
 func (pm *ProcessManager) StartConnectorListener() {
-	// Start local HTTP / WebSocket server for Chromium DOM
+	// Start local HTTP / WebSocket server for Chromium DOM control plane
 	go func() {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 			conn, err := upgrader.Upgrade(w, r, nil)
 			if err != nil {
-				log.Println("WS upgrade failed:", err)
+				log.Println("WebSocket upgrade protocol failed:", err)
 				return
 			}
 			pm.wsMutex.Lock()
@@ -55,21 +55,32 @@ func (pm *ProcessManager) StartConnectorListener() {
 			}()
 
 			for {
-				if _, _, err := conn.ReadMessage(); err != nil {
+				if _, msg, err := conn.ReadMessage(); err != nil {
 					break
+				} else {
+					var req map[string]string
+					if json.Unmarshal(msg, &req) == nil && req["action"] == "hello" {
+						// Synchronize DOM state upon initial client connection
+						pm.mu.Lock()
+						cfg := pm.config
+						pm.mu.Unlock()
+						if cfg != nil {
+							syncMsg := pm.buildSyncMessage(cfg)
+							_ = conn.WriteJSON(syncMsg)
+						}
+					}
 				}
 			}
 		})
 
-
-		log.Println("Starting local HTTP/WS server on 127.0.0.1:50001")
+		log.Println("Initializing local HTTP/WS control server on 127.0.0.1:50001")
 		if err := http.ListenAndServe("127.0.0.1:50001", mux); err != nil {
-			log.Printf("Local HTTP/WS server failed: %v", err)
+			log.Printf("Local HTTP/WS server initialization failed: %v", err)
 		}
 	}()
 
 	if pm.config != nil && !pm.config.Connector.IPCControlIn {
-		log.Println("IPC Control In is disabled in configuration. Skipping connector listener.")
+		log.Println("IPC Control Inbound directive is disabled in configuration. Bypassing connector listener.")
 		return
 	}
 
@@ -82,43 +93,38 @@ func (pm *ProcessManager) StartConnectorListener() {
 		groupName = pm.config.Connector.Group
 	}
 
-	// Cleanup mechanism: Ensure socket file is removed before binding
-	// to prevent "address already in use" errors if the app crashed previously.
+	// Purge stale socket descriptors to prevent binding collisions
 	if _, err := os.Stat(sockPath); err == nil {
 		if err := os.Remove(sockPath); err != nil {
-			log.Printf("Failed to remove existing vlx_control socket at %s: %v", sockPath, err)
+			log.Printf("Failed to purge stale vlx_control socket at %s: %v", sockPath, err)
 		}
 	}
 
 	listener, err := net.Listen("unix", sockPath)
 	if err != nil {
-		log.Printf("Failed to start vlx_control listener: %v", err)
+		log.Printf("Failed to bind vlx_control IPC listener: %v", err)
 		return
 	}
 	defer listener.Close()
 
-	// Apply permissions to the socket
 	if err := os.Chmod(sockPath, 0770); err != nil {
-		log.Printf("Warning: Failed to set permissions on socket %s: %v", sockPath, err)
+		log.Printf("Warning: Unable to assign permissions on socket descriptor %s: %v", sockPath, err)
 	}
 
-	// Change ownership
 	var uid, gid int = -1, -1
 
-	// Lookup user visionbridge
 	u, err := user.Lookup("visionbridge")
 	if err != nil {
-		log.Printf("Warning: User 'visionbridge' not found, skipping user ownership change for socket.")
+		log.Printf("Warning: System user 'visionbridge' unresolved, bypassing UID ownership assignment.")
 	} else {
 		if parsedUID, err := strconv.Atoi(u.Uid); err == nil {
 			uid = parsedUID
 		}
 	}
 
-	// Lookup group
 	g, err := user.LookupGroup(groupName)
 	if err != nil {
-		log.Printf("Warning: Group '%s' not found, skipping group ownership change for socket.", groupName)
+		log.Printf("Warning: System group '%s' unresolved, bypassing GID ownership assignment.", groupName)
 	} else {
 		if parsedGID, err := strconv.Atoi(g.Gid); err == nil {
 			gid = parsedGID
@@ -127,18 +133,18 @@ func (pm *ProcessManager) StartConnectorListener() {
 
 	if uid != -1 || gid != -1 {
 		if err := os.Chown(sockPath, uid, gid); err != nil {
-			log.Printf("Warning: Failed to set ownership on socket %s: %v", sockPath, err)
+			log.Printf("Warning: Failed to execute ownership assignment on socket %s: %v", sockPath, err)
 		} else {
-			log.Printf("Socket %s ownership set to UID %d, GID %d", sockPath, uid, gid)
+			log.Printf("Socket %s ownership explicitly bound to UID %d, GID %d", sockPath, uid, gid)
 		}
 	}
 
-	log.Printf("Listening for control commands on %s", sockPath)
+	log.Printf("IPC socket active. Listening for control directives on %s", sockPath)
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Printf("Failed to accept vlx_control connection: %v", err)
+			log.Printf("Failed to accept inbound vlx_control connection stream: %v", err)
 			continue
 		}
 
@@ -149,7 +155,7 @@ func (pm *ProcessManager) StartConnectorListener() {
 				var cmd ControlCommand
 				if err := decoder.Decode(&cmd); err != nil {
 					if err.Error() != "EOF" {
-						log.Printf("Failed to decode JSON from vlx_control: %v", err)
+						log.Printf("JSON payload decoding failure from vlx_control IPC: %v", err)
 					}
 					break
 				}
@@ -163,14 +169,14 @@ func (pm *ProcessManager) StartConnectorListener() {
 func (pm *ProcessManager) handleControlCommand(cmd ControlCommand) {
 	if cmd.Action == "set_input_state" && cmd.Target == "stream" {
 		pm.mu.Lock()
-		log.Printf("Stream output Active state changing to: %v", cmd.Payload.Enabled)
+		log.Printf("Stream output runtime active state requested to transition: %v", cmd.Payload.Enabled)
 		if pm.config != nil {
 			pm.config.Output.Active = cmd.Payload.Enabled
 		}
 
-		// If turning OFF the stream, brutally kill the running FFmpeg process
+		// Hard termination of FFmpeg process to immediately halt stream broadcast
 		if !cmd.Payload.Enabled && pm.cmd != nil && pm.cmd.Process != nil {
-			log.Println("Killing active FFmpeg process to stop stream...")
+			log.Println("Executing SIGKILL on active FFmpeg process to terminate stream transmission...")
 			pm.cmd.Process.Kill()
 		}
 		pm.mu.Unlock()
@@ -186,7 +192,7 @@ func (pm *ProcessManager) handleControlCommand(cmd ControlCommand) {
 			}
 			if cmd.Payload.Enabled {
 				wsCmd["action"] = "play"
-				wsCmd["path"] = cmd.Payload.Text
+				wsCmd["files"] = pm.ResolvePath(cmd.Payload.Text)
 			} else {
 				wsCmd["action"] = "hide"
 			}
@@ -203,23 +209,11 @@ func (pm *ProcessManager) handleControlCommand(cmd ControlCommand) {
 			pm.broadcastWSMessage(wsCmd)
 		}
 	} else if cmd.Action == "trigger_alert" {
-		log.Printf("trigger_alert action received for target %s, text: %s", cmd.Target, cmd.Payload.Text)
-		// Custom logic can be handled here or via ZMQ if drawtext is implemented.
+		log.Printf("trigger_alert event directive received for target %s, text payload: %s", cmd.Target, cmd.Payload.Text)
 	} else if cmd.Action == "reload" && cmd.Target == "chromium" {
-		log.Println("Reloading Chromium overlay via control command")
+		log.Println("Executing manual restart of Chromium DOM rendering engine via IPC directive")
 		pm.ReloadChromium()
 	} else {
-		log.Printf("Unknown action received: %s", cmd.Action)
-	}
-}
-
-func (pm *ProcessManager) broadcastWSMessage(msg interface{}) {
-	pm.wsMutex.Lock()
-	defer pm.wsMutex.Unlock()
-	for client := range pm.wsClients {
-		if err := client.WriteJSON(msg); err != nil {
-			client.Close()
-			delete(pm.wsClients, client)
-		}
+		log.Printf("Unrecognized control action directive received: %s", cmd.Action)
 	}
 }
