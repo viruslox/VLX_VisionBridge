@@ -2,31 +2,18 @@ package engine
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 
 	"github.com/user/VLX_VisionBridge/internal/engine/mixer"
 	"github.com/user/VLX_VisionBridge/internal/engine/streamer"
 	"github.com/user/VLX_VisionBridge/internal/models"
 )
 
-func BuildFFmpegArgs(cfg *models.Config) ([]string, error) {
+func BuildPipelineArgs(cfg *models.Config) ([]string, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config cannot be nil")
 	}
 
-	// Parse input resolution
-	inputResParts := strings.Split(cfg.Input.Resolution, "x")
-	if len(inputResParts) != 2 {
-		return nil, fmt.Errorf("invalid input resolution format, expected WxH: %s", cfg.Input.Resolution)
-	}
-	_, errInputW := strconv.Atoi(inputResParts[0])
-	_, errInputH := strconv.Atoi(inputResParts[1])
-	if errInputW != nil || errInputH != nil {
-		return nil, fmt.Errorf("invalid input resolution values: %s", cfg.Input.Resolution)
-	}
-
-	hasActiveLayer := false
+	hasActiveLayer := cfg.Input.ChromiumSource.Active
 	if cfg.Input.MediaSource.Active {
 		for _, layer := range cfg.Input.MediaSource.Layers {
 			if layer.Active {
@@ -35,26 +22,23 @@ func BuildFFmpegArgs(cfg *models.Config) ([]string, error) {
 			}
 		}
 	}
-	if cfg.Input.ChromiumSource.Active {
-		hasActiveLayer = true
-	}
 
 	if !hasActiveLayer {
 		return []string{}, nil
 	}
 
-	var args []string
+	var gstArgs []string
 
-	// 1. Build mixing pipeline (Sources -> Encoder -> TEE)
+	// 1. Build mixing pipeline (WebRTC + Media -> GStreamer TEEs)
 	argsFilter, _, _, _ := mixer.BuildFilterComplex(cfg)
-	args = append(args, argsFilter...)
+	gstArgs = append(gstArgs, argsFilter...)
 
-	// 2. Build output pipeline (TEE -> Muxer -> Sinks)
+	// 2. Build output pipeline (TEEs -> Muxer -> Local MediaMTX Sink)
 	outArgs, err := streamer.BuildOutputArgs(cfg)
 	if err != nil {
 		return nil, err
 	}
-	args = append(args, outArgs...)
+	gstArgs = append(gstArgs, outArgs...)
 
-	return args, nil
+	return gstArgs, nil
 }
