@@ -3,8 +3,10 @@ package engine
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,6 +20,10 @@ import (
 	"github.com/user/VLX_VisionBridge/internal/db"
 	"github.com/user/VLX_VisionBridge/internal/models"
 )
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool { return true },
+}
 
 type tailBuffer struct {
 	buf []byte
@@ -84,6 +90,56 @@ func (pm *ProcessManager) Start(ctx context.Context, config *models.Config) erro
 	pm.isRunning = true
 	pm.mu.Unlock()
 
+	// Initialize the centralized WebSocket Control Server
+	go func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+			c, err := upgrader.Upgrade(w, r, nil)
+			if err != nil {
+				log.Printf("WebSocket upgrade protocol failed: %v", err)
+				return
+			}
+
+			pm.wsMutex.Lock()
+			if pm.wsClients == nil {
+				pm.wsClients = make(map[*websocket.Conn]bool)
+			}
+			pm.wsClients[c] = true
+			pm.wsMutex.Unlock()
+
+			defer func() {
+				pm.wsMutex.Lock()
+				delete(pm.wsClients, c)
+				pm.wsMutex.Unlock()
+				c.Close()
+			}()
+
+			for {
+				_, msg, err := c.ReadMessage()
+				if err != nil {
+					break
+				}
+
+				var req map[string]string
+				if json.Unmarshal(msg, &req) == nil && req["action"] == "hello" {
+					pm.mu.Lock()
+					cfg := pm.config
+					pm.mu.Unlock()
+					if cfg != nil {
+						syncMsg := pm.buildSyncMessage(cfg)
+						pm.wsMutex.Lock()
+						_ = c.WriteJSON(syncMsg)
+						pm.wsMutex.Unlock()
+					}
+				}
+			}
+		})
+		log.Println("Starting centralized WebSocket Control Server on 127.0.0.1:50001")
+		if err := http.ListenAndServe("127.0.0.1:50001", mux); err != nil {
+			log.Printf("WebSocket Server initialization failed: %v", err)
+		}
+	}()
+
 	go pm.monitor()
 
 	return nil
@@ -98,7 +154,7 @@ func (pm *ProcessManager) Stop() {
 	pm.isRunning = false
 
 	if pm.cmd != nil && pm.cmd.Process != nil {
-		log.Println("Signaling GStreamer process to terminate gracefully...")
+		log.Println("Signaling GStreamer pipeline to terminate gracefully...")
 		_ = pm.cmd.Process.Signal(syscall.SIGTERM)
 	}
 
@@ -120,7 +176,7 @@ func (pm *ProcessManager) Stop() {
 }
 
 // ResolvePath determines whether the provided target is a single file or a directory.
-// If it is a directory, it retrieves all valid media files to populate the carousel array.
+// If it is a directory, it extracts all valid media files to populate the DOM carousel array.
 func (pm *ProcessManager) ResolvePath(basePath string) []string {
 	if basePath == "" {
 		return nil
@@ -150,7 +206,7 @@ func (pm *ProcessManager) ResolvePath(basePath string) []string {
 	return files
 }
 
-// buildLayerStyle constructs absolute CSS positioning strings for the DOM elements based on configuration constraints.
+// buildLayerStyle constructs absolute CSS positioning strings based on configuration constraints.
 func buildLayerStyle(zIndex int, width, height, x, y *int) string {
 	style := fmt.Sprintf("z-index: %d; position: absolute; ", zIndex)
 	if x != nil {
@@ -217,10 +273,8 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 		activeOverlays[99] = true
 
 		shouldStart := true
-		if cmd, exists := pm.overlayCmds[99]; exists && cmd != nil && cmd.Process != nil {
-			if cmd.ProcessState == nil {
-				shouldStart = false
-			}
+		if cmd, exists := pm.overlayCmds[99]; exists && cmd != nil && cmd.ProcessState == nil {
+			shouldStart = false
 		}
 
 		if shouldStart {
@@ -335,41 +389,44 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
         }
     }
 
-    var ws = new WebSocket('ws://127.0.0.1:50001/ws');
-    ws.onopen = function() {
-        ws.send(JSON.stringify({action: "hello"}));
-    };
-    ws.onmessage = function(event) {
-        try {
-            var msg = JSON.parse(event.data);
-            if (msg.action === 'sync') {
-                document.body.style.backgroundColor = msg.bgColor;
-                msg.layers.forEach(function(l) {
-                    var container = document.getElementById(l.id);
-                    if (container) {
-                        container.style.cssText = l.style;
+    function connectWS() {
+        var ws = new WebSocket('ws://127.0.0.1:50001/ws');
+        ws.onopen = function() {
+            ws.send(JSON.stringify({action: "hello"}));
+        };
+        ws.onmessage = function(event) {
+            try {
+                var msg = JSON.parse(event.data);
+                if (msg.action === 'sync') {
+                    document.body.style.backgroundColor = msg.bgColor;
+                    msg.layers.forEach(function(l) {
+                        var container = document.getElementById(l.id);
+                        if (container) {
+                            container.style.cssText = l.style;
+                        }
+                        if (l.active) playLayer(l.id, l.files, l.volume);
+                        else stopLayer(l.id);
+                    });
+                } else if (msg.action === "play" && msg.files) {
+                    playLayer(msg.layer, msg.files, msg.volume);
+                } else if (msg.action === "hide") {
+                    stopLayer(msg.layer);
+                } else if (msg.action === "volume" && msg.volume !== undefined) {
+                    var container = document.getElementById(msg.layer);
+                    if (container && container.firstElementChild) {
+                        container.firstElementChild.volume = parseFloat(msg.volume) / 100.0;
                     }
-                    if (l.active) playLayer(l.id, l.files, l.volume);
-                    else stopLayer(l.id);
-                });
-            } else if (msg.action === "play" && msg.files) {
-                playLayer(msg.layer, msg.files, msg.volume);
-            } else if (msg.action === "hide") {
-                stopLayer(msg.layer);
-            } else if (msg.action === "volume" && msg.volume !== undefined) {
-                var container = document.getElementById(msg.layer);
-                if (container && container.firstElementChild) {
-                    container.firstElementChild.volume = parseFloat(msg.volume) / 100.0;
                 }
+            } catch(e) {
+                console.error('WebSocket payload parsing error:', e);
             }
-        } catch(e) {
-            console.error('WebSocket payload parsing error:', e);
-        }
-    };
-    ws.onclose = function() {
-        // Retry connection logic without executing DOM reload
-        setTimeout(function() { window.location.reload(); }, 5000);
-    };
+        };
+        ws.onclose = function() {
+            setTimeout(connectWS, 2000);
+        };
+    }
+    
+    connectWS();
   </script>
 </body>
 </html>`
@@ -406,6 +463,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				"--autoplay-policy=no-user-gesture-required",
 				"--disable-dev-shm-usage",
 				"--no-sandbox",
+				"--allow-file-access-from-files", // Critical security override for local media loading
 				fileURL,
 			)
 
