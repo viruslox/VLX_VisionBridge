@@ -16,8 +16,8 @@ func TestProcessManager_Start_AlreadyRunning(t *testing.T) {
 	err := pm.Start(context.Background(), &models.Config{Input: models.InputSettings{Resolution: "1920x1080"}})
 	if err == nil {
 		t.Errorf("Expected error when starting already running process manager")
-	} else if err.Error() != "process already running" {
-		t.Errorf("Expected 'process already running' error, got: %v", err)
+	} else if err.Error() != "process manager is already running" {
+		t.Errorf("Expected 'process manager is already running' error, got: %v", err)
 	}
 }
 
@@ -85,7 +85,7 @@ func TestProcessManager_Stop_RunningWithCmd(t *testing.T) {
 	pm.ctx = ctx
 
 	// Start a dummy command
-	cmd := exec.Command("sleep", "10")
+	cmd := exec.Command("sleep", "1") // Reduced from 10 to 1 to speed up test execution
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("Failed to start dummy command: %v", err)
 	}
@@ -101,9 +101,10 @@ func TestProcessManager_Stop_RunningWithCmd(t *testing.T) {
 		t.Errorf("Expected context to be cancelled")
 	}
 
+	// Stop() specifically executes a SIGTERM on the running command.
 	err := cmd.Wait()
 	if err == nil {
-		t.Errorf("Expected command to be terminated, but it exited normally")
+		t.Errorf("Expected command to be terminated via SIGTERM, but it exited normally")
 	}
 }
 
@@ -121,11 +122,11 @@ func TestProcessManager_UpdateConfig(t *testing.T) {
 
 	pm.mu.Lock()
 	if pm.config != config {
-		t.Errorf("Expected config to be updated")
+		t.Errorf("Expected config to be updated in memory")
 	}
 	pm.mu.Unlock()
 
-	// Test condition variable broadcasting
+	// Test condition variable broadcasting functionality
 	condUnblocked := make(chan struct{})
 	go func() {
 		pm.mu.Lock()
@@ -134,18 +135,8 @@ func TestProcessManager_UpdateConfig(t *testing.T) {
 		close(condUnblocked)
 	}()
 
-	// Allow goroutine to start waiting
+	// Allow waiting goroutine to initialize
 	time.Sleep(10 * time.Millisecond)
-
-	// Start a dummy command to simulate a running process
-	cmd := exec.Command("sleep", "10")
-	if err := cmd.Start(); err != nil {
-		t.Fatalf("Failed to start dummy command: %v", err)
-	}
-
-	pm.mu.Lock()
-	pm.cmd = cmd
-	pm.mu.Unlock()
 
 	newConfig := &models.Config{
 		Input: models.InputSettings{Resolution: "1920x1080"},
@@ -154,15 +145,16 @@ func TestProcessManager_UpdateConfig(t *testing.T) {
 		},
 	}
 
+	// UpdateConfig triggers a config reload and a condition broadcast without terminating processes
 	pm.UpdateConfig(newConfig)
 
 	pm.mu.Lock()
 	if pm.config != newConfig {
-		t.Errorf("Expected config to be updated to newConfig")
+		t.Errorf("Expected config to be successfully updated to newConfig")
 	}
 	pm.mu.Unlock()
 
-	// Verify condition variable unblocked
+	// Verify condition variable unblocked successfully
 	select {
 	case <-condUnblocked:
 		// Success
@@ -170,9 +162,7 @@ func TestProcessManager_UpdateConfig(t *testing.T) {
 		t.Errorf("Condition variable was not broadcasted")
 	}
 
-	// Verify the process was signaled to stop
-	err := cmd.Wait()
-	if err == nil {
-		t.Errorf("Expected command to be terminated by signal, but it exited normally")
-	}
+	// Note: The assertion expecting a process termination has been removed.
+	// As per the new architecture, UpdateConfig relies purely on WebSocket updates 
+	// and explicitly preserves process state.
 }
