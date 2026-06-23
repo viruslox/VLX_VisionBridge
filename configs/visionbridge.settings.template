@@ -1,87 +1,97 @@
-# VLX VisionBridge User Profile
-visionbridge_USER: "visionbridge"
-visionbridge_DIR: "/opt/VLX_VisionBridge"
-
-# Database settings
 database:
-  dsn: "/opt/VLX_VisionBridge/var/visionbridge.db" # SQLite database path
+  dsn: "/opt/VLX_VisionBridge/var/visionbridge.db"
 
 connector:
   ipc_control_in: true
   group: "frameflow"
   control_socket: "/tmp/vlx_control.sock"
 
-# Global output settings for the stream
 output:
-  active: false           # Keeps GStreamer dormant (0% CPU) until a [ZMQ_CONTROL] Target=stream Enabled=true IPC command wakes it up
-  resolution: "1920x1080" # Target output resolution
-  fps: 30                 # Target output framerate
-  video_bitrate: "6000k"  # Output video bitrate
-  audio_bitrate: "160k"   # Output audio bitrate
-  destinations:           # List of RTMP endpoints to stream to
-    - "rtmp://127.0.0.1:1935/live/internal"
+  active: false
+  resolution: "1920x1080"
+  fps: 30
+  video_bitrate: "8000k"
+  audio_bitrate: "160k"
+  destinations:
+    - "rtmp://127.0.0.1:1999/streamout"
 
 input:
-  bg_color: "black"       # Global canvas background color
-  resolution: "1920x1080" # Layer's canvas size
+  bg_color: "black"        # Global canvas background color
+  resolution: "1920x1080"  # Master canvas size
   framerate: 30
-  webrtc_port_min: 50000
-  webrtc_port_max: 50050
+  carousel_delay: 5        # Delay in seconds between static images in carousel mode
+
   chromium_source:
-    active: false
-    z1_active: true
-    z1_path: "https://example.com/lower"
+    active: true
+
+    z1_active: false
+    z1_path: "/opt/VLX_FrameFlow/media/intro.mp4"
+    z1_width: null
+    z1_height: null
+    z1_x: null
+    z1_y: null
     z1_volume: 100
-    z1_width: 1920
-    z1_height: 1080
-    z1_x: 0
-    z1_y: 0
+
     z2_active: false
-    z2_path: "https://example.com/middle"
+    z2_path: ""
+    z2_width: null
+    z2_height: null
+    z2_x: null
+    z2_y: null
     z2_volume: 100
-    z2_width: 1920
-    z2_height: 1080
-    z2_x: 0
-    z2_y: 0
+
     z3_active: false
-    z3_path: "https://example.com/upper"
+    z3_path: ""
+    z3_width: null
+    z3_height: null
+    z3_x: null
+    z3_y: null
     z3_volume: 100
-    z3_width: 1920
-    z3_height: 1080
-    z3_x: 0
-    z3_y: 0
+
     z4_active: false
     z4_path: ""
+    z4_width: null
+    z4_height: null
+    z4_x: null
+    z4_y: null
     z4_volume: 100
-    z4_width: 1920
-    z4_height: 1080
-    z4_x: 0
-    z4_y: 0
+
     z5_active: false
     z5_path: ""
+    z5_width: null
+    z5_height: null
+    z5_x: null
+    z5_y: null
     z5_volume: 100
-    z5_width: 1920
-    z5_height: 1080
-    z5_x: 0
-    z5_y: 0
+
     z6_active: false
     z6_path: ""
+    z6_width: null
+    z6_height: null
+    z6_x: null
+    z6_y: null
     z6_volume: 100
-    z6_width: 1920
-    z6_height: 1080
-    z6_x: 0
-    z6_y: 0
+
     z7_active: false
     z7_path: ""
+    z7_width: null
+    z7_height: null
+    z7_x: null
+    z7_y: null
     z7_volume: 100
-    z7_width: 1920
-    z7_height: 1080
-    z7_x: 0
-    z7_y: 0
+
     z8_active: false
     z8_path: ""
+    z8_width: null
+    z8_height: null
+    z8_x: null
+    z8_y: null
     z8_volume: 100
-    z8_width: 1920
-    z8_height: 1080
-    z8_x: 0
-    z8_y: 0
+
+    z9_active: false
+    z9_path: ""
+    z9_width: null
+    z9_height: null
+    z9_x: null
+    z9_y: null
+    z9_volume: 100
