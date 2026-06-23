@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -222,12 +223,12 @@ func buildLayerStyle(zIndex int, width, height, x, y *int) string {
 	if width != nil {
 		style += fmt.Sprintf("width: %dpx; ", *width)
 	} else {
-		style += "width: 100%; "
+		style += "width: 100%%; "
 	}
 	if height != nil {
 		style += fmt.Sprintf("height: %dpx; ", *height)
 	} else {
-		style += "height: 100%; "
+		style += "height: 100%%; "
 	}
 	return style
 }
@@ -283,6 +284,12 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				bgColor = "black"
 			}
 
+			// Apply configurable carousel delay or default to 5000ms
+			carouselDelayMs := 5000
+			if cfg.Input.CarouselDelay > 0 {
+				carouselDelayMs = cfg.Input.CarouselDelay * 1000
+			}
+
 			resParts := strings.Split(cfg.Input.Resolution, "x")
 			resWidth := "1920"
 			resHeight := "1080"
@@ -304,7 +311,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 </head>
 <body>
   <div id="z1"></div><div id="z2"></div><div id="z3"></div><div id="z4"></div>
-  <div id="z5"></div><div id="z6"></div><div id="z7"></div><div id="z8"></div>
+  <div id="z5"></div><div id="z6"></div><div id="z7"></div><div id="z8"></div><div id="z9"></div>
 
   <script>
     var carousels = {};
@@ -385,7 +392,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
             c.timer = setTimeout(function() {
                 c.index = (c.index + 1) % c.files.length;
                 playNextCarousel(layerId);
-            }, 5000);
+            }, ` + strconv.Itoa(carouselDelayMs) + `);
         }
     }
 
@@ -463,7 +470,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				"--autoplay-policy=no-user-gesture-required",
 				"--disable-dev-shm-usage",
 				"--no-sandbox",
-				"--allow-file-access-from-files", // Critical security override for local media loading
+				"--allow-file-access-from-files",
 				fileURL,
 			)
 
@@ -546,12 +553,12 @@ func (pm *ProcessManager) buildSyncMessage(cfg *models.Config) map[string]interf
 			{ID: "z6", Active: cs.Z6Active, Files: pm.ResolvePath(cs.Z6Path), Volume: cs.Z6Volume, Style: buildLayerStyle(6, cs.Z6Width, cs.Z6Height, cs.Z6X, cs.Z6Y)},
 			{ID: "z7", Active: cs.Z7Active, Files: pm.ResolvePath(cs.Z7Path), Volume: cs.Z7Volume, Style: buildLayerStyle(7, cs.Z7Width, cs.Z7Height, cs.Z7X, cs.Z7Y)},
 			{ID: "z8", Active: cs.Z8Active, Files: pm.ResolvePath(cs.Z8Path), Volume: cs.Z8Volume, Style: buildLayerStyle(8, cs.Z8Width, cs.Z8Height, cs.Z8X, cs.Z8Y)},
+			{ID: "z9", Active: cs.Z9Active, Files: pm.ResolvePath(cs.Z9Path), Volume: cs.Z9Volume, Style: buildLayerStyle(9, cs.Z9Width, cs.Z9Height, cs.Z9X, cs.Z9Y)},
 		},
 	}
 }
 
 // UpdateConfig synchronizes the configuration state in memory and delegates UI updates to the WebSocket plane.
-// Crucially, it does NOT dispatch SIGTERM signals, ensuring pipeline continuity and preventing animation disruption.
 func (pm *ProcessManager) UpdateConfig(config *models.Config) {
 	pm.mu.Lock()
 	pm.config = config
@@ -562,7 +569,13 @@ func (pm *ProcessManager) UpdateConfig(config *models.Config) {
 	pm.mu.Unlock()
 
 	syncMsg := pm.buildSyncMessage(config)
-	pm.broadcastWSMessage(syncMsg)
+	
+	pm.wsMutex.Lock()
+	defer pm.wsMutex.Unlock()
+	data, _ := json.Marshal(syncMsg)
+	for client := range pm.wsClients {
+		_ = client.WriteMessage(websocket.TextMessage, data)
+	}
 
 	log.Println("Configuration successfully updated. Overlay layers synchronized dynamically via WebSocket.")
 }
@@ -800,16 +813,5 @@ func (pm *ProcessManager) ReloadChromium() {
 
 	if cfg != nil {
 		pm.manageOverlays(cfg)
-	}
-}
-
-func (pm *ProcessManager) broadcastWSMessage(msg interface{}) {
-	pm.wsMutex.Lock()
-	defer pm.wsMutex.Unlock()
-	for client := range pm.wsClients {
-		if err := client.WriteJSON(msg); err != nil {
-			client.Close()
-			delete(pm.wsClients, client)
-		}
 	}
 }
