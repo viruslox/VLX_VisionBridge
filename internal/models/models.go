@@ -11,7 +11,7 @@ type OutputSettings struct {
 	Destinations []string `yaml:"destinations"`
 }
 
-// ChromiumSource defines the settings for up to 8 native DOM Z-layers manipulated via WebSocket.
+// ChromiumSource defines the settings for up to 9 native DOM Z-layers manipulated via WebSocket.
 type ChromiumSource struct {
 	Active   bool   `yaml:"active"`
 	Z1Active bool   `yaml:"z1_active"`
@@ -77,13 +77,22 @@ type ChromiumSource struct {
 	Z8Height *int   `yaml:"z8_height"`
 	Z8X      *int   `yaml:"z8_x"`
 	Z8Y      *int   `yaml:"z8_y"`
+
+	Z9Active bool   `yaml:"z9_active"`
+	Z9Path   string `yaml:"z9_path"`
+	Z9Volume *int   `yaml:"z9_volume"`
+	Z9Width  *int   `yaml:"z9_width"`
+	Z9Height *int   `yaml:"z9_height"`
+	Z9X      *int   `yaml:"z9_x"`
+	Z9Y      *int   `yaml:"z9_y"`
 }
 
 // InputSettings defines the main engine inputs, including base resolution and global background properties.
 type InputSettings struct {
 	BgColor        string         `yaml:"bg_color" json:"bg_color"`
-	Resolution     string         `yaml:"resolution"`
+	Resolution     string         `yaml:"resolution" json:"resolution"`
 	Framerate      int            `yaml:"framerate" json:"framerate"`
+	CarouselDelay  int            `yaml:"carousel_delay" json:"carousel_delay"`
 	WebrtcPortMin  int            `yaml:"webrtc_port_min"`
 	WebrtcPortMax  int            `yaml:"webrtc_port_max"`
 	ChromiumSource ChromiumSource `yaml:"chromium_source"`
