@@ -570,12 +570,8 @@ func (pm *ProcessManager) UpdateConfig(config *models.Config) {
 
 	syncMsg := pm.buildSyncMessage(config)
 	
-	pm.wsMutex.Lock()
-	defer pm.wsMutex.Unlock()
-	data, _ := json.Marshal(syncMsg)
-	for client := range pm.wsClients {
-		_ = client.WriteMessage(websocket.TextMessage, data)
-	}
+	// Delegate transmission to the secure broadcast method which handles dead-socket garbage collection
+	pm.broadcastWSMessage(syncMsg)
 
 	log.Println("Configuration successfully updated. Overlay layers synchronized dynamically via WebSocket.")
 }
@@ -813,5 +809,18 @@ func (pm *ProcessManager) ReloadChromium() {
 
 	if cfg != nil {
 		pm.manageOverlays(cfg)
+	}
+}
+
+func (pm *ProcessManager) broadcastWSMessage(msg interface{}) {
+	pm.wsMutex.Lock()
+	defer pm.wsMutex.Unlock()
+	
+	for client := range pm.wsClients {
+		if err := client.WriteJSON(msg); err != nil {
+			// Connection is dead. Reclaim system resources immediately.
+			_ = client.Close()
+			delete(pm.wsClients, client)
+		}
 	}
 }
