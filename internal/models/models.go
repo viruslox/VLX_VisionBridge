@@ -89,13 +89,16 @@ type ChromiumSource struct {
 
 // InputSettings defines the main engine inputs, including base resolution and global background properties.
 type InputSettings struct {
-	BgColor        string         `yaml:"bg_color" json:"bg_color"`
-	Resolution     string         `yaml:"resolution" json:"resolution"`
-	Framerate      int            `yaml:"framerate" json:"framerate"`
-	CarouselDelay  int            `yaml:"carousel_delay" json:"carousel_delay"`
-	WebrtcPortMin  int            `yaml:"webrtc_port_min"`
-	WebrtcPortMax  int            `yaml:"webrtc_port_max"`
-	ChromiumSource ChromiumSource `yaml:"chromium_source"`
+	BgColor             string         `yaml:"bg_color" json:"bg_color"`
+	Resolution          string         `yaml:"resolution" json:"resolution"`
+	Framerate           int            `yaml:"framerate" json:"framerate"`
+	CarouselDelay       int            `yaml:"carousel_delay" json:"carousel_delay"`
+	WebrtcPortMin       int            `yaml:"webrtc_port_min"`
+	WebrtcPortMax       int            `yaml:"webrtc_port_max"`
+	OverlayServerActive bool           `yaml:"overlay_server_active" json:"overlay_server_active"`
+	OverlayServerPort   int            `yaml:"overlay_server_port" json:"overlay_server_port"`
+	MediaFolderPath     string         `yaml:"media_folder_path" json:"media_folder_path"`
+	ChromiumSource      ChromiumSource `yaml:"chromium_source"`
 }
 
 // InputResult represents the generated GStreamer argument slice and state assessment flags.
