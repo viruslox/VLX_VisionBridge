@@ -21,7 +21,7 @@ input:
   framerate: 30
   carousel_delay: 5        # Delay in seconds between static images in carousel mode
   overlay_server_active: true
-  overlay_server_port: 50001
+  overlay_server_port: 49999
   media_folder_path: "/opt/VLX_FrameFlow/media"
 
   chromium_source:
