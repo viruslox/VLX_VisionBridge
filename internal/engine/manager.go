@@ -410,9 +410,10 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
             if (path.startsWith(mediaBasePath)) {
                 var relativePath = path.substring(mediaBasePath.length);
                 if (relativePath.startsWith('/')) relativePath = relativePath.substring(1);
-                el.src = 'http://127.0.0.1:' + serverPort + '/media/' + relativePath;
+                el.src = 'http://127.0.0.1:' + serverPort + '/media/' + encodeURI(relativePath);
             } else {
-                el.src = 'file://' + path; // Fallback
+                // Fallback
+                el.src = 'file://' + encodeURI(path);
             }
         }
 
@@ -540,6 +541,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				"--autoplay-policy=no-user-gesture-required",
 				"--disable-dev-shm-usage",
 				"--no-sandbox",
+				"--allow-file-access-from-files",
 			)
 
 			if cfg.Input.OverlayServerActive {
@@ -551,10 +553,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				)
 			} else {
 				fileURL = "file://" + htmlPath
-				cmdArgs = append(cmdArgs,
-					"--allow-file-access-from-files",
-					fileURL,
-				)
+				cmdArgs = append(cmdArgs, fileURL)
 			}
 
 			chromeBin, err := exec.LookPath("chromium")
