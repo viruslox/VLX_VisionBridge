@@ -7,11 +7,12 @@ connector:
   control_socket: "/tmp/vlx_control.sock"
 
 output:
-  active: false
+  active: true
   resolution: "1920x1080"
   fps: 30
   video_bitrate: "8000k"
   audio_bitrate: "160k"
+  audio_sample_rate: 44100
   destinations:
     - "rtmp://127.0.0.1:1999/streamout"
 
