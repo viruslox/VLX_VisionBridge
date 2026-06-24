@@ -3,12 +3,13 @@ package models
 
 // OutputSettings defines the streaming output configuration for MediaMTX/FFmpeg external push.
 type OutputSettings struct {
-	Active       bool     `yaml:"active" json:"active"`
-	Resolution   string   `yaml:"resolution"`
-	FPS          int      `yaml:"fps"`
-	VideoBitrate string   `yaml:"video_bitrate"`
-	AudioBitrate string   `yaml:"audio_bitrate"`
-	Destinations []string `yaml:"destinations"`
+	Active          bool     `yaml:"active" json:"active"`
+	Resolution      string   `yaml:"resolution"`
+	FPS             int      `yaml:"fps"`
+	VideoBitrate    string   `yaml:"video_bitrate"`
+	AudioBitrate    string   `yaml:"audio_bitrate"`
+	AudioSampleRate int      `yaml:"audio_sample_rate" json:"audio_sample_rate"`
+	Destinations    []string `yaml:"destinations"`
 }
 
 // ChromiumSource defines the settings for up to 9 native DOM Z-layers manipulated via WebSocket.
