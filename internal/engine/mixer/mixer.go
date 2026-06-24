@@ -2,14 +2,15 @@ package mixer
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/user/VLX_VisionBridge/internal/models"
 )
 
-// BuildFilterComplex constructs a static, immutable GStreamer pipeline.
-// It captures the X11 virtual display and the isolated PulseAudio sink.
+// BuildFilterComplex constructs a static, immutable GStreamer pipeline dynamically driven by configuration.
 func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
+	// Parse Video Resolution
 	resParts := strings.Split(cfg.Input.Resolution, "x")
 	resWidth, resHeight := "1920", "1080"
 	if len(resParts) == 2 {
@@ -17,40 +18,60 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 		resHeight = resParts[1]
 	}
 
+	// Parse Video Framerate
 	framerate := "30/1"
 	if cfg.Input.Framerate > 0 {
 		framerate = fmt.Sprintf("%d/1", cfg.Input.Framerate)
 	}
 
+	// Parse Audio Sample Rate (Default to 44100 to fix RTMP conflicts)
+	sampleRate := 44100
+	if cfg.Output.AudioSampleRate > 0 {
+		sampleRate = cfg.Output.AudioSampleRate
+	}
+
+	// Parse Video Bitrate (e.g., "8000k" -> "8000")
+	vBitrate := strings.TrimSuffix(cfg.Output.VideoBitrate, "k")
+	if vBitrate == "" {
+		vBitrate = "8000"
+	}
+
+	// Parse Audio Bitrate (e.g., "160k" -> 160000 bits)
+	aBitrateStr := strings.TrimSuffix(cfg.Output.AudioBitrate, "k")
+	aBitrateInt := 160000
+	if val, err := strconv.Atoi(aBitrateStr); err == nil {
+		aBitrateInt = val * 1000
+	}
+
 	var args []string
 
-	// Video pipeline: Compositor -> Scale/Rate -> x264enc (8Mbps, Keyframe interval: 1s)
+	// Video pipeline: Compositor -> Scale/Rate -> x264enc
 	args = append(args,
 		"compositor", "name=comp", "background=black", "!",
 		fmt.Sprintf("video/x-raw,width=%s,height=%s,framerate=%s", resWidth, resHeight, framerate), "!",
 		"videoconvert", "!",
-		"x264enc", "tune=zerolatency", "speed-preset=ultrafast", "bitrate=8000", "key-int-max=30", "!",
+		"x264enc", "tune=zerolatency", "speed-preset=ultrafast", fmt.Sprintf("bitrate=%s", vBitrate), "key-int-max=30", "!",
 		"h264parse", "!", "tee", "name=vtee",
 	)
 
-	// Audio pipeline: Mixer -> Resample (48kHz) -> AAC
+	// Audio pipeline: Mixer -> Resample -> AAC
 	args = append(args,
 		"audiomixer", "name=acomp", "!",
 		"audioconvert", "!",
 		"audioresample", "!",
-		"audio/x-raw,rate=48000,channels=2", "!",
-		"avenc_aac", "bitrate=160000", "!",
+		fmt.Sprintf("audio/x-raw,rate=%d,channels=2", sampleRate), "!",
+		"avenc_aac", fmt.Sprintf("bitrate=%d", aBitrateInt), "!",
 		"aacparse", "!", "tee", "name=atee",
 	)
 
-	// Master Clocks: Ensures continuous streaming even if sources drop frames or go silent
+	// Master Clocks: Ensures continuous streaming even if Chromium drops
 	args = append(args,
 		"videotestsrc", "pattern=black", "is-live=true", "!",
 		fmt.Sprintf("video/x-raw,width=%s,height=%s,framerate=%s", resWidth, resHeight, framerate), "!", "comp.sink_0",
 	)
 	args = append(args,
 		"audiotestsrc", "wave=silence", "is-live=true", "!",
-		"audio/x-raw,rate=48000,channels=2", "!", "acomp.sink_0",
+		fmt.Sprintf("audio/x-raw,rate=%d,channels=2", sampleRate), "!", "acomp.sink_0",
 	)
 
 	// Native input capture (Chromium via X11 and PulseAudio)
