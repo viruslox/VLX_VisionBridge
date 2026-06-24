@@ -326,7 +326,6 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
             el = document.createElement('video');
             el.autoplay = true;
             el.playsInline = true;
-            if (volume !== undefined && volume !== null) el.volume = parseFloat(volume) / 100.0;
         } else if (isImg) {
             el = document.createElement('img');
         } else {
@@ -334,6 +333,16 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
             el.allow = "autoplay; camera; microphone; display-capture";
             el.setAttribute("allowtransparency", "true");
             el.frameBorder = "0";
+        }
+
+        if (volume !== undefined && volume !== null) {
+            var v = parseFloat(volume);
+            if (v === 0) {
+                el.muted = true;
+            } else {
+                el.muted = false;
+                el.volume = v / 100.0;
+            }
         }
         
         el.src = (path.startsWith('http://') || path.startsWith('https://')) ? path : 'file://' + path;
@@ -385,8 +394,10 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 
         if (el.tagName === 'VIDEO') {
             el.onended = function() {
-                c.index = (c.index + 1) % c.files.length;
-                playNextCarousel(layerId);
+                setTimeout(function() {
+                    c.index = (c.index + 1) % c.files.length;
+                    playNextCarousel(layerId);
+                }, ` + strconv.Itoa(carouselDelayMs) + `);
             };
         } else {
             c.timer = setTimeout(function() {

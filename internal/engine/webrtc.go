@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/pion/webrtc/v3"
+	"github.com/user/VLX_VisionBridge/internal/models"
 )
 
 var (
@@ -16,9 +17,11 @@ var (
 	webrtcMutex          sync.Mutex
 	WebRTCVideoTrack     *webrtc.TrackRemote
 	WebRTCAudioTrack     *webrtc.TrackRemote
+	webrtcConfig         *models.Config
 )
 
-func startWebRTCServer() {
+func StartWebRTCServer(cfg *models.Config) {
+	webrtcConfig = cfg
 	http.HandleFunc("/webrtc/offer", handleWebRTCOffer)
 	log.Println("Starting WebRTC signaling server on :50000")
 	if err := http.ListenAndServe(":50000", nil); err != nil {
@@ -52,13 +55,18 @@ func handleWebRTCOffer(w http.ResponseWriter, r *http.Request) {
 		webrtcPeerConnection.Close()
 	}
 
+	se := webrtc.SettingEngine{}
+	if webrtcConfig != nil && webrtcConfig.Input.WebrtcPortMin > 0 && webrtcConfig.Input.WebrtcPortMax > 0 {
+		se.SetEphemeralUDPPortRange(uint16(webrtcConfig.Input.WebrtcPortMin), uint16(webrtcConfig.Input.WebrtcPortMax))
+	}
+
 	m := &webrtc.MediaEngine{}
 	if err := m.RegisterDefaultCodecs(); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	api := webrtc.NewAPI(webrtc.WithMediaEngine(m))
+	api := webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithSettingEngine(se))
 	peerConnection, err := api.NewPeerConnection(webrtc.Configuration{})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

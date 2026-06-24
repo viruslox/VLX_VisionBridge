@@ -20,6 +20,8 @@ input:
   resolution: "1920x1080"  # Master canvas size
   framerate: 30
   carousel_delay: 5        # Delay in seconds between static images in carousel mode
+  webrtc_port_min: 50000
+  webrtc_port_max: 50010
 
   chromium_source:
     active: true
