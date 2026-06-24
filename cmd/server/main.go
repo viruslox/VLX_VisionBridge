@@ -133,6 +133,8 @@ func main() {
 	pm := engine.NewProcessManager(dbConn)
 	defer pm.Stop()
 
+	go engine.StartWebRTCServer(initialConfig)
+
 	// Start Process Manager with initial config
 	if err := pm.Start(ctx, initialConfig); err != nil {
 		log.Fatalf("Failed to start process manager: %v", err)
