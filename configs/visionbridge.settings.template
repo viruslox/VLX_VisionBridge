@@ -20,8 +20,13 @@ input:
   resolution: "1920x1080"  # Master canvas size
   framerate: 30
   carousel_delay: 5        # Delay in seconds between static images in carousel mode
-  webrtc_port_min: 50000
-  webrtc_port_max: 50010
+  
+  webrtc_port_min: 50000   # UDP ports for inbound WebRTC streams
+  webrtc_port_max: 50050
+
+  overlay_server_active: true
+  overlay_server_port: 50051
+  media_folder_path: "/opt/VLX_FrameFlow/media"
 
   chromium_source:
     active: true
