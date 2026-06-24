@@ -776,6 +776,8 @@ func (pm *ProcessManager) disableModule(module string) {
 
 	if module == "[chromium]" {
 		pm.config.Input.ChromiumSource.Active = false
+	} else if module == "[output]" {
+		pm.config.Output.Active = false
 	}
 }
 
@@ -841,8 +843,9 @@ func (pm *ProcessManager) executeSingleRun(lastBuildErr *string) (monitorAction,
 			if len(lines) > 0 {
 				isMisconfig = true
 			}
+			finalModule = identifyErrorModule(stderrStr, cfg)
 		}
-		errMsg = fmt.Sprintf("GStreamer crash detected: %v", runErr)
+		errMsg = fmt.Sprintf("GStreamer crash detected: %v\n\n--- GSTREAMER ERROR DETAILS ---\n%s\n-------------------------------", runErr, strings.TrimSpace(stderrStr))
 	}
 	log.Println(errMsg)
 
