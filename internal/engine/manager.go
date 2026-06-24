@@ -54,18 +54,19 @@ type RetryTracker struct {
 }
 
 type ProcessManager struct {
-	cmd         *exec.Cmd
-	config      *models.Config
-	db          *sql.DB
-	ctx         context.Context
-	cancel      context.CancelFunc
-	mu          sync.Mutex
-	cond        *sync.Cond
-	isRunning   bool
-	overlayCmds map[int]*exec.Cmd
-	retries     map[string]*RetryTracker
-	wsClients   map[*websocket.Conn]bool
-	wsMutex     sync.Mutex
+	cmd           *exec.Cmd
+	config        *models.Config
+	db            *sql.DB
+	ctx           context.Context
+	cancel        context.CancelFunc
+	mu            sync.Mutex
+	cond          *sync.Cond
+	isRunning     bool
+	overlayCmds   map[int]*exec.Cmd
+	retries       map[string]*RetryTracker
+	wsClients     map[*websocket.Conn]bool
+	wsMutex       sync.Mutex
+	overlayServer *http.Server
 }
 
 func NewProcessManager(dbConn *sql.DB) *ProcessManager {
@@ -77,6 +78,101 @@ func NewProcessManager(dbConn *sql.DB) *ProcessManager {
 	}
 	pm.cond = sync.NewCond(&pm.mu)
 	return pm
+}
+
+// startOverlayServer initializes the dynamic HTTP/WebSocket server based on configuration parameters.
+func (pm *ProcessManager) startOverlayServer(cfg *models.Config) {
+	pm.mu.Lock()
+	if pm.overlayServer != nil {
+		_ = pm.overlayServer.Shutdown(context.Background())
+		pm.overlayServer = nil
+	}
+	pm.mu.Unlock()
+
+	if !cfg.Input.OverlayServerActive {
+		log.Println("Overlay Web Server is disabled in configuration. Falling back to strict file:// protocols.")
+		return
+	}
+
+	port := cfg.Input.OverlayServerPort
+	if port <= 0 {
+		port = 50051
+	}
+
+	mediaPath := cfg.Input.MediaFolderPath
+	if mediaPath == "" {
+		mediaPath = "/opt/VLX_FrameFlow/media"
+	}
+
+	mux := http.NewServeMux()
+
+	// 1. HOSTING HTML OVERLAY
+	mux.HandleFunc("/overlay", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		http.ServeFile(w, r, "/opt/VLX_VisionBridge/var/overlay.html")
+	})
+
+	// 2. HOSTING SECURE MEDIA DIRECTORY
+	mux.Handle("/media/", http.StripPrefix("/media/", http.FileServer(http.Dir(mediaPath))))
+
+	// 3. WEBSOCKET CONTROL PLANE
+	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		c, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Printf("WebSocket upgrade protocol failed: %v", err)
+			return
+		}
+
+		pm.wsMutex.Lock()
+		if pm.wsClients == nil {
+			pm.wsClients = make(map[*websocket.Conn]bool)
+		}
+		pm.wsClients[c] = true
+		pm.wsMutex.Unlock()
+
+		defer func() {
+			pm.wsMutex.Lock()
+			delete(pm.wsClients, c)
+			pm.wsMutex.Unlock()
+			c.Close()
+		}()
+
+		for {
+			_, msg, err := c.ReadMessage()
+			if err != nil {
+				break
+			}
+
+			var req map[string]string
+			if json.Unmarshal(msg, &req) == nil && req["action"] == "hello" {
+				pm.mu.Lock()
+				currentCfg := pm.config
+				pm.mu.Unlock()
+				if currentCfg != nil {
+					syncMsg := pm.buildSyncMessage(currentCfg)
+					pm.wsMutex.Lock()
+					_ = c.WriteJSON(syncMsg)
+					pm.wsMutex.Unlock()
+				}
+			}
+		}
+	})
+
+	srv := &http.Server{
+		Addr:    fmt.Sprintf("127.0.0.1:%d", port),
+		Handler: mux,
+	}
+
+	pm.mu.Lock()
+	pm.overlayServer = srv
+	pm.mu.Unlock()
+
+	go func() {
+		log.Printf("Starting internal HTTP/WebSocket Control Server on %s (Media Root: %s)", srv.Addr, mediaPath)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Printf("Internal Server initialization failed: %v", err)
+		}
+	}()
 }
 
 func (pm *ProcessManager) Start(ctx context.Context, config *models.Config) error {
@@ -91,56 +187,7 @@ func (pm *ProcessManager) Start(ctx context.Context, config *models.Config) erro
 	pm.isRunning = true
 	pm.mu.Unlock()
 
-	// Initialize the centralized WebSocket Control Server
-	go func() {
-		mux := http.NewServeMux()
-		mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-			c, err := upgrader.Upgrade(w, r, nil)
-			if err != nil {
-				log.Printf("WebSocket upgrade protocol failed: %v", err)
-				return
-			}
-
-			pm.wsMutex.Lock()
-			if pm.wsClients == nil {
-				pm.wsClients = make(map[*websocket.Conn]bool)
-			}
-			pm.wsClients[c] = true
-			pm.wsMutex.Unlock()
-
-			defer func() {
-				pm.wsMutex.Lock()
-				delete(pm.wsClients, c)
-				pm.wsMutex.Unlock()
-				c.Close()
-			}()
-
-			for {
-				_, msg, err := c.ReadMessage()
-				if err != nil {
-					break
-				}
-
-				var req map[string]string
-				if json.Unmarshal(msg, &req) == nil && req["action"] == "hello" {
-					pm.mu.Lock()
-					cfg := pm.config
-					pm.mu.Unlock()
-					if cfg != nil {
-						syncMsg := pm.buildSyncMessage(cfg)
-						pm.wsMutex.Lock()
-						_ = c.WriteJSON(syncMsg)
-						pm.wsMutex.Unlock()
-					}
-				}
-			}
-		})
-		log.Println("Starting centralized WebSocket Control Server on 127.0.0.1:50001")
-		if err := http.ListenAndServe("127.0.0.1:50001", mux); err != nil {
-			log.Printf("WebSocket Server initialization failed: %v", err)
-		}
-	}()
-
+	pm.startOverlayServer(config)
 	go pm.monitor()
 
 	return nil
@@ -153,6 +200,10 @@ func (pm *ProcessManager) Stop() {
 		return
 	}
 	pm.isRunning = false
+
+	if pm.overlayServer != nil {
+		_ = pm.overlayServer.Shutdown(context.Background())
+	}
 
 	if pm.cmd != nil && pm.cmd.Process != nil {
 		log.Println("Signaling GStreamer pipeline to terminate gracefully...")
@@ -176,8 +227,6 @@ func (pm *ProcessManager) Stop() {
 	pm.mu.Unlock()
 }
 
-// ResolvePath determines whether the provided target is a single file or a directory.
-// If it is a directory, it extracts all valid media files to populate the DOM carousel array.
 func (pm *ProcessManager) ResolvePath(basePath string) []string {
 	if basePath == "" {
 		return nil
@@ -198,7 +247,8 @@ func (pm *ProcessManager) ResolvePath(basePath string) []string {
 			if !e.IsDir() {
 				lower := strings.ToLower(e.Name())
 				if strings.HasSuffix(lower, ".mp4") || strings.HasSuffix(lower, ".webm") ||
-					strings.HasSuffix(lower, ".png") || strings.HasSuffix(lower, ".jpg") || strings.HasSuffix(lower, ".jpeg") {
+					strings.HasSuffix(lower, ".png") || strings.HasSuffix(lower, ".jpg") || strings.HasSuffix(lower, ".jpeg") ||
+					strings.HasSuffix(lower, ".html") {
 					files = append(files, filepath.Join(basePath, e.Name()))
 				}
 			}
@@ -207,7 +257,6 @@ func (pm *ProcessManager) ResolvePath(basePath string) []string {
 	return files
 }
 
-// buildLayerStyle constructs absolute CSS positioning strings based on configuration constraints.
 func buildLayerStyle(zIndex int, width, height, x, y *int) string {
 	style := fmt.Sprintf("z-index: %d; position: absolute; ", zIndex)
 	if x != nil {
@@ -233,7 +282,6 @@ func buildLayerStyle(zIndex int, width, height, x, y *int) string {
 	return style
 }
 
-// startEnvironment initializes the Xvfb virtual display and the PulseAudio loopback daemon.
 func (pm *ProcessManager) startEnvironment(resWidth, resHeight string) {
 	if _, exists := pm.overlayCmds[100]; !exists {
 		xvfbCmd := exec.Command("Xvfb", ":99", "-screen", "0", fmt.Sprintf("%sx%sx24", resWidth, resHeight), "-ac", "-nolisten", "tcp")
@@ -242,7 +290,6 @@ func (pm *ProcessManager) startEnvironment(resWidth, resHeight string) {
 		} else {
 			log.Printf("Initialized Xvfb on display :99 (%sx%s)", resWidth, resHeight)
 			pm.overlayCmds[100] = xvfbCmd
-			// Enforce a startup delay to prevent Chromium rendering failures
 			time.Sleep(1 * time.Second)
 		}
 	}
@@ -284,10 +331,19 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				bgColor = "black"
 			}
 
-			// Apply configurable carousel delay or default to 5000ms
 			carouselDelayMs := 5000
 			if cfg.Input.CarouselDelay > 0 {
 				carouselDelayMs = cfg.Input.CarouselDelay * 1000
+			}
+
+			overlayPort := cfg.Input.OverlayServerPort
+			if overlayPort <= 0 {
+				overlayPort = 50051
+			}
+
+			mediaBasePath := cfg.Input.MediaFolderPath
+			if mediaBasePath == "" {
+				mediaBasePath = "/opt/VLX_FrameFlow/media"
 			}
 
 			resParts := strings.Split(cfg.Input.Resolution, "x")
@@ -315,6 +371,8 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 
   <script>
     var carousels = {};
+    var serverPort = ` + strconv.Itoa(overlayPort) + `;
+    var mediaBasePath = "` + mediaBasePath + `";
 
     function createMediaElement(path, volume) {
         var lower = path.toLowerCase();
@@ -345,7 +403,19 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
             }
         }
         
-        el.src = (path.startsWith('http://') || path.startsWith('https://')) ? path : 'file://' + path;
+        // Smart URL Resolution: Dynamically routes requested files through the local HTTP server
+        if (path.startsWith('http://') || path.startsWith('https://')) {
+            el.src = path;
+        } else {
+            if (path.startsWith(mediaBasePath)) {
+                var relativePath = path.substring(mediaBasePath.length);
+                if (relativePath.startsWith('/')) relativePath = relativePath.substring(1);
+                el.src = 'http://127.0.0.1:' + serverPort + '/media/' + relativePath;
+            } else {
+                el.src = 'file://' + path; // Fallback
+            }
+        }
+
         el.style.width = '100%';
         el.style.height = '100%';
         el.style.border = 'none';
@@ -408,7 +478,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
     }
 
     function connectWS() {
-        var ws = new WebSocket('ws://127.0.0.1:50001/ws');
+        var ws = new WebSocket('ws://127.0.0.1:' + serverPort + '/ws');
         ws.onopen = function() {
             ws.send(JSON.stringify({action: "hello"}));
         };
@@ -458,9 +528,33 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 
 			log.Printf("Initializing Chromium browser natively on Xvfb Display :99")
 
-			fileURL := htmlPath
-			if strings.HasPrefix(htmlPath, "/") {
+			var fileURL string
+			var cmdArgs []string
+
+			cmdArgs = append(cmdArgs,
+				"--kiosk",
+				"--disable-infobars",
+				"--disable-extensions",
+				"--window-position=0,0",
+				fmt.Sprintf("--window-size=%s,%s", resWidth, resHeight),
+				"--autoplay-policy=no-user-gesture-required",
+				"--disable-dev-shm-usage",
+				"--no-sandbox",
+			)
+
+			if cfg.Input.OverlayServerActive {
+				fileURL = fmt.Sprintf("http://127.0.0.1:%d/overlay", overlayPort)
+				cmdArgs = append(cmdArgs,
+					"--disable-web-security",
+					"--allow-running-insecure-content",
+					fileURL,
+				)
+			} else {
 				fileURL = "file://" + htmlPath
+				cmdArgs = append(cmdArgs,
+					"--allow-file-access-from-files",
+					fileURL,
+				)
 			}
 
 			chromeBin, err := exec.LookPath("chromium")
@@ -472,19 +566,7 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				}
 			}
 
-			cmd := exec.Command(chromeBin,
-				"--kiosk",
-				"--disable-infobars",
-				"--disable-extensions",
-				"--window-position=0,0",
-				fmt.Sprintf("--window-size=%s,%s", resWidth, resHeight),
-				"--autoplay-policy=no-user-gesture-required",
-				"--disable-dev-shm-usage",
-				"--no-sandbox",
-				"--allow-file-access-from-files",
-				fileURL,
-			)
-
+			cmd := exec.Command(chromeBin, cmdArgs...)
 			cmd.Env = append(os.Environ(), "DISPLAY=:99", "PULSE_SERVER=unix:/tmp/pulse-visionbridge/native")
 
 			err = cmd.Start()
@@ -536,7 +618,6 @@ func (pm *ProcessManager) UpdateFilter(config *models.Config) {
 	pm.mu.Unlock()
 }
 
-// buildSyncMessage constructs a comprehensive snapshot of the active DOM state.
 func (pm *ProcessManager) buildSyncMessage(cfg *models.Config) map[string]interface{} {
 	type LayerState struct {
 		ID     string   `json:"id"`
@@ -569,9 +650,19 @@ func (pm *ProcessManager) buildSyncMessage(cfg *models.Config) map[string]interf
 	}
 }
 
-// UpdateConfig synchronizes the configuration state in memory and delegates UI updates to the WebSocket plane.
+// UpdateConfig evaluates runtime modifications and propagates them correctly.
 func (pm *ProcessManager) UpdateConfig(config *models.Config) {
 	pm.mu.Lock()
+	
+	// Detect if core overlay server settings have been modified
+	restartServer := false
+	if pm.config == nil ||
+		pm.config.Input.OverlayServerActive != config.Input.OverlayServerActive ||
+		pm.config.Input.OverlayServerPort != config.Input.OverlayServerPort ||
+		pm.config.Input.MediaFolderPath != config.Input.MediaFolderPath {
+		restartServer = true
+	}
+
 	pm.config = config
 
 	if pm.cond != nil {
@@ -579,12 +670,15 @@ func (pm *ProcessManager) UpdateConfig(config *models.Config) {
 	}
 	pm.mu.Unlock()
 
-	syncMsg := pm.buildSyncMessage(config)
-	
-	// Delegate transmission to the secure broadcast method which handles dead-socket garbage collection
-	pm.broadcastWSMessage(syncMsg)
-
-	log.Println("Configuration successfully updated. Overlay layers synchronized dynamically via WebSocket.")
+	if restartServer {
+		log.Println("Core Overlay Server settings modified. Initiating warm restart of Control Server...")
+		pm.startOverlayServer(config)
+		pm.ReloadChromium()
+	} else {
+		syncMsg := pm.buildSyncMessage(config)
+		pm.broadcastWSMessage(syncMsg)
+		log.Println("Configuration successfully updated. Overlay layers synchronized dynamically via WebSocket.")
+	}
 }
 
 type monitorAction int
@@ -823,13 +917,13 @@ func (pm *ProcessManager) ReloadChromium() {
 	}
 }
 
+// broadcastWSMessage securely transmits JSON payloads to all connected WebSocket clients.
 func (pm *ProcessManager) broadcastWSMessage(msg interface{}) {
 	pm.wsMutex.Lock()
 	defer pm.wsMutex.Unlock()
 	
 	for client := range pm.wsClients {
 		if err := client.WriteJSON(msg); err != nil {
-			// Connection is dead. Reclaim system resources immediately.
 			_ = client.Close()
 			delete(pm.wsClients, client)
 		}
