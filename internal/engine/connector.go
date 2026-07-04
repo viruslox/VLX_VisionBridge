@@ -2,13 +2,30 @@ package engine
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net"
 	"os"
 	"os/user"
 	"strconv"
 	"strings"
+	"sync"
+
+	"gopkg.in/yaml.v3"
 )
+
+var configMutex sync.Mutex
+
+func resolveConfigPath() string {
+	envPath := os.Getenv("CONFIG_PATH")
+	if envPath != "" {
+		return envPath
+	}
+	if _, err := os.Stat("configs/visionbridge.settings"); err == nil {
+		return "configs/visionbridge.settings"
+	}
+	return "/opt/VLX_VisionBridge/etc/visionbridge.settings"
+}
 
 type ControlPayload struct {
 	Enabled bool   `json:"enabled"`
@@ -136,16 +153,80 @@ func (pm *ProcessManager) handleControlCommand(cmd ControlCommand) {
 		if strings.HasPrefix(cmd.Target, "overlay@layer") {
 			idStr := strings.TrimPrefix(cmd.Target, "overlay@layer")
 			zLayer := "z" + idStr
-			wsCmd := map[string]interface{}{
-				"layer": zLayer,
+
+			configMutex.Lock()
+
+			configPath := resolveConfigPath()
+			data, err := os.ReadFile(configPath)
+			if err != nil {
+				log.Printf("Failed to read configuration file: %v", err)
+				configMutex.Unlock()
+				return
 			}
-			if cmd.Payload.Enabled {
-				wsCmd["action"] = "play"
-				wsCmd["files"] = pm.ResolvePath(cmd.Payload.Text)
-			} else {
-				wsCmd["action"] = "hide"
+
+			var node yaml.Node
+			if err := yaml.Unmarshal(data, &node); err != nil {
+				log.Printf("Failed to parse configuration file: %v", err)
+				configMutex.Unlock()
+				return
 			}
-			pm.broadcastWSMessage(wsCmd)
+
+			if len(node.Content) > 0 {
+				doc := node.Content[0]
+				for i := 0; i < len(doc.Content); i += 2 {
+					if doc.Content[i].Value == "input" {
+						inputMap := doc.Content[i+1]
+						for j := 0; j < len(inputMap.Content); j += 2 {
+							if inputMap.Content[j].Value == "chromium_source" {
+								chromMap := inputMap.Content[j+1]
+								activeKey := fmt.Sprintf("%s_active", zLayer)
+								pathKey := fmt.Sprintf("%s_path", zLayer)
+								for k := 0; k < len(chromMap.Content); k += 2 {
+									if chromMap.Content[k].Value == activeKey {
+										if cmd.Payload.Enabled {
+											chromMap.Content[k+1].Value = "true"
+										} else {
+											chromMap.Content[k+1].Value = "false"
+										}
+									}
+									if cmd.Payload.Enabled && chromMap.Content[k].Value == pathKey {
+										resolvedPaths := pm.ResolvePath(cmd.Payload.Text)
+										if len(resolvedPaths) > 0 {
+											chromMap.Content[k+1].Value = resolvedPaths[0]
+										} else {
+											chromMap.Content[k+1].Value = cmd.Payload.Text
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			out, err := yaml.Marshal(&node)
+			if err != nil {
+				log.Printf("Failed to marshal updated configuration: %v", err)
+				configMutex.Unlock()
+				return
+			}
+
+			tmpFile := configPath + ".tmp"
+			if err := os.WriteFile(tmpFile, out, 0644); err != nil {
+				log.Printf("Failed to write temporary configuration file: %v", err)
+				configMutex.Unlock()
+				return
+			}
+			if err := os.Rename(tmpFile, configPath); err != nil {
+				os.Remove(tmpFile)
+				log.Printf("Failed to rename temporary configuration file: %v", err)
+				configMutex.Unlock()
+				return
+			}
+
+			configMutex.Unlock()
+			log.Printf("Updated configuration for %s (Enabled: %v)", zLayer, cmd.Payload.Enabled)
+
 		} else if strings.HasPrefix(cmd.Target, "volume@layer") {
 			idStr := strings.TrimPrefix(cmd.Target, "volume@layer")
 			zLayer := "z" + idStr
