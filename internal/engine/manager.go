@@ -408,9 +408,9 @@ webrtcHtmlContent := fmt.Sprintf(`<!DOCTYPE html>
 					let stream = videoElement.srcObject;
 					if (!stream) {
 						stream = new MediaStream();
-						videoElement.srcObject = stream;
 					}
 					stream.addTrack(event.track);
+					videoElement.srcObject = stream; 
 				}
 			};
 
