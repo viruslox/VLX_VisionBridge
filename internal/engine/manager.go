@@ -356,16 +356,29 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 
 			pm.startEnvironment(resWidth, resHeight)
 
-			webrtcHtmlContent := `<!DOCTYPE html>
+webrtcHtmlContent := fmt.Sprintf(`<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>WebRTC Bridge</title>
     <style>
-        /* CSS reset to ensure the video perfectly fills the Chromium layer */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body, html { width: 100vw; height: 100vh; overflow: hidden; background: transparent; }
-        video { width: 100%; height: 100%; object-fit: fill; border: none; outline: none; }
+        body, html { 
+            width: 100vw; 
+            height: 100vh; 
+            overflow: hidden; 
+            background: %s; /* Iniettiamo il bgColor (es. "black") */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        video { 
+            width: 100%%; 
+            height: 100%%; 
+            object-fit: contain; /* Rispetta le proporzioni originali */
+            border: none; 
+            outline: none; 
+        }
     </style>
 </head>
 <body>
@@ -374,13 +387,11 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
     <script>
         const videoElement = document.getElementById('live-stream');
 
-        // Parse the stream parameter from the iframe URL (e.g., ?stream=cameraman_V1A1)
         const urlParams = new URLSearchParams(window.location.search);
         const streamName = urlParams.get('stream') || 'default_stream';
         const streamUser = urlParams.get('user') || 'visionbridge';
         const streamPass = urlParams.get('pass') || 'visionbridge';
 
-        // MediaMTX default WebRTC API endpoint
 		const whepUrl = 'http://127.0.0.1:8889/' + streamName + '/whep';
 
 		async function initializeWebRTC() {
@@ -400,7 +411,6 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/sdp',
-			// 2. SET Credentials here!
 					'Authorization': 'Basic ' + btoa(streamUser + ":" + streamPass)
 				},
 				body: offer.sdp
@@ -418,18 +428,14 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 			);
 		}
 
-        // Initialize connection and handle disconnections
         initializeWebRTC().catch(console.error);
     </script>
 </body>
-</html>`
-			if err := os.MkdirAll(mediaBasePath, 0755); err == nil {
+</html>`, bgColor)
+if err := os.MkdirAll(mediaBasePath, 0755); err == nil {
 				webrtcFilePath := filepath.Join(mediaBasePath, "webrtc.html")
-				if _, err := os.Stat(webrtcFilePath); os.IsNotExist(err) {
-					os.WriteFile(webrtcFilePath, []byte(webrtcHtmlContent), 0644)
-				}
+				os.WriteFile(webrtcFilePath, []byte(webrtcHtmlContent), 0644)
 			}
-
 
 			htmlContent := `<!DOCTYPE html>
 <html>
