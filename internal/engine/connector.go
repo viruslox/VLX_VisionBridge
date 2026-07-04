@@ -190,12 +190,7 @@ func (pm *ProcessManager) handleControlCommand(cmd ControlCommand) {
 										}
 									}
 									if cmd.Payload.Enabled && chromMap.Content[k].Value == pathKey {
-										resolvedPaths := pm.ResolvePath(cmd.Payload.Text)
-										if len(resolvedPaths) > 0 {
-											chromMap.Content[k+1].Value = resolvedPaths[0]
-										} else {
-											chromMap.Content[k+1].Value = cmd.Payload.Text
-										}
+										chromMap.Content[k+1].Value = cmd.Payload.Text
 									}
 								}
 							}
