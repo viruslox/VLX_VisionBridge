@@ -167,3 +167,64 @@ input:
 		t.Fatalf("Timed out waiting for watcher callback")
 	}
 }
+
+func TestWatcher_AtomicRename(t *testing.T) {
+	yamlContent1 := `
+output:
+  resolution: "1920x1080"
+  fps: 60
+input:
+  chromium_source:
+    active: true
+`
+	yamlContent2 := `
+output:
+  resolution: "1920x1080"
+  fps: 60
+input:
+  chromium_source:
+    active: false
+`
+
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "visionbridge.settings")
+	err := os.WriteFile(configFile, []byte(yamlContent1), 0644)
+	if err != nil {
+		t.Fatalf("Failed to write temp config file: %v", err)
+	}
+
+	ch := make(chan DiffResult, 1)
+	watcher := NewWatcher(configFile, func(cfg *models.Config, diff DiffResult) {
+		ch <- diff
+	})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	err = watcher.Start(ctx)
+	if err != nil {
+		t.Fatalf("Failed to start watcher: %v", err)
+	}
+	defer watcher.Stop()
+
+	time.Sleep(100 * time.Millisecond)
+
+	tmpFile := configFile + ".tmp"
+	err = os.WriteFile(tmpFile, []byte(yamlContent2), 0644)
+	if err != nil {
+		t.Fatalf("Failed to update config file: %v", err)
+	}
+	err = os.Rename(tmpFile, configFile)
+	if err != nil {
+		t.Fatalf("Failed to rename temp config file: %v", err)
+	}
+
+	select {
+	case diff := <-ch:
+		if !diff.RequiresRestart || diff.RequiresFilterUpdate {
+			t.Errorf("Expected requiresRestart=true for active state change via rename, got %v", diff)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatalf("Timed out waiting for watcher callback after rename")
+	}
+}

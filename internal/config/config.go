@@ -190,8 +190,21 @@ func (w *Watcher) watchEvents(ctx context.Context, watcher *fsnotify.Watcher) {
 				}
 				return
 			}
-			if event.Op&fsnotify.Write == fsnotify.Write {
+			if event.Has(fsnotify.Write) || event.Has(fsnotify.Create) {
 				// Add a small delay to ensure file is completely written, debounced
+				if timer != nil {
+					timer.Stop()
+				}
+				timer = time.NewTimer(100 * time.Millisecond)
+				timerC = timer.C
+			} else if event.Has(fsnotify.Remove) || event.Has(fsnotify.Rename) {
+				// File was replaced via atomic rename or removed, re-add the watch
+				// Adding a short delay in a goroutine before re-adding to ensure the new file is in place
+				go func(path string) {
+					time.Sleep(50 * time.Millisecond)
+					watcher.Add(path)
+				}(w.path)
+
 				if timer != nil {
 					timer.Stop()
 				}
