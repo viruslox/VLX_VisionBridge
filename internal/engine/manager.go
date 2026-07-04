@@ -189,6 +189,7 @@ func (pm *ProcessManager) Start(ctx context.Context, config *models.Config) erro
 
 	pm.startOverlayServer(config)
 	go pm.monitor()
+	go pm.StartConnectorListener()
 
 	return nil
 }
