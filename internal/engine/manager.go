@@ -557,7 +557,7 @@ if err := os.MkdirAll(mediaBasePath, 0755); err == nil {
             if (el.tagName === 'VIDEO') el.loop = true;
             container.appendChild(el);
         } else {
-            carousels[layerId] = { files: files, index: 0, timer: null, volume: volume };
+            carousels[layerId] = { files: files, index: Math.floor(Math.random() * files.length), timer: null, volume: volume };
             playNextCarousel(layerId);
         }
     }
