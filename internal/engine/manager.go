@@ -572,16 +572,16 @@ if err := os.MkdirAll(mediaBasePath, 0755); err == nil {
         var el = createMediaElement(path, c.volume);
         container.appendChild(el);
 
-        if (el.tagName === 'VIDEO') {
+		if (el.tagName === 'VIDEO') {
             el.onended = function() {
                 setTimeout(function() {
-                    c.index = (c.index + 1) % c.files.length;
+                    c.index = Math.floor(Math.random() * c.files.length);
                     playNextCarousel(layerId);
                 }, ` + strconv.Itoa(carouselDelayMs) + `);
             };
         } else {
             c.timer = setTimeout(function() {
-                c.index = (c.index + 1) % c.files.length;
+                c.index = Math.floor(Math.random() * c.files.length);
                 playNextCarousel(layerId);
             }, ` + strconv.Itoa(carouselDelayMs) + `);
         }
