@@ -394,18 +394,43 @@ webrtcHtmlContent := fmt.Sprintf(`<!DOCTYPE html>
 
 		const whepUrl = 'http://127.0.0.1:8889/' + streamName + '/whep';
 
-		async function initializeWebRTC() {
+	async function initializeWebRTC() {
 			const peerConnection = new RTCPeerConnection();
 
 			peerConnection.addTransceiver('video', { direction: 'recvonly' });
 			peerConnection.addTransceiver('audio', { direction: 'recvonly' });
 
+			// FIX 1: Gestione flessibile delle tracce, previene il crash se event.streams[0] non esiste
 			peerConnection.ontrack = (event) => {
-				videoElement.srcObject = event.streams[0];
+				if (event.streams && event.streams.length > 0) {
+					videoElement.srcObject = event.streams[0];
+				} else {
+					let stream = videoElement.srcObject;
+					if (!stream) {
+						stream = new MediaStream();
+						videoElement.srcObject = stream;
+					}
+					stream.addTrack(event.track);
+				}
 			};
 
 			const offer = await peerConnection.createOffer();
 			await peerConnection.setLocalDescription(offer);
+
+			// FIX 2: Mette in pausa l'esecuzione finché il browser non ha raccolto tutti i candidati ICE locali
+			await new Promise((resolve) => {
+				if (peerConnection.iceGatheringState === 'complete') {
+					resolve();
+				} else {
+					const checkState = () => {
+						if (peerConnection.iceGatheringState === 'complete') {
+							peerConnection.removeEventListener('icegatheringstatechange', checkState);
+							resolve();
+						}
+					};
+					peerConnection.addEventListener('icegatheringstatechange', checkState);
+				}
+			});
 
 			const response = await fetch(whepUrl, {
 				method: 'POST',
@@ -413,7 +438,8 @@ webrtcHtmlContent := fmt.Sprintf(`<!DOCTYPE html>
 					'Content-Type': 'application/sdp',
 					'Authorization': 'Basic ' + btoa(streamUser + ":" + streamPass)
 				},
-				body: offer.sdp
+				// Invia a MediaMTX l'SDP FINALE arricchito con gli indirizzi ICE validi
+				body: peerConnection.localDescription.sdp
 			});
 
 			if (!response.ok) {
@@ -427,6 +453,7 @@ webrtcHtmlContent := fmt.Sprintf(`<!DOCTYPE html>
 				new RTCSessionDescription({ type: 'answer', sdp: answerSdp })
 			);
 		}
+
 
         initializeWebRTC().catch(console.error);
     </script>
