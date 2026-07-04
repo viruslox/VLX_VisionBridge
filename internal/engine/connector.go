@@ -105,7 +105,11 @@ func (pm *ProcessManager) StartConnectorListener() {
 					break
 				}
 
+				log.Printf("Received control command via IPC: %+v", cmd)
+
 				pm.handleControlCommand(cmd)
+
+				log.Printf("Execution of control command '%s' for target '%s' completed successfully.", cmd.Action, cmd.Target)
 			}
 		}(conn)
 	}
