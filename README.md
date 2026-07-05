@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-VLX VisionBridge is a headless, high-performance Linux service written in Go. VLX_VisionBridge utilizes a DOM-dominant Architecture: All media rendering (videos, images, carousels) happens exclusively in the Chromium DOM. GStreamer acts solely as a passive X11/PulseAudio screen recorder pushing to MediaMTX, while WebRTC captures internal chromium_source signaling.
+VLX VisionBridge is a headless, high-performance Linux service written in Go. VLX_VisionBridge utilizes a DOM-dominant Architecture: All media rendering (videos, images, carousels) happens exclusively in the Chromium DOM. GStreamer acts solely as a passive screen recorder using a static pipeline with `ximagesrc` (capturing Xvfb display :99) and `pulsesrc` to push output to MediaMTX. Complex JS screen capturing and dynamic GStreamer source switching are explicitly avoided.
 
 The service is designed for professional 24/7 broadcasting environments where configuration must be dynamic and resource efficiency is paramount. We are basically building a sort of obs-studio for remote VMs.
 
@@ -10,7 +10,7 @@ The service is designed for professional 24/7 broadcasting environments where co
 
 VisionBridge employs a highly optimized, Cloud-Native "Sidecar" Architecture based on three pillars:
 1. **DOM-dominant Architecture**: All media rendering (videos, images, carousels) happens exclusively in the Chromium DOM.
-2. **GStreamer Core**: GStreamer acts solely as a passive X11/PulseAudio screen recorder pushing to MediaMTX, while WebRTC captures internal `chromium_source` signaling.
+2. **GStreamer Core**: GStreamer acts solely as a passive screen recorder using a static pipeline with `ximagesrc` (capturing Xvfb display :99) and `pulsesrc` pushing to MediaMTX.
 3. **Local Proxy (Sidecar)**: GStreamer muxes the output and pushes it unencrypted to a local MediaMTX server (`rtmp://127.0.0.1:1935/live/internal`). External routing and TLS are handled dynamically by Chatbridge invoking MediaMTX REST APIs.
 
 ## Requirements Note
@@ -25,7 +25,7 @@ apt-get install gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugin
 
 ## Core Principles
 
-- **DOM-dominant Architecture**: All media rendering happens exclusively in the Chromium DOM. GStreamer acts solely as a passive X11/PulseAudio screen recorder.
+- **DOM-dominant Architecture**: All media rendering happens exclusively in the Chromium DOM. GStreamer acts solely as a passive screen recorder using a static pipeline with `ximagesrc` (capturing Xvfb display :99) and `pulsesrc`. Complex JS screen capturing and dynamic GStreamer source switching are explicitly avoided.
 - **Headless First**: Managed entirely via configuration files or DB entries.
 - **Dynamic Reconfiguration**: Hot-reloading of layouts and sources without dropping the output stream (where technically possible).
 - **Resource Optimization**: Sources marked as "OFF" are completely excluded from the processing pipeline.
@@ -35,7 +35,7 @@ apt-get install gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugin
 
 VisionBridge operates alongside MediaMTX and ChatBridge on the same localhost.
 
-The `input` configuration revolves around `chromium_source`, which supports exactly 8 distinct Z-layers (`Z1` to `Z8`) with explicit `height`, `width`, `x`, `y`, `volume`, and `path` variables. It dynamically generates HTML tags (`<video autoplay loop>`, `<img>`) based on the content type inferred from the path.
+The `input` configuration revolves around `chromium_source`, which supports exactly 9 distinct Z-layers (`Z1` to `Z9`) with explicit `height`, `width`, `x`, `y`, `volume`, and `path` variables. It dynamically generates HTML tags (`<video autoplay loop>`, `<img>`, `<iframe>`) based on the content type inferred from the path.
 
 For directory-based media playback in `chromium_source`, the Go backend provides an HTTP endpoint (`/api/list-dir?path=...`) that the Chromium WebSocket client fetches to automatically sequence and loop media as a carousel without GStreamer intervention.
 
@@ -45,7 +45,7 @@ input:
   chromium_source:
     active: true
     z1_active: true
-    z1_path: "/opt/VLX_VisionBridge/data/layer1.mp4"
+    z1_path: "/opt/VLX_VisionBridge/media/layer1.mp4"
     z1_volume: 100
     z1_width: 1920
     z1_height: 1080
@@ -55,7 +55,7 @@ input:
 
 ## Layer Control Rules
 
-- **Rule 1:** Incoming JSON control commands for overlays are parsed and broadcasted as WebSocket messages (e.g., `{"layer": "z1", "action": "play", "path": "..."}`) to Chromium clients for zero-CPU DOM manipulation.
+- **Rule 1:** Incoming JSON control commands for overlays map to a Single Source of Truth (SSOT) pattern: JSON commands update the YAML settings file directly, and the file watcher triggers WebSocket broadcasts to the Chromium clients for zero-CPU DOM manipulation.
 - **Rule 2:** `chromium_source` layers MUST be kept `active: true` constantly. Show/Hide logic for web layers must be handled via WebSockets/JavaScript to avoid stream drops. Setting the target stream to disabled (`Enabled: false`) triggers a process termination to halt the active stream.
 
 ## Configuration Concepts
@@ -67,6 +67,6 @@ input:
 - **Language**: Go (Golang)
 - **Processing Engine**: GStreamer (via os/exec)
 - **Database**: SQLite (State persistence, Logs, Metadata)
-- **Messaging**: ZeroMQ JSON control commands are parsed and broadcasted as WebSocket messages to Chromium clients.
+- **Messaging**: JSON control commands map to an SSOT pattern updating the YAML settings directly, and the file watcher triggers WebSocket broadcasts to Chromium clients.
 
 See [Architecture](ARCHITECTURE.md) for High-Level Design details.

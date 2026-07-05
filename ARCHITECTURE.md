@@ -4,7 +4,7 @@ This document outlines the high-level design and architectural details of VLX Vi
 
 ## System Overview
 
-VLX VisionBridge is a headless, high-performance Linux service written in Go. It essentially functions as a remote, headless OBS Studio tailored for remote VMs. VLX_VisionBridge utilizes a DOM-dominant Architecture: All media rendering (videos, images, carousels) happens exclusively in the Chromium DOM. GStreamer acts solely as a passive X11/PulseAudio screen recorder pushing to MediaMTX, while WebRTC captures internal `chromium_source` signaling.
+VLX VisionBridge is a headless, high-performance Linux service written in Go. It essentially functions as a remote, headless OBS Studio tailored for remote VMs. VLX_VisionBridge utilizes a DOM-dominant Architecture: All media rendering (videos, images, carousels) happens exclusively in the Chromium DOM. GStreamer acts solely as a passive screen recorder using a static pipeline with `ximagesrc` (capturing Xvfb display :99) and `pulsesrc` pushing to MediaMTX.
 
 ### MediaMTX Sidecar Proxy Pattern
 VisionBridge acts strictly as a low-latency video mixer pushing to `localhost` (`rtmp://127.0.0.1:1935/live/internal`), delegating all RTMPS/TLS network resilience and dynamic external routing to the local MediaMTX instance (controlled via REST APIs by Chatbridge).
@@ -27,7 +27,7 @@ The project is structured according to common Go conventions, primarily using th
 The service is fully configured via the `visionbridge.settings` file (default location: `/opt/VLX_VisionBridge/etc/visionbridge.settings`, but can be overridden by `CONFIG_PATH` or positional arguments).
 
 The configuration is hot-reloadable. A `Config Watcher` uses `fsnotify` to monitor the settings file. When changes are detected, a diffing logic determines the required action:
-- **RequiresFilterUpdate**: Changes to layout properties like `X`, `Y`, and `Volume` trigger a live filter update via ZMQ without dropping the stream.
+- **RequiresFilterUpdate**: Layout property changes (like X, Y, Volume) map to a Single Source of Truth (SSOT) pattern updating the YAML settings file directly, and the file watcher triggers WebSocket broadcasts to the Chromium DOM for zero-CPU DOM manipulation.
 - **RequiresRestart**: Changes to structural properties like `Size`, `Active`, or `Destinations` require a full GStreamer process restart.
 
 ## Input Pipelines
@@ -36,22 +36,22 @@ The system coordinates a single DOM-dominant pipeline conceptually similar to a 
 
 ### HTML Overlays (`chromium_source`)
 
-An independently spawned headless Chromium process dynamically rendering up to 8 Z-layers (`Z1` to `Z8`).
+An independently spawned Chromium process running in non-headless mode inside an Xvfb display dynamically rendering up to 9 Z-layers (`Z1` to `Z9`).
 - All media rendering (videos, images, carousels) happens exclusively in the Chromium DOM.
-- It dynamically generates HTML tags (`<video autoplay loop>`, `<img>`) based on the content type inferred from the path.
+- It dynamically generates HTML tags (`<video autoplay loop>`, `<img>`, `<iframe>`) based on the content type inferred from the path.
 - For directory-based media playback, the Go backend provides an HTTP endpoint (`/api/list-dir?path=...`) that the Chromium WebSocket client fetches to automatically sequence and loop media as a carousel without GStreamer intervention.
 - Background colors can be dynamically injected into the generated HTML via `BgColor` under `InputSettings`.
 - Ensures absolute layout positioning via inline CSS directly to eliminate browser offsets.
 
 ## Engine & Mixer
 
-GStreamer acts solely as a passive X11/PulseAudio screen recorder pushing to MediaMTX, while WebRTC captures internal `chromium_source` signaling.
+GStreamer acts solely as a passive screen recorder using a static pipeline with `ximagesrc` (capturing Xvfb display :99) and `pulsesrc` pushing to MediaMTX.
 
 The base canvas size for the pipeline is defined by `cfg.Input.Resolution` within the `InputSettings`. This establishes the drawing area for all overlays and layers. The final scaled output, which is sent to external destinations, is defined separately by `cfg.Output.Resolution`. Because the input resolution dictates the fundamental structure of the pipeline and video buffers, any changes to the input resolution require a full restart, whereas changes to individual layer positions or sizes may not.
 
 ### VLX Connector (IPC Integration)
 To eliminate local SRT network overhead and reduce latency for deployments running alongside `VLX_ChatBridge`, VisionBridge integrates a dedicated IPC connector:
-- **Control Ingress**: A listener on the Unix control socket (`/tmp/vlx_control.sock`) handles incoming control messages. Incoming JSON control commands for overlays are parsed and broadcasted as WebSocket messages to Chromium clients for zero-CPU DOM manipulation.
+- **Control Ingress**: A listener on the Unix control socket (`/tmp/vlx_control.sock`) handles incoming control messages. Incoming JSON control commands for overlays are processed using a Single Source of Truth (SSOT) pattern: JSON commands update the YAML settings file directly, and the file watcher triggers WebSocket broadcasts to the Chromium clients for zero-CPU DOM manipulation.
 - **Auto-Fallback Concept**: Users can hook `runOnPublish` / `runOnUnpublish` scripts in MediaMTX to inject JSON into VisionBridge's control socket. This allows creating an automatic "Be Right Back" screen or fallback sequence upon signal loss.
 
 - **Dynamic Updates via WebSocket**: Live properties are manipulated in real-time. Control commands sent to the configured control socket map to the `ControlCommand` struct, containing `event_id`, `timestamp`, `action` (e.g., 'set_input_state'), `target`, and a `payload` object.
