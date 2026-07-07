@@ -53,11 +53,12 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 
 	// Video pipeline: Compositor -> Scale/Rate -> x264enc
 	args = append(args,
-		"compositor", "name=comp", "background=black", "!",
-		fmt.Sprintf("video/x-raw,width=%s,height=%s,framerate=%s", resWidth, resHeight, framerate), "!",
-		"videoconvert", "!",
-		"x264enc", "tune=zerolatency", "speed-preset=ultrafast", fmt.Sprintf("bitrate=%s", vBitrate), "key-int-max=30", "!",
-		"h264parse", "!", "tee", "name=vtee",
+	    "compositor", "name=comp", "background=black", "!",
+	    fmt.Sprintf("video/x-raw,width=%s,height=%s,framerate=%s", resWidth, resHeight, framerate), "!",
+	    "videoconvert", "!",
+	    "video/x-raw,format=I420,colorimetry=bt709", "!", // <--- BT.709 - LIMITED RANGE
+	    "x264enc", "tune=zerolatency", "speed-preset=ultrafast", fmt.Sprintf("bitrate=%s", vBitrate), "key-int-max=60", "!", // <--- 2secs KEYFRAME
+	    "h264parse", "!", "tee", "name=vtee",
 	)
 
 	// Audio pipeline: Mixer -> Resample -> AAC
