@@ -11,7 +11,11 @@ import (
 // BuildFilterComplex constructs a static, immutable GStreamer pipeline dynamically driven by configuration.
 func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 	// Parse Video Resolution
-	resParts := strings.Split(cfg.Input.Resolution, "x")
+	resStr := cfg.Input.Resolution
+	if cfg.Output.Resolution != "" {
+		resStr = cfg.Output.Resolution
+	}
+	resParts := strings.Split(resStr, "x")
 	resWidth, resHeight := "1920", "1080"
 	if len(resParts) == 2 {
 		resWidth = resParts[0]
@@ -20,7 +24,9 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 
 	// Parse Video Framerate
 	framerate := "30/1"
-	if cfg.Input.Framerate > 0 {
+	if cfg.Output.FPS > 0 {
+		framerate = fmt.Sprintf("%d/1", cfg.Output.FPS)
+	} else if cfg.Input.Framerate > 0 {
 		framerate = fmt.Sprintf("%d/1", cfg.Input.Framerate)
 	}
 
