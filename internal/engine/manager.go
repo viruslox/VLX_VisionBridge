@@ -574,7 +574,13 @@ if err := os.MkdirAll(mediaBasePath, 0755); err == nil {
 
 		if (el.tagName === 'VIDEO') {
             el.onended = function() {
-                setTimeout(function() {
+                c.timer = setTimeout(function() {
+                    c.index = Math.floor(Math.random() * c.files.length);
+                    playNextCarousel(layerId);
+                }, ` + strconv.Itoa(carouselDelayMs) + `);
+            };
+            el.onerror = function() {
+                c.timer = setTimeout(function() {
                     c.index = Math.floor(Math.random() * c.files.length);
                     playNextCarousel(layerId);
                 }, ` + strconv.Itoa(carouselDelayMs) + `);
