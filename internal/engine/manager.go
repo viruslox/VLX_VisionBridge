@@ -659,6 +659,7 @@ if err := os.MkdirAll(mediaBasePath, 0755); err == nil {
 				"--allow-file-access-from-files",
 				"--disable-web-security",
 				"--allow-running-insecure-content",
+				"--force-device-scale-factor=1",
 			)
 
 			if cfg.Input.OverlayServerActive {
