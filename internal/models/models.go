@@ -94,6 +94,7 @@ type InputSettings struct {
 	Resolution          string         `yaml:"resolution" json:"resolution"`
 	Framerate           int            `yaml:"framerate" json:"framerate"`
 	CarouselDelay       int            `yaml:"carousel_delay" json:"carousel_delay"`
+	CarouselShuffle     bool           `yaml:"carousel_shuffle" json:"carousel_shuffle"`
 	WebrtcPortMin       int            `yaml:"webrtc_port_min"`
 	WebrtcPortMax       int            `yaml:"webrtc_port_max"`
 	OverlayServerActive bool           `yaml:"overlay_server_active" json:"overlay_server_active"`
