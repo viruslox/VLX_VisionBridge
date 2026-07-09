@@ -337,6 +337,14 @@ func (pm *ProcessManager) manageOverlays(cfg *models.Config) {
 				carouselDelayMs = cfg.Input.CarouselDelay * 1000
 			}
 
+			// Carousel ordering mode injected into the overlay JS.
+			// true  = shuffle-bag (random, no repeats until the folder is exhausted)
+			// false = deterministic natural/alphabetical order
+			carouselShuffleJS := "false"
+			if cfg.Input.CarouselShuffle {
+				carouselShuffleJS = "true"
+			}
+
 			overlayPort := cfg.Input.OverlayServerPort
 			if overlayPort <= 0 {
 				overlayPort = 50051
@@ -482,6 +490,73 @@ if err := os.MkdirAll(mediaBasePath, 0755); err == nil {
     var carousels = {};
     var serverPort = ` + strconv.Itoa(overlayPort) + `;
     var mediaBasePath = "` + mediaBasePath + `";
+    var carouselShuffle = ` + carouselShuffleJS + `;
+
+    // Encode each path segment individually so special characters (#, ?, &,
+    // spaces, parentheses, unicode, ...) are escaped safely, while the '/'
+    // separators are preserved. encodeURI alone leaves #, ? and & intact,
+    // which breaks filenames containing them.
+    function encodePathSegments(p) {
+        return p.split('/').map(function(seg) {
+            return encodeURIComponent(seg);
+        }).join('/');
+    }
+
+    // Natural / human sort comparator: "img2.png" sorts before "img10.png".
+    // Case-insensitive; splits each name into numeric and text chunks and
+    // compares numeric chunks by value rather than lexicographically.
+    function naturalCompare(a, b) {
+        var ax = [], bx = [];
+        String(a).toLowerCase().replace(/(\d+)|(\D+)/g, function(_, num, str) {
+            ax.push([num === undefined ? Infinity : parseInt(num, 10), str || '']);
+        });
+        String(b).toLowerCase().replace(/(\d+)|(\D+)/g, function(_, num, str) {
+            bx.push([num === undefined ? Infinity : parseInt(num, 10), str || '']);
+        });
+        while (ax.length && bx.length) {
+            var an = ax.shift(), bn = bx.shift();
+            var d = an[0] - bn[0] || an[1].localeCompare(bn[1]);
+            if (d) return d;
+        }
+        return ax.length - bx.length;
+    }
+
+    // Fisher-Yates in-place shuffle.
+    function shuffleInPlace(arr) {
+        for (var i = arr.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+        }
+        return arr;
+    }
+
+    // Build a fresh shuffled "bag" of indices for a carousel. Guarantees every
+    // file plays once before any repeats, and avoids a repeat across the seam
+    // when a new bag is generated.
+    function buildBag(c) {
+        var idx = [];
+        for (var i = 0; i < c.files.length; i++) idx.push(i);
+        shuffleInPlace(idx);
+        if (c.lastIndex !== undefined && idx.length > 1 && idx[0] === c.lastIndex) {
+            var t = idx[0]; idx[0] = idx[1]; idx[1] = t;
+        }
+        c.bag = idx;
+        c.bagPos = 0;
+    }
+
+    // Pick the next index for a carousel, honoring the shuffle/sequential mode.
+    function nextIndex(c) {
+        if (carouselShuffle) {
+            if (!c.bag || c.bagPos >= c.bag.length) buildBag(c);
+            var index = c.bag[c.bagPos++];
+            c.lastIndex = index;
+            return index;
+        }
+        // Sequential mode: step through the (already natural-sorted) list, wrap around.
+        var next = (c.lastIndex === undefined) ? 0 : (c.lastIndex + 1) % c.files.length;
+        c.lastIndex = next;
+        return next;
+    }
 
     function createMediaElement(path, volume) {
         var lower = path.toLowerCase();
@@ -519,10 +594,10 @@ if err := os.MkdirAll(mediaBasePath, 0755); err == nil {
             if (path.startsWith(mediaBasePath)) {
                 var relativePath = path.substring(mediaBasePath.length);
                 if (relativePath.startsWith('/')) relativePath = relativePath.substring(1);
-                el.src = 'http://127.0.0.1:' + serverPort + '/media/' + encodeURI(relativePath);
+                el.src = 'http://127.0.0.1:' + serverPort + '/media/' + encodePathSegments(relativePath);
             } else {
-                // Fallback
-                el.src = 'file://' + encodeURI(path);
+                // Fallback (absolute path: the leading '/' is preserved by encodePathSegments)
+                el.src = 'file://' + encodePathSegments(path);
             }
         }
 
@@ -557,7 +632,10 @@ if err := os.MkdirAll(mediaBasePath, 0755); err == nil {
             if (el.tagName === 'VIDEO') el.loop = true;
             container.appendChild(el);
         } else {
-            carousels[layerId] = { files: files, index: Math.floor(Math.random() * files.length), timer: null, volume: volume };
+            var ordered = files.slice();
+            if (!carouselShuffle) ordered.sort(naturalCompare); // deterministic human-numeric order
+            carousels[layerId] = { files: ordered, bag: null, bagPos: 0, lastIndex: undefined, timer: null, volume: volume };
+            carousels[layerId].index = nextIndex(carousels[layerId]);
             playNextCarousel(layerId);
         }
     }
@@ -575,19 +653,19 @@ if err := os.MkdirAll(mediaBasePath, 0755); err == nil {
 		if (el.tagName === 'VIDEO') {
             el.onended = function() {
                 c.timer = setTimeout(function() {
-                    c.index = Math.floor(Math.random() * c.files.length);
+                    c.index = nextIndex(c);
                     playNextCarousel(layerId);
                 }, ` + strconv.Itoa(carouselDelayMs) + `);
             };
             el.onerror = function() {
                 c.timer = setTimeout(function() {
-                    c.index = Math.floor(Math.random() * c.files.length);
+                    c.index = nextIndex(c);
                     playNextCarousel(layerId);
                 }, ` + strconv.Itoa(carouselDelayMs) + `);
             };
         } else {
             c.timer = setTimeout(function() {
-                c.index = Math.floor(Math.random() * c.files.length);
+                c.index = nextIndex(c);
                 playNextCarousel(layerId);
             }, ` + strconv.Itoa(carouselDelayMs) + `);
         }
