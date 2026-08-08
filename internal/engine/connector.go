@@ -47,7 +47,7 @@ func (pm *ProcessManager) StartConnectorListener() {
 	}
 
 	sockPath := "/tmp/vlx_control.sock"
-	groupName := "frameflow"
+	groupName := "visionbridge"
 	if pm.config != nil && pm.config.Connector.ControlSocket != "" {
 		sockPath = pm.config.Connector.ControlSocket
 	}

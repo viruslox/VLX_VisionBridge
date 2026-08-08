@@ -220,30 +220,7 @@ func setupUserAndSettings(installBase, etcDir, varDir, selectedUser string) {
 	if destNode.Kind == yaml.DocumentNode && len(destNode.Content) > 0 {
 		mapping := destNode.Content[0]
 		if mapping.Kind == yaml.MappingNode {
-			foundUser := false
-			foundDir := false
-			for i := 0; i < len(mapping.Content); i += 2 {
-				if mapping.Content[i].Value == "visionbridge_USER" {
-					mapping.Content[i+1].Value = selectedUser
-					foundUser = true
-				}
-				if mapping.Content[i].Value == "visionbridge_DIR" {
-					mapping.Content[i+1].Value = "/opt/VLX_VisionBridge"
-					foundDir = true
-				}
-			}
-			if !foundUser {
-				keyNode := &yaml.Node{Kind: yaml.ScalarNode, Value: "visionbridge_USER"}
-				valNode := &yaml.Node{Kind: yaml.ScalarNode, Value: selectedUser}
-				mapping.Content = append(mapping.Content, keyNode, valNode)
-			}
-			if !foundDir {
-				keyNode := &yaml.Node{Kind: yaml.ScalarNode, Value: "visionbridge_DIR"}
-				valNode := &yaml.Node{Kind: yaml.ScalarNode, Value: "/opt/VLX_VisionBridge"}
-				mapping.Content = append(mapping.Content, keyNode, valNode)
-			}
-
-			// Update database DSN
+			// Update database DSN and connector group
 			for i := 0; i < len(mapping.Content); i += 2 {
 				if mapping.Content[i].Value == "database" {
 					dbMapping := mapping.Content[i+1]
@@ -255,7 +232,17 @@ func setupUserAndSettings(installBase, etcDir, varDir, selectedUser string) {
 							}
 						}
 					}
-					break
+				}
+				if mapping.Content[i].Value == "connector" {
+					connectorMapping := mapping.Content[i+1]
+					if connectorMapping.Kind == yaml.MappingNode {
+						for j := 0; j < len(connectorMapping.Content); j += 2 {
+							if connectorMapping.Content[j].Value == "group" {
+								connectorMapping.Content[j+1].Value = selectedUser
+								break
+							}
+						}
+					}
 				}
 			}
 		}
