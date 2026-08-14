@@ -335,7 +335,7 @@ func Install() {
 	users := getEligibleUsers()
 	selectedUser := promptUser(users)
 
-	setupUserAndSettings(installBase, etcDir, varDir, selectedUser)
+	setupUserAndSettings(installBase, etcDir, varDir, selectedUser, groupWasSet, dsnWasSet)
 
 	fmt.Println("Removing pipewire and disabling lingering for users...")
 	if err := exec.Command("apt-get", "purge", "-y", "pipewire", "wireplumber", "pipewire-pulse", "pipewire-audio").Run(); err != nil {
