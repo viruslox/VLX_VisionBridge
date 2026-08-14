@@ -195,7 +195,42 @@ func promptUser(users []string) string {
 	return selectedUser
 }
 
-func setupUserAndSettings(installBase, etcDir, varDir, selectedUser string) {
+// fieldIsSet reports whether the given dotted key path exists in the raw YAML
+// content with a non-empty, non-null value. It must be called against the
+// settings file content as it existed *before* copyTemplate/addMissingKeys
+// runs, since that merge step already backfills missing keys with template
+// defaults — by the time setupUserAndSettings runs, every key "exists," so
+// checking presence after the merge can no longer tell a user-set value apart
+// from a filled-in default.
+func fieldIsSet(content []byte, path ...string) bool {
+	var node yaml.Node
+	if err := yaml.Unmarshal(content, &node); err != nil {
+		return false
+	}
+	if node.Kind != yaml.DocumentNode || len(node.Content) == 0 {
+		return false
+	}
+	current := node.Content[0]
+	for _, key := range path {
+		if current.Kind != yaml.MappingNode {
+			return false
+		}
+		found := false
+		for i := 0; i < len(current.Content); i += 2 {
+			if current.Content[i].Value == key {
+				current = current.Content[i+1]
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return !(current.Kind == yaml.ScalarNode && current.Value == "")
+}
+
+func setupUserAndSettings(installBase, etcDir, varDir, selectedUser string, groupWasSet, dsnWasSet bool) {
 	if selectedUser == "visionbridge" {
 		cmd := exec.Command("id", "-u", "visionbridge")
 		if err := cmd.Run(); err != nil {
@@ -222,7 +257,7 @@ func setupUserAndSettings(installBase, etcDir, varDir, selectedUser string) {
 		if mapping.Kind == yaml.MappingNode {
 			// Update database DSN and connector group
 			for i := 0; i < len(mapping.Content); i += 2 {
-				if mapping.Content[i].Value == "database" {
+				if !dsnWasSet && mapping.Content[i].Value == "database" {
 					dbMapping := mapping.Content[i+1]
 					if dbMapping.Kind == yaml.MappingNode {
 						for j := 0; j < len(dbMapping.Content); j += 2 {
@@ -233,7 +268,7 @@ func setupUserAndSettings(installBase, etcDir, varDir, selectedUser string) {
 						}
 					}
 				}
-				if mapping.Content[i].Value == "connector" {
+				if !groupWasSet && mapping.Content[i].Value == "connector" {
 					connectorMapping := mapping.Content[i+1]
 					if connectorMapping.Kind == yaml.MappingNode {
 						for j := 0; j < len(connectorMapping.Content); j += 2 {
@@ -275,6 +310,15 @@ func Install() {
 	setupDirectories(binDir, etcDir, varDir)
 
 	copyExecutable(binDir)
+
+	settingsPath := filepath.Join(etcDir, "visionbridge.settings")
+	var groupWasSet, dsnWasSet bool
+	if raw, err := os.ReadFile(settingsPath); err == nil {
+		groupWasSet = fieldIsSet(raw, "connector", "group")
+		dsnWasSet = fieldIsSet(raw, "database", "dsn")
+	}
+	// If the file doesn't exist yet, both flags stay false — correct, since on
+	// a true fresh install nothing has been set and the defaults should apply.
 
 	setupConfig(etcDir)
 
