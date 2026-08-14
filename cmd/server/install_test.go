@@ -244,3 +244,100 @@ func TestAddMissingKeys(t *testing.T) {
 		})
 	}
 }
+
+func TestFieldIsSet(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		path     []string
+		expected bool
+	}{
+		{
+			name:     "Top-level key set with value",
+			content:  "a: hello\n",
+			path:     []string{"a"},
+			expected: true,
+		},
+		{
+			name:     "Top-level key missing entirely",
+			content:  "b: hello\n",
+			path:     []string{"a"},
+			expected: false,
+		},
+		{
+			name:     "Top-level key present but empty string",
+			content:  "a: \"\"\n",
+			path:     []string{"a"},
+			expected: false,
+		},
+		{
+			name:     "Top-level key present but null",
+			content:  "a: null\n",
+			path:     []string{"a"},
+			expected: false,
+		},
+		{
+			name:     "Nested key set with value",
+			content:  "connector:\n  group: frameflow\n",
+			path:     []string{"connector", "group"},
+			expected: true,
+		},
+		{
+			name:     "Nested key missing, parent present",
+			content:  "connector:\n  ipc_control_in: true\n",
+			path:     []string{"connector", "group"},
+			expected: false,
+		},
+		{
+			name:     "Nested key missing, parent also missing",
+			content:  "database:\n  dsn: /tmp/x.db\n",
+			path:     []string{"connector", "group"},
+			expected: false,
+		},
+		{
+			name:     "Nested key present but empty string",
+			content:  "connector:\n  group: \"\"\n",
+			path:     []string{"connector", "group"},
+			expected: false,
+		},
+		{
+			name:     "Parent key exists but is a scalar, not a mapping",
+			content:  "connector: not_a_map\n",
+			path:     []string{"connector", "group"},
+			expected: false,
+		},
+		{
+			name:     "Empty document",
+			content:  "",
+			path:     []string{"connector", "group"},
+			expected: false,
+		},
+		{
+			name:     "Invalid YAML",
+			content:  "connector:\n  - broken\n group: x",
+			path:     []string{"connector", "group"},
+			expected: false,
+		},
+		{
+			name:     "Deeply nested key set with value",
+			content:  "a:\n  b:\n    c: value\n",
+			path:     []string{"a", "b", "c"},
+			expected: true,
+		},
+		{
+			name:     "Deeply nested key missing at deepest level",
+			content:  "a:\n  b:\n    x: value\n",
+			path:     []string{"a", "b", "c"},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := fieldIsSet([]byte(tt.content), tt.path...)
+			if result != tt.expected {
+				t.Errorf("fieldIsSet() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}
