@@ -496,11 +496,17 @@ if err := os.MkdirAll(mediaBasePath, 0755); err == nil {
     // spaces, parentheses, unicode, ...) are escaped safely, while the '/'
     // separators are preserved. encodeURI alone leaves #, ? and & intact,
     // which breaks filenames containing them.
-    function encodePathSegments(p) {
-        return p.split('/').map(function(seg) {
-            return encodeURIComponent(seg);
-        }).join('/');
-    }
+	function encodePathSegments(p) {
+	    var queryIdx = p.indexOf('?');
+	    var pathPart = queryIdx === -1 ? p : p.substring(0, queryIdx);
+	    var queryPart = queryIdx === -1 ? '' : p.substring(queryIdx); // keeps leading '?'
+	
+	    var encodedPath = pathPart.split('/').map(function(seg) {
+	        return encodeURIComponent(seg);
+	    }).join('/');
+	
+	    return encodedPath + queryPart;
+	}
 
     // Natural / human sort comparator: "img2.png" sorts before "img10.png".
     // Case-insensitive; splits each name into numeric and text chunks and
