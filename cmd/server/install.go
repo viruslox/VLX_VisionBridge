@@ -227,7 +227,14 @@ func fieldIsSet(content []byte, path ...string) bool {
 			return false
 		}
 	}
-	return !(current.Kind == yaml.ScalarNode && current.Value == "")
+	if current.Kind == yaml.ScalarNode {
+		// Treat empty, explicit null (~/null), and the YAML null tag as "not set"
+		// so the installer default is applied for these.
+		if current.Value == "" || current.Tag == "!!null" {
+			return false
+		}
+	}
+	return true
 }
 
 func setupUserAndSettings(installBase, etcDir, varDir, selectedUser string, groupWasSet, dsnWasSet bool) {
