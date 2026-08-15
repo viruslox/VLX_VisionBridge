@@ -12,9 +12,18 @@ type OutputSettings struct {
 	Destinations    []string `yaml:"destinations"`
 }
 
-// ChromiumSource defines the settings for up to 9 native DOM Z-layers manipulated via WebSocket.
+// ChromiumSource defines the settings for up to 10 native DOM Z-layers manipulated via WebSocket.
 type ChromiumSource struct {
 	Active   bool   `yaml:"active"`
+
+	Z0Active bool   `yaml:"z0_active"`
+	Z0Path   string `yaml:"z0_path"`
+	Z0Volume *int   `yaml:"z0_volume"`
+	Z0Width  *int   `yaml:"z0_width"`
+	Z0Height *int   `yaml:"z0_height"`
+	Z0X      *int   `yaml:"z0_x"`
+	Z0Y      *int   `yaml:"z0_y"`
+
 	Z1Active bool   `yaml:"z1_active"`
 	Z1Path   string `yaml:"z1_path"`
 	Z1Volume *int   `yaml:"z1_volume"`

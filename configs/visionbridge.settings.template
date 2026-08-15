@@ -33,6 +33,14 @@ input:
   chromium_source:
     active: true
 
+    z0_active: false
+    z0_path: ""
+    z0_width: null
+    z0_height: null
+    z0_x: null
+    z0_y: null
+    z0_volume: 100
+
     z1_active: false
     z1_path: "/opt/VLX_VisionBridge/media/intro.mp4"
     z1_width: null

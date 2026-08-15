@@ -36,7 +36,7 @@ The system coordinates a single DOM-dominant pipeline conceptually similar to a 
 
 ### HTML Overlays (`chromium_source`)
 
-An independently spawned Chromium process running in non-headless mode inside an Xvfb display dynamically rendering up to 9 Z-layers (`Z1` to `Z9`).
+An independently spawned Chromium process running in non-headless mode inside an Xvfb display dynamically rendering up to 10 Z-layers (`Z0` to `Z9`).
 - All media rendering (videos, images, carousels) happens exclusively in the Chromium DOM.
 - It dynamically generates HTML tags (`<video autoplay loop>`, `<img>`, `<iframe>`) based on the content type inferred from the path.
 - For directory-based media playback, the Go backend provides an HTTP endpoint (`/api/list-dir?path=...`) that the Chromium WebSocket client fetches to automatically sequence and loop media as a carousel without GStreamer intervention.
@@ -66,7 +66,7 @@ The output layer encodes the composite frames into H.264/AAC and pushes to a rob
 ## Resilience & Process Management
 
 A robust `ProcessManager` governs the underlying GStreamer subprocess:
-- **Idle Behavior**: If the stream output is deactivated via configuration or IPC, the ProcessManager keeps GStreamer fully dormant (consuming 0% CPU) until a `[ZMQ_CONTROL] Target=stream Enabled=true` command wakes it up.
+- **Idle Behavior**: If the stream output is deactivated via configuration or IPC, the ProcessManager keeps GStreamer fully dormant (consuming 0% CPU) until a JSON `ControlCommand` with `target='stream'` and `enabled=true` wakes it up.
 - **Health Monitor**: Monitors CPU/RAM usage and stream stability, logging metrics to SQLite.
 - **Error Diagnostics**: Maintains a `tailBuffer` of the last 4096 bytes of the process's standard error stream to pinpoint failures (identifying them as `[input]`, `[mixer]`, or `[output]` issues).
 - **RetryTracker**: Uses a backoff strategy (5 quick retries, 2 slow retries, then dynamic disablement) for isolating failures in sources like Chromium overlays.
