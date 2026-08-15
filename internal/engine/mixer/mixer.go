@@ -62,14 +62,22 @@ func BuildFilterComplex(cfg *models.Config) ([]string, string, string, string) {
 	)
 
 	// Audio pipeline: Mixer -> Resample -> AAC
-	args = append(args,
-		"audiomixer", "name=acomp", "!",
-		"audioconvert", "!",
-		"audioresample", "!",
-		fmt.Sprintf("audio/x-raw,rate=%d,channels=2", sampleRate), "!",
-		"avenc_aac", fmt.Sprintf("bitrate=%d", aBitrateInt), "!",
-		"aacparse", "!", "tee", "name=atee",
-	)
+ 	args = append(args,
+ 		"audiomixer", "name=acomp", "!",
+ 		"audioconvert", "!",
+ 		"audioresample", "!",
+ 		fmt.Sprintf("audio/x-raw,rate=%d,channels=2", sampleRate), "!",
++		// Dynamic range control before the encoder. Sources on a z-layer vary wildly
++		// (hot local mp4s vs. actioncam WHEP feeds); this tames peaks so avenc_aac
++		// never receives an over-0dBFS signal and hard-clips. soft-knee + ratio<1
++		// compresses gently; threshold 0.6 (~-4.4 dBFS) leaves headroom. No makeup
++		// gain here, so quiet sources stay quiet (unlike ChatBridge's mixer).
++		"audiodynamic", "mode=compressor", "characteristics=soft-knee",
++		"ratio=0.6", "threshold=0.6", "!",
++		"audioconvert", "!",
+ 		"avenc_aac", fmt.Sprintf("bitrate=%d", aBitrateInt), "!",
+ 		"aacparse", "!", "tee", "name=atee",
+ 	)
 
 	// Master Clocks: Ensures continuous streaming even if Chromium drops
 	args = append(args,
