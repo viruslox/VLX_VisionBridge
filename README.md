@@ -35,7 +35,7 @@ apt-get install gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugin
 
 VisionBridge operates alongside MediaMTX and ChatBridge on the same localhost.
 
-The `input` configuration revolves around `chromium_source`, which supports exactly 9 distinct Z-layers (`Z1` to `Z9`) with explicit `height`, `width`, `x`, `y`, `volume`, and `path` variables. It dynamically generates HTML tags (`<video autoplay loop>`, `<img>`, `<iframe>`) based on the content type inferred from the path.
+The `input` configuration revolves around `chromium_source`, which supports exactly 10 distinct Z-layers (`Z0` to `Z9`) with explicit `height`, `width`, `x`, `y`, `volume`, and `path` variables. It dynamically generates HTML tags (`<video autoplay loop>`, `<img>`, `<iframe>`) based on the content type inferred from the path.
 
 For directory-based media playback in `chromium_source`, the Go backend provides an HTTP endpoint (`/api/list-dir?path=...`) that the Chromium WebSocket client fetches to automatically sequence and loop media as a carousel without GStreamer intervention.
 

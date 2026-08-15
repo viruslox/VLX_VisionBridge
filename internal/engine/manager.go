@@ -483,7 +483,7 @@ if err := os.MkdirAll(mediaBasePath, 0755); err == nil {
 </style>
 </head>
 <body>
-  <div id="z1"></div><div id="z2"></div><div id="z3"></div><div id="z4"></div>
+  <div id="z0"></div><div id="z1"></div><div id="z2"></div><div id="z3"></div><div id="z4"></div>
   <div id="z5"></div><div id="z6"></div><div id="z7"></div><div id="z8"></div><div id="z9"></div>
 
   <script>
@@ -834,6 +834,7 @@ func (pm *ProcessManager) buildSyncMessage(cfg *models.Config) map[string]interf
 		"action":  "sync",
 		"bgColor": bgColor,
 		"layers": []LayerState{
+			{ID: "z0", Active: cs.Z0Active, Files: pm.ResolvePath(cs.Z0Path), Volume: cs.Z0Volume, Style: buildLayerStyle(0, cs.Z0Width, cs.Z0Height, cs.Z0X, cs.Z0Y)},
 			{ID: "z1", Active: cs.Z1Active, Files: pm.ResolvePath(cs.Z1Path), Volume: cs.Z1Volume, Style: buildLayerStyle(1, cs.Z1Width, cs.Z1Height, cs.Z1X, cs.Z1Y)},
 			{ID: "z2", Active: cs.Z2Active, Files: pm.ResolvePath(cs.Z2Path), Volume: cs.Z2Volume, Style: buildLayerStyle(2, cs.Z2Width, cs.Z2Height, cs.Z2X, cs.Z2Y)},
 			{ID: "z3", Active: cs.Z3Active, Files: pm.ResolvePath(cs.Z3Path), Volume: cs.Z3Volume, Style: buildLayerStyle(3, cs.Z3Width, cs.Z3Height, cs.Z3X, cs.Z3Y)},

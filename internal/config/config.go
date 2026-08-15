@@ -59,6 +59,11 @@ func chromiumSourceDiff(old, new models.ChromiumSource) bool {
 	if old.Active != new.Active {
 		return true
 	}
+	if old.Z0Active != new.Z0Active || old.Z0Path != new.Z0Path ||
+		!ptrIntEqual(old.Z0Volume, new.Z0Volume) || !ptrIntEqual(old.Z0Width, new.Z0Width) || !ptrIntEqual(old.Z0Height, new.Z0Height) ||
+		!ptrIntEqual(old.Z0X, new.Z0X) || !ptrIntEqual(old.Z0Y, new.Z0Y) {
+		return true
+	}
 	if old.Z1Active != new.Z1Active || old.Z1Path != new.Z1Path ||
 		!ptrIntEqual(old.Z1Volume, new.Z1Volume) || !ptrIntEqual(old.Z1Width, new.Z1Width) || !ptrIntEqual(old.Z1Height, new.Z1Height) ||
 		!ptrIntEqual(old.Z1X, new.Z1X) || !ptrIntEqual(old.Z1Y, new.Z1Y) {
