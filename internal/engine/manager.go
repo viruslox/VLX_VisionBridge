@@ -401,6 +401,22 @@ webrtcHtmlContent := fmt.Sprintf(`<!DOCTYPE html>
         const streamUser = urlParams.get('user') || 'visionbridge';
         const streamPass = urlParams.get('pass') || 'visionbridge';
 
+        // Volume forwarded from a VisionBridge z-layer (see manager.go createMediaElement).
+        function applyVolume(v) {
+            var vol = parseFloat(v);
+            if (isNaN(vol)) return;
+            videoElement.muted = (vol === 0);
+            videoElement.volume = Math.min(Math.max(vol / 100.0, 0), 1);
+        }
+        var initialVolume = urlParams.get('vlx_volume');
+        if (initialVolume !== null) applyVolume(initialVolume);
+
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'vlx-set-volume') {
+                applyVolume(event.data.volume);
+            }
+        });
+
 		const whepUrl = 'http://127.0.0.1:8889/' + streamName + '/whep';
 
 	async function initializeWebRTC() {
@@ -583,7 +599,7 @@ if err := os.MkdirAll(mediaBasePath, 0755); err == nil {
             el.frameBorder = "0";
         }
 
-        if (volume !== undefined && volume !== null) {
+        if (volume !== undefined && volume !== null && el.tagName !== 'IFRAME') {
             var v = parseFloat(volume);
             if (v === 0) {
                 el.muted = true;
@@ -605,6 +621,20 @@ if err := os.MkdirAll(mediaBasePath, 0755); err == nil {
                 // Fallback (absolute path: the leading '/' is preserved by encodePathSegments)
                 el.src = 'file://' + encodePathSegments(path);
             }
+        }
+
+        // Forward volume into HTML-based layers (webrtc.html, overlay pages) that can't be
+        // controlled from outside their frame via .volume/.muted. Initial value travels via
+        // a query param (survives loads); live updates travel via postMessage once loaded.
+        if (el.tagName === 'IFRAME' && volume !== undefined && volume !== null) {
+            var ifrVol = parseFloat(volume);
+            var sep = el.src.indexOf('?') === -1 ? '?' : '&';
+            el.src = el.src + sep + 'vlx_volume=' + ifrVol;
+            el.addEventListener('load', function() {
+                try {
+                    el.contentWindow.postMessage({ type: 'vlx-set-volume', volume: ifrVol }, '*');
+                } catch (e) {}
+            });
         }
 
         el.style.width = '100%';
@@ -702,7 +732,16 @@ if err := os.MkdirAll(mediaBasePath, 0755); err == nil {
                 } else if (msg.action === "volume" && msg.volume !== undefined) {
                     var container = document.getElementById(msg.layer);
                     if (container && container.firstElementChild) {
-                        container.firstElementChild.volume = parseFloat(msg.volume) / 100.0;
+                        var child = container.firstElementChild;
+                        var vol = parseFloat(msg.volume);
+                        if (child.tagName === 'IFRAME') {
+                            try {
+                                child.contentWindow.postMessage({ type: 'vlx-set-volume', volume: vol }, '*');
+                            } catch (e) {}
+                        } else {
+                            child.volume = vol / 100.0;
+                            child.muted = (vol === 0);
+                        }
                     }
                 }
             } catch(e) {
