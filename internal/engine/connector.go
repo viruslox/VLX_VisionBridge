@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -238,7 +239,112 @@ func (pm *ProcessManager) handleControlCommand(cmd ControlCommand) {
 	} else if cmd.Action == "reload" && cmd.Target == "chromium" {
 		log.Println("Executing manual restart of Chromium DOM rendering engine via IPC directive")
 		pm.ReloadChromium()
+	} else if cmd.Action == "apply_template" {
+		templateName := cmd.Payload.Text
+		log.Printf("Applying Z-layout template '%s' via IPC directive", templateName)
+		if err := pm.applyLayoutTemplate(templateName); err != nil {
+			log.Printf("Failed to apply layout template '%s': %v", templateName, err)
+		} else {
+			log.Printf("Layout template '%s' applied; watcher will hot-reload the new layout", templateName)
+		}
 	} else {
 		log.Printf("Unrecognized control action directive received: %s", cmd.Action)
 	}
+}
+
+// mappingValue returns the value node for key within a YAML mapping node, or nil.
+func mappingValue(m *yaml.Node, key string) *yaml.Node {
+	if m == nil || m.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value == key {
+			return m.Content[i+1]
+		}
+	}
+	return nil
+}
+
+// findChromiumSourceNode returns the value node of the chromium_source mapping,
+// whether it sits at the document top level or nested under input:. This lets a
+// template be either a chromium_source-only file or a full settings-shaped file.
+func findChromiumSourceNode(root *yaml.Node) *yaml.Node {
+	if root == nil || len(root.Content) == 0 {
+		return nil
+	}
+	doc := root.Content[0]
+	if n := mappingValue(doc, "chromium_source"); n != nil {
+		return n
+	}
+	if input := mappingValue(doc, "input"); input != nil {
+		if n := mappingValue(input, "chromium_source"); n != nil {
+			return n
+		}
+	}
+	return nil
+}
+
+// applyLayoutTemplate copies the chromium_source (Z-layout) block from a named
+// template file into the live settings file. The template must reside in the
+// same folder as the settings file; path components are stripped to prevent
+// traversal. The write is atomic (temp + rename), so the existing config
+// watcher detects the change and hot-reloads the new layout.
+func (pm *ProcessManager) applyLayoutTemplate(templateName string) error {
+	name := filepath.Base(strings.TrimSpace(templateName))
+	if name == "" || name == "." || name == ".." {
+		return fmt.Errorf("invalid template name %q", templateName)
+	}
+
+	configPath := resolveConfigPath()
+	templatePath := filepath.Join(filepath.Dir(configPath), name)
+
+	templateData, err := os.ReadFile(templatePath)
+	if err != nil {
+		return fmt.Errorf("read template %s: %w", templatePath, err)
+	}
+
+	var templateNode yaml.Node
+	if err := yaml.Unmarshal(templateData, &templateNode); err != nil {
+		return fmt.Errorf("parse template %s: %w", templatePath, err)
+	}
+	templateChrom := findChromiumSourceNode(&templateNode)
+	if templateChrom == nil {
+		return fmt.Errorf("template %s has no chromium_source block", templatePath)
+	}
+
+	configMutex.Lock()
+	defer configMutex.Unlock()
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("read config: %w", err)
+	}
+
+	var node yaml.Node
+	if err := yaml.Unmarshal(data, &node); err != nil {
+		return fmt.Errorf("parse config: %w", err)
+	}
+
+	liveChrom := findChromiumSourceNode(&node)
+	if liveChrom == nil {
+		return fmt.Errorf("live config has no input.chromium_source block")
+	}
+
+	liveChrom.Content = templateChrom.Content
+
+	out, err := yaml.Marshal(&node)
+	if err != nil {
+		return fmt.Errorf("marshal config: %w", err)
+	}
+
+	tmpFile := configPath + ".tmp"
+	if err := os.WriteFile(tmpFile, out, 0644); err != nil {
+		return fmt.Errorf("write temp config: %w", err)
+	}
+	if err := os.Rename(tmpFile, configPath); err != nil {
+		os.Remove(tmpFile)
+		return fmt.Errorf("rename temp config: %w", err)
+	}
+
+	return nil
 }
