@@ -12,7 +12,7 @@ type OutputSettings struct {
 	Destinations    []string `yaml:"destinations"`
 }
 
-// ChromiumSource defines the settings for up to 10 native DOM Z-layers manipulated via WebSocket.
+// ChromiumSource defines the settings for up to 13 native DOM Z-layers (Z0-Z12) manipulated via WebSocket.
 type ChromiumSource struct {
 	Active   bool   `yaml:"active"`
 
@@ -95,6 +95,30 @@ type ChromiumSource struct {
 	Z9Height *int   `yaml:"z9_height"`
 	Z9X      *int   `yaml:"z9_x"`
 	Z9Y      *int   `yaml:"z9_y"`
+
+	Z10Active bool   `yaml:"z10_active"`
+	Z10Path   string `yaml:"z10_path"`
+	Z10Volume *int   `yaml:"z10_volume"`
+	Z10Width  *int   `yaml:"z10_width"`
+	Z10Height *int   `yaml:"z10_height"`
+	Z10X      *int   `yaml:"z10_x"`
+	Z10Y      *int   `yaml:"z10_y"`
+
+	Z11Active bool   `yaml:"z11_active"`
+	Z11Path   string `yaml:"z11_path"`
+	Z11Volume *int   `yaml:"z11_volume"`
+	Z11Width  *int   `yaml:"z11_width"`
+	Z11Height *int   `yaml:"z11_height"`
+	Z11X      *int   `yaml:"z11_x"`
+	Z11Y      *int   `yaml:"z11_y"`
+
+	Z12Active bool   `yaml:"z12_active"`
+	Z12Path   string `yaml:"z12_path"`
+	Z12Volume *int   `yaml:"z12_volume"`
+	Z12Width  *int   `yaml:"z12_width"`
+	Z12Height *int   `yaml:"z12_height"`
+	Z12X      *int   `yaml:"z12_x"`
+	Z12Y      *int   `yaml:"z12_y"`
 }
 
 // InputSettings defines the main engine inputs, including base resolution and global background properties.

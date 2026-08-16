@@ -36,7 +36,7 @@ The system coordinates a single DOM-dominant pipeline conceptually similar to a 
 
 ### HTML Overlays (`chromium_source`)
 
-An independently spawned Chromium process running in non-headless mode inside an Xvfb display dynamically rendering up to 10 Z-layers (`Z0` to `Z9`).
+An independently spawned Chromium process running in non-headless mode inside an Xvfb display dynamically rendering up to 13 Z-layers (`Z0` to `Z12`).
 - All media rendering (videos, images, carousels) happens exclusively in the Chromium DOM.
 - It dynamically generates HTML tags (`<video autoplay loop>`, `<img>`, `<iframe>`) based on the content type inferred from the path.
 - For directory-based media playback, the Go backend provides an HTTP endpoint (`/api/list-dir?path=...`) that the Chromium WebSocket client fetches to automatically sequence and loop media as a carousel without GStreamer intervention.

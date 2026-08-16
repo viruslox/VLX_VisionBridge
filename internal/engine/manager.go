@@ -501,6 +501,7 @@ if err := os.MkdirAll(mediaBasePath, 0755); err == nil {
 <body>
   <div id="z0"></div><div id="z1"></div><div id="z2"></div><div id="z3"></div><div id="z4"></div>
   <div id="z5"></div><div id="z6"></div><div id="z7"></div><div id="z8"></div><div id="z9"></div>
+  <div id="z10"></div><div id="z11"></div><div id="z12"></div>
 
   <script>
     var carousels = {};
@@ -883,6 +884,9 @@ func (pm *ProcessManager) buildSyncMessage(cfg *models.Config) map[string]interf
 			{ID: "z7", Active: cs.Z7Active, Files: pm.ResolvePath(cs.Z7Path), Volume: cs.Z7Volume, Style: buildLayerStyle(7, cs.Z7Width, cs.Z7Height, cs.Z7X, cs.Z7Y)},
 			{ID: "z8", Active: cs.Z8Active, Files: pm.ResolvePath(cs.Z8Path), Volume: cs.Z8Volume, Style: buildLayerStyle(8, cs.Z8Width, cs.Z8Height, cs.Z8X, cs.Z8Y)},
 			{ID: "z9", Active: cs.Z9Active, Files: pm.ResolvePath(cs.Z9Path), Volume: cs.Z9Volume, Style: buildLayerStyle(9, cs.Z9Width, cs.Z9Height, cs.Z9X, cs.Z9Y)},
+			{ID: "z10", Active: cs.Z10Active, Files: pm.ResolvePath(cs.Z10Path), Volume: cs.Z10Volume, Style: buildLayerStyle(10, cs.Z10Width, cs.Z10Height, cs.Z10X, cs.Z10Y)},
+			{ID: "z11", Active: cs.Z11Active, Files: pm.ResolvePath(cs.Z11Path), Volume: cs.Z11Volume, Style: buildLayerStyle(11, cs.Z11Width, cs.Z11Height, cs.Z11X, cs.Z11Y)},
+			{ID: "z12", Active: cs.Z12Active, Files: pm.ResolvePath(cs.Z12Path), Volume: cs.Z12Volume, Style: buildLayerStyle(12, cs.Z12Width, cs.Z12Height, cs.Z12X, cs.Z12Y)},
 		},
 	}
 }

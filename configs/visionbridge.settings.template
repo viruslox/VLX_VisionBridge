@@ -112,3 +112,27 @@ input:
     z9_x: null
     z9_y: null
     z9_volume: 100
+
+    z10_active: false
+    z10_path: ""
+    z10_width: null
+    z10_height: null
+    z10_x: null
+    z10_y: null
+    z10_volume: 100
+
+    z11_active: false
+    z11_path: ""
+    z11_width: null
+    z11_height: null
+    z11_x: null
+    z11_y: null
+    z11_volume: 100
+
+    z12_active: false
+    z12_path: ""
+    z12_width: null
+    z12_height: null
+    z12_x: null
+    z12_y: null
+    z12_volume: 100

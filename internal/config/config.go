@@ -104,6 +104,26 @@ func chromiumSourceDiff(old, new models.ChromiumSource) bool {
 		!ptrIntEqual(old.Z8X, new.Z8X) || !ptrIntEqual(old.Z8Y, new.Z8Y) {
 		return true
 	}
+	if old.Z9Active != new.Z9Active || old.Z9Path != new.Z9Path ||
+		!ptrIntEqual(old.Z9Volume, new.Z9Volume) || !ptrIntEqual(old.Z9Width, new.Z9Width) || !ptrIntEqual(old.Z9Height, new.Z9Height) ||
+		!ptrIntEqual(old.Z9X, new.Z9X) || !ptrIntEqual(old.Z9Y, new.Z9Y) {
+		return true
+	}
+	if old.Z10Active != new.Z10Active || old.Z10Path != new.Z10Path ||
+		!ptrIntEqual(old.Z10Volume, new.Z10Volume) || !ptrIntEqual(old.Z10Width, new.Z10Width) || !ptrIntEqual(old.Z10Height, new.Z10Height) ||
+		!ptrIntEqual(old.Z10X, new.Z10X) || !ptrIntEqual(old.Z10Y, new.Z10Y) {
+		return true
+	}
+	if old.Z11Active != new.Z11Active || old.Z11Path != new.Z11Path ||
+		!ptrIntEqual(old.Z11Volume, new.Z11Volume) || !ptrIntEqual(old.Z11Width, new.Z11Width) || !ptrIntEqual(old.Z11Height, new.Z11Height) ||
+		!ptrIntEqual(old.Z11X, new.Z11X) || !ptrIntEqual(old.Z11Y, new.Z11Y) {
+		return true
+	}
+	if old.Z12Active != new.Z12Active || old.Z12Path != new.Z12Path ||
+		!ptrIntEqual(old.Z12Volume, new.Z12Volume) || !ptrIntEqual(old.Z12Width, new.Z12Width) || !ptrIntEqual(old.Z12Height, new.Z12Height) ||
+		!ptrIntEqual(old.Z12X, new.Z12X) || !ptrIntEqual(old.Z12Y, new.Z12Y) {
+		return true
+	}
 	return false
 }
 
