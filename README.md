@@ -9,6 +9,7 @@ The service is designed for professional 24/7 broadcasting environments where co
 ## How it Works
 
 VisionBridge employs a highly optimized, Cloud-Native "Sidecar" Architecture based on three pillars:
+
 1. **DOM-dominant Architecture**: All media rendering (videos, images, carousels) happens exclusively in the Chromium DOM.
 2. **GStreamer Core**: GStreamer acts solely as a passive screen recorder using a static pipeline with `ximagesrc` (capturing Xvfb display :99) and `pulsesrc` pushing to MediaMTX.
 3. **Local Proxy (Sidecar)**: GStreamer muxes the output and pushes it unencrypted to a local MediaMTX server (`rtmp://127.0.0.1:1935/live/internal`). External routing and TLS are handled dynamically by Chatbridge invoking MediaMTX REST APIs.
@@ -70,3 +71,47 @@ input:
 - **Messaging**: JSON control commands map to an SSOT pattern updating the YAML settings directly, and the file watcher triggers WebSocket broadcasts to Chromium clients.
 
 See [Architecture](ARCHITECTURE.md) for High-Level Design details.
+
+## Configuration Reference
+
+VisionBridge is configured via a YAML settings file containing four primary sections: `database`, `connector`, `output`, and `input`.
+
+### Database
+
+- `dsn`: The Data Source Name or path to the SQLite database file.
+
+### Connector
+
+- `ipc_control_in`: Boolean to enable or disable IPC control socket.
+- `group`: The user group assigned to the control socket for permission access.
+- `control_socket`: The file path for the Unix domain control socket.
+
+### Output
+
+- `active`: Boolean to toggle the streaming output state.
+- `resolution`: The final scaled output resolution (e.g., "1920x1080").
+- `fps`: Target frames per second.
+- `video_bitrate`: Target video encoding bitrate.
+- `audio_bitrate`: Target audio encoding bitrate.
+- `audio_sample_rate`: Target audio sample rate.
+- `destinations`: Array of destination URIs to push the stream to.
+
+### Input
+
+- `bg_color`: The global background color (e.g., "black") used in the Chromium overlay.
+- `resolution`: The base canvas resolution for rendering layers.
+- `framerate`: The processing framerate for inputs.
+- `carousel_delay`: Sleep duration between sequential media playbacks in milliseconds.
+- `carousel_shuffle`: Boolean to randomize carousel playback order.
+- `webrtc_port_min`: Minimum ephemeral UDP port for WebRTC signaling.
+- `webrtc_port_max`: Maximum ephemeral UDP port for WebRTC signaling.
+- `overlay_server_active`: Boolean to enable the internal Web/WebSocket server.
+- `overlay_server_port`: Port for the internal Web/WebSocket server.
+- `media_folder_path`: Base path for the media directory to serve static assets.
+- `chromium_source`: A block that configures up to 13 native DOM Z-layers (`Z0` to `Z12`).
+  - `active`: Boolean to keep the entire Chromium layer active.
+  - `z*_active`: Boolean to enable/disable a specific layer (e.g., `z0_active`).
+  - `z*_path`: File path, directory path, or URL for the media source.
+  - `z*_volume`: Volume (0-100) for native media elements.
+  - `z*_width`, `z*_height`: Width and height dimensions of the layer.
+  - `z*_x`, `z*_y`: X and Y absolute layout coordinates of the layer.
