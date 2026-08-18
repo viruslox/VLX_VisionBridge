@@ -147,6 +147,10 @@ func (pm *ProcessManager) handleControlCommand(cmd ControlCommand) {
 			pm.cmd.Process.Kill()
 		}
 		pm.mu.Unlock()
+
+		if err := pm.writeSettingsScalar([]string{"output", "active"}, strconv.FormatBool(cmd.Payload.Enabled)); err != nil {
+			log.Printf("Failed to persist stream active state to configuration file: %v", err)
+		}
 		return
 	}
 
@@ -233,6 +237,10 @@ func (pm *ProcessManager) handleControlCommand(cmd ControlCommand) {
 				"volume": vol,
 			}
 			pm.broadcastWSMessage(wsCmd)
+
+			if err := pm.writeSettingsScalar([]string{"input", "chromium_source", fmt.Sprintf("%s_volume", zLayer)}, cmd.Payload.Text); err != nil {
+				log.Printf("Failed to persist layer %s volume to configuration file: %v", zLayer, err)
+			}
 		}
 	} else if cmd.Action == "trigger_alert" {
 		log.Printf("trigger_alert event directive received for target %s, text payload: %s", cmd.Target, cmd.Payload.Text)
@@ -344,6 +352,72 @@ func (pm *ProcessManager) applyLayoutTemplate(templateName string) error {
 	if err := os.Rename(tmpFile, configPath); err != nil {
 		os.Remove(tmpFile)
 		return fmt.Errorf("rename temp config: %w", err)
+	}
+
+	return nil
+}
+
+// writeSettingsScalar performs an atomic YAML node mutation for a given nested key path.
+func (pm *ProcessManager) writeSettingsScalar(keys []string, value string) error {
+	configMutex.Lock()
+	defer configMutex.Unlock()
+
+	configPath := resolveConfigPath()
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to read config for scalar write: %w", err)
+	}
+
+	var node yaml.Node
+	if err := yaml.Unmarshal(data, &node); err != nil {
+		return fmt.Errorf("failed to parse config for scalar write: %w", err)
+	}
+
+	if len(keys) == 0 {
+		return nil
+	}
+
+	current := &node
+	if current.Kind == yaml.DocumentNode && len(current.Content) > 0 {
+		current = current.Content[0]
+	}
+
+	for i, key := range keys {
+		if i == len(keys)-1 {
+			// Set the value
+			found := false
+			for j := 0; j+1 < len(current.Content); j += 2 {
+				if current.Content[j].Value == key {
+					current.Content[j+1].Value = value
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("key %q not found in config mapping", key)
+			}
+		} else {
+			// Traverse down
+			next := mappingValue(current, key)
+			if next == nil {
+				return fmt.Errorf("key path %v failed at %q", keys, key)
+			}
+			current = next
+		}
+	}
+
+	out, err := yaml.Marshal(&node)
+	if err != nil {
+		return fmt.Errorf("failed to marshal updated config: %w", err)
+	}
+
+	tmpFile := configPath + ".tmp"
+	if err := os.WriteFile(tmpFile, out, 0644); err != nil {
+		return fmt.Errorf("failed to write temporary config: %w", err)
+	}
+	if err := os.Rename(tmpFile, configPath); err != nil {
+		os.Remove(tmpFile)
+		return fmt.Errorf("failed to rename temporary config: %w", err)
 	}
 
 	return nil

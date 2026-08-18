@@ -853,6 +853,10 @@ func (pm *ProcessManager) UpdateFilter(config *models.Config) {
 	pm.mu.Lock()
 	pm.config = config
 	pm.mu.Unlock()
+
+	// Push the new layer state (including volumes) to the live overlay so a
+	// filter-only change applies without a pipeline restart.
+	pm.broadcastWSMessage(pm.buildSyncMessage(config))
 }
 
 func (pm *ProcessManager) buildSyncMessage(cfg *models.Config) map[string]interface{} {
