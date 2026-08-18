@@ -143,3 +143,4 @@ control_api:
   port: "8770"
   user: "visionbridge"
   pass: "changeme"
+  log_unit: "visionbridge"

@@ -29,12 +29,15 @@ type Server struct {
 	pass     string
 	shutdown func()
 	httpSrv  *http.Server
+
+	logUnit string          // systemd unit tailed by the on-demand console
+	tickets *ticketManager  // short-lived tickets authorizing the console WS
 }
 
 // New builds the control API server. If user is empty, requests are not
 // authenticated (the 127.0.0.1 bind is then the only trust boundary).
-func New(pm *engine.ProcessManager, bindAddr, port, user, pass string, shutdown func()) *Server {
-	s := &Server{pm: pm, user: user, pass: pass, shutdown: shutdown}
+func New(pm *engine.ProcessManager, bindAddr, port, user, pass, logUnit string, shutdown func()) *Server {
+	s := &Server{pm: pm, user: user, pass: pass, shutdown: shutdown, logUnit: logUnit, tickets: newTicketManager()}
 
 	if bindAddr == "" {
 		bindAddr = "127.0.0.1"
@@ -50,6 +53,10 @@ func New(pm *engine.ProcessManager, bindAddr, port, user, pass string, shutdown 
 	mux.HandleFunc("/api/layer", s.auth(s.handleLayer))
 	mux.HandleFunc("/api/volume", s.auth(s.handleVolume))
 	mux.HandleFunc("/api/shutdown", s.auth(s.handleShutdown))
+	// Console: ticket issued over the authenticated API; the WS route is validated
+	// by that single-use ticket (browsers can't set auth headers on a WS handshake).
+	mux.HandleFunc("/api/console/ticket", s.auth(s.handleConsoleTicket))
+	mux.HandleFunc("/api/console/ws", s.handleConsoleWS)
 
 	s.httpSrv = &http.Server{Addr: bindAddr + ":" + port, Handler: mux}
 	return s

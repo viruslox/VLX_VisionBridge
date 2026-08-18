@@ -168,6 +168,7 @@ func main() {
 			initialConfig.ControlAPI.Port,
 			initialConfig.ControlAPI.User,
 			initialConfig.ControlAPI.Pass,
+			initialConfig.ControlAPI.LogUnit,
 			shutdownVB,
 		)
 		ctrlAPI.Start()
