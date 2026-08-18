@@ -1,0 +1,15 @@
+# VLX_VisionBridge Frontend (web GUI) settings
+
+# Standalone web server binding (Apache reverse-proxy target)
+bind_address=0.0.0.0
+bind_port=8091
+
+# GUI credentials (BasicAuth required to reach the panel)
+VB_GUI_USER=frontend
+VB_GUI_PASS=frontend
+
+# Backend control API (must match the control_api block in visionbridge.settings)
+backend_address=127.0.0.1
+backend_port=8770
+backend_user=visionbridge
+backend_pass=changeme
