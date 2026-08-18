@@ -85,6 +85,17 @@ VisionBridge is configured via a YAML settings file containing five primary sect
 - `pass`: The Basic Auth password for the API.
 - `log_unit`: The systemd log unit used for fetching logs in the UI.
 
+#### Frontend Settings (frontend.settings)
+
+- `bind_address`: The IP address to bind the frontend GUI to.
+- `bind_port`: The port to bind the frontend GUI to.
+- `VB_GUI_USER`: The Basic Auth username required to reach the panel.
+- `VB_GUI_PASS`: The Basic Auth password required to reach the panel.
+- `backend_address`: The IP address of the backend control API (must match `control_api.bind_address`).
+- `backend_port`: The port of the backend control API (must match `control_api.port`).
+- `backend_user`: The Basic Auth username of the backend control API (must match `control_api.user`).
+- `backend_pass`: The Basic Auth password of the backend control API (must match `control_api.pass`).
+
 ## Input Pipelines
 
 The system coordinates a single DOM-dominant pipeline conceptually similar to a "Scene":
