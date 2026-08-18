@@ -34,7 +34,7 @@ The configuration is hot-reloadable. A `Config Watcher` uses `fsnotify` to monit
 
 ### Configuration Reference
 
-VisionBridge is configured via a YAML settings file containing four primary sections:
+VisionBridge is configured via a YAML settings file containing five primary sections:
 
 #### Database
 
@@ -75,6 +75,15 @@ VisionBridge is configured via a YAML settings file containing four primary sect
   - `z*_volume`: Volume (0-100) for native media elements.
   - `z*_width`, `z*_height`: Width and height dimensions of the layer.
   - `z*_x`, `z*_y`: X and Y absolute layout coordinates of the layer.
+
+#### Control API
+
+- `enable`: Boolean to enable or disable the control API.
+- `bind_address`: The IP address to bind the API to.
+- `port`: The port to bind the API to.
+- `user`: The Basic Auth username for the API.
+- `pass`: The Basic Auth password for the API.
+- `log_unit`: The systemd log unit used for fetching logs in the UI.
 
 ## Input Pipelines
 
