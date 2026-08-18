@@ -163,6 +163,7 @@ type ControlAPIConfig struct {
 	Port     string `yaml:"port" json:"port"`
 	User     string `yaml:"user" json:"user"`
 	Pass     string `yaml:"pass" json:"pass"`
+	LogUnit  string `yaml:"log_unit" json:"log_unit"`
 }
 
 // Config is the root struct abstracting the config.yaml application state.
