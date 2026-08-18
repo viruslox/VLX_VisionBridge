@@ -136,3 +136,10 @@ input:
     z12_x: null
     z12_y: null
     z12_volume: 100
+
+control_api:
+  enable: true
+  bind_address: "127.0.0.1"
+  port: "8770"
+  user: "visionbridge"
+  pass: "changeme"

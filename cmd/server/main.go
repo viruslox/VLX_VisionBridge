@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	"github.com/user/VLX_VisionBridge/internal/config"
+	"github.com/user/VLX_VisionBridge/internal/controlapi"
 	"github.com/user/VLX_VisionBridge/internal/db"
 	"github.com/user/VLX_VisionBridge/internal/engine"
 	"github.com/user/VLX_VisionBridge/internal/models"
@@ -151,6 +152,27 @@ func main() {
 	}
 	defer watcher.Stop()
 
+	// Start the always-on control/status API used by the web GUI. It runs
+	// regardless of pipeline state so the GUI can always reach the backend, and
+	// dispatches toggles through the engine's existing control handler.
+	shutdownVB := func() {
+		if p, err := os.FindProcess(os.Getpid()); err == nil {
+			_ = p.Signal(syscall.SIGTERM)
+		}
+	}
+	var ctrlAPI *controlapi.Server
+	if initialConfig.ControlAPI.Enable {
+		ctrlAPI = controlapi.New(
+			pm,
+			initialConfig.ControlAPI.BindAddr,
+			initialConfig.ControlAPI.Port,
+			initialConfig.ControlAPI.User,
+			initialConfig.ControlAPI.Pass,
+			shutdownVB,
+		)
+		ctrlAPI.Start()
+	}
+
 	// 5. Handle OS Signals
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -159,6 +181,10 @@ func main() {
 	sig := <-sigChan
 	log.Printf("Received signal: %v. Initiating graceful shutdown...", sig)
 	cancel() // Cancel context
+
+	if ctrlAPI != nil {
+		ctrlAPI.Stop()
+	}
 
 	log.Println("Shutdown complete.")
 }

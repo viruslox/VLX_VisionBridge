@@ -156,10 +156,20 @@ type ConnectorSettings struct {
 	ControlSocket string `yaml:"control_socket" json:"control_socket"`
 }
 
+// ControlAPIConfig defines the always-on HTTP control/status API for the web GUI.
+type ControlAPIConfig struct {
+	Enable   bool   `yaml:"enable" json:"enable"`
+	BindAddr string `yaml:"bind_address" json:"bind_address"`
+	Port     string `yaml:"port" json:"port"`
+	User     string `yaml:"user" json:"user"`
+	Pass     string `yaml:"pass" json:"pass"`
+}
+
 // Config is the root struct abstracting the config.yaml application state.
 type Config struct {
-	Database  DatabaseConfig    `yaml:"database"`
-	Connector ConnectorSettings `yaml:"connector"`
-	Output    OutputSettings    `yaml:"output"`
-	Input     InputSettings     `yaml:"input"`
+	Database   DatabaseConfig    `yaml:"database"`
+	Connector  ConnectorSettings `yaml:"connector"`
+	Output     OutputSettings    `yaml:"output"`
+	Input      InputSettings     `yaml:"input"`
+	ControlAPI ControlAPIConfig  `yaml:"control_api"`
 }
