@@ -83,6 +83,10 @@ func SetupDatabase(dsn string) *sql.DB {
 		return nil
 	}
 
+	if err := db.SetupTemplatesTable(dbConn); err != nil {
+		log.Printf("Warning: failed to set up templates table: %v", err)
+	}
+
 	if err := db.SetupTables(dbConn); err != nil {
 		dbConn.Close()
 		log.Fatalf("Failed to setup database tables: %v", err)
@@ -164,6 +168,7 @@ func main() {
 	if initialConfig.ControlAPI.Enable {
 		ctrlAPI = controlapi.New(
 			pm,
+			dbConn,
 			initialConfig.ControlAPI.BindAddr,
 			initialConfig.ControlAPI.Port,
 			initialConfig.ControlAPI.User,

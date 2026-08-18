@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"database/sql"
 	"reflect"
 	"strconv"
 	"time"
@@ -32,12 +33,13 @@ type Server struct {
 
 	logUnit string          // systemd unit tailed by the on-demand console
 	tickets *ticketManager  // short-lived tickets authorizing the console WS
+	db      *sql.DB         // template store
 }
 
 // New builds the control API server. If user is empty, requests are not
 // authenticated (the 127.0.0.1 bind is then the only trust boundary).
-func New(pm *engine.ProcessManager, bindAddr, port, user, pass, logUnit string, shutdown func()) *Server {
-	s := &Server{pm: pm, user: user, pass: pass, shutdown: shutdown, logUnit: logUnit, tickets: newTicketManager()}
+func New(pm *engine.ProcessManager, dbConn *sql.DB, bindAddr, port, user, pass, logUnit string, shutdown func()) *Server {
+	s := &Server{pm: pm, db: dbConn, user: user, pass: pass, shutdown: shutdown, logUnit: logUnit, tickets: newTicketManager()}
 
 	if bindAddr == "" {
 		bindAddr = "127.0.0.1"
@@ -57,6 +59,10 @@ func New(pm *engine.ProcessManager, bindAddr, port, user, pass, logUnit string, 
 	// by that single-use ticket (browsers can't set auth headers on a WS handshake).
 	mux.HandleFunc("/api/console/ticket", s.auth(s.handleConsoleTicket))
 	mux.HandleFunc("/api/console/ws", s.handleConsoleWS)
+	mux.HandleFunc("/api/templates", s.auth(s.handleTemplatesList))
+	mux.HandleFunc("/api/templates/save", s.auth(s.handleTemplateSave))
+	mux.HandleFunc("/api/templates/apply", s.auth(s.handleTemplateApply))
+	mux.HandleFunc("/api/templates/delete", s.auth(s.handleTemplateDelete))
 
 	s.httpSrv = &http.Server{Addr: bindAddr + ":" + port, Handler: mux}
 	return s
