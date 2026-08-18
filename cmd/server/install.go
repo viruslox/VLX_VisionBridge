@@ -121,6 +121,19 @@ func copyExecutable(binDir string) {
 		log.Fatalf("Failed to write executable: %v", err)
 	}
 	fmt.Println("Copied executable to", destExe)
+
+	frontendExePath := filepath.Join(filepath.Dir(exePath), "VLX_VisionBridge_frontend")
+	frontendDestExe := filepath.Join(binDir, "VLX_VisionBridge_frontend")
+	frontendExeData, err := os.ReadFile(frontendExePath)
+	if err == nil {
+		if err := os.WriteFile(frontendDestExe, frontendExeData, 0755); err != nil {
+			log.Printf("Warning: Failed to write frontend executable: %v", err)
+		} else {
+			fmt.Println("Copied frontend executable to", frontendDestExe)
+		}
+	} else {
+		log.Printf("Warning: Failed to read frontend executable (it may not exist in the same directory): %v", err)
+	}
 }
 
 func setupConfig(etcDir string) {
@@ -129,6 +142,16 @@ func setupConfig(etcDir string) {
 		log.Fatalf("Failed to handle visionbridge.settings: %v", err)
 	}
 	fmt.Println("Configured settings template at", configPath)
+
+	frontendConfigPath := filepath.Join(etcDir, "frontend.settings")
+	if _, err := os.Stat(frontendConfigPath); os.IsNotExist(err) {
+		if err := os.WriteFile(frontendConfigPath, configs.FrontendSettingsTemplate, 0600); err != nil {
+			log.Fatalf("Failed to handle frontend.settings: %v", err)
+		}
+		fmt.Println("Configured frontend settings template at", frontendConfigPath)
+	} else {
+		fmt.Println("Frontend settings already exist at", frontendConfigPath)
+	}
 }
 
 func promptChromiumInstall() {
