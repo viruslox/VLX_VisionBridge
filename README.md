@@ -125,6 +125,19 @@ VisionBridge is configured via a YAML settings file containing five primary sect
 - `pass`: The Basic Auth password for the API.
 - `log_unit`: The systemd log unit used for fetching logs in the UI.
 
+## Reverse Proxy
+
+Instruct the users to use apache reverse proxy like this:
+
+```apache
+# ===== VisionBridge GUI  (frontend :<port> — console WS at /api/console/ws) =====
+RedirectMatch ^/visionbridge$  /visionbridge/
+
+ProxyPass        /visionbridge/api/console/ws ws://127.0.0.1:<port>/api/console/ws
+ProxyPass        /visionbridge/               http://127.0.0.1:<port>/
+ProxyPassReverse /visionbridge/               http://127.0.0.1:<port>/
+```
+
 ### Frontend Settings (frontend.settings)
 
 - `bind_address`: The IP address to bind the frontend GUI to.

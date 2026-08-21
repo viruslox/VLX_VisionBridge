@@ -1,146 +1,146 @@
 database:
-  dsn: "/opt/VLX_VisionBridge/var/visionbridge.db"
+  dsn: "/opt/VLX_VisionBridge/var/visionbridge.db" # The Data Source Name or path to the SQLite database file.
 
 connector:
-  ipc_control_in: true
-  group: "visionbridge"
-  control_socket: "/tmp/vlx_control.sock"
+  ipc_control_in: true                  # Boolean to enable or disable IPC control socket.
+  group: "visionbridge"                 # The user group assigned to the control socket for permission access.
+  control_socket: "/tmp/vlx_control.sock" # The file path for the Unix domain control socket.
 
 output:
-  active: true
-  resolution: "1920x1080"
-  fps: 30
-  video_bitrate: "8000k"
-  audio_bitrate: "160k"
-  audio_sample_rate: 44100
+  active: true                          # Boolean to toggle the streaming output state.
+  resolution: "1920x1080"               # The final scaled output resolution (e.g., "1920x1080").
+  fps: 30                               # Target frames per second.
+  video_bitrate: "8000k"                # Target video encoding bitrate.
+  audio_bitrate: "160k"                 # Target audio encoding bitrate.
+  audio_sample_rate: 44100              # Target audio sample rate.
   destinations:
-    - "rtmp://127.0.0.1:1999/streamout"
+    - "rtmp://127.0.0.1:1999/streamout" # Destination URI to push the stream to.
 
 input:
   bg_color: "black"        # Global canvas background color
   resolution: "1920x1080"  # Master canvas size
-  framerate: 30
+  framerate: 30                         # The processing framerate for inputs.
   carousel_delay: 5        # Delay in seconds between static images in carousel mode
   carousel_shuffle: true   # true = shuffle (random, no repeats until folder exhausted); false = natural/alphabetical order
   
   webrtc_port_min: 50000   # UDP ports for inbound WebRTC streams
-  webrtc_port_max: 50050
+  webrtc_port_max: 50050                # Maximum ephemeral UDP port for WebRTC signaling.
 
-  overlay_server_active: true
-  overlay_server_port: 50051
-  media_folder_path: "/opt/VLX_VisionBridge/media"
+  overlay_server_active: true           # Boolean to enable the internal Web/WebSocket server.
+  overlay_server_port: 50051            # Port for the internal Web/WebSocket server.
+  media_folder_path: "/opt/VLX_VisionBridge/media" # Base path for the media directory to serve static assets.
 
   chromium_source:
-    active: true
+    active: true                        # Boolean to keep the entire Chromium layer active.
 
-    z0_active: false
-    z0_path: ""
-    z0_width: null
-    z0_height: null
-    z0_x: null
-    z0_y: null
-    z0_volume: 100
+    z0_active: false                    # Boolean to enable/disable a specific layer (e.g., `z0_active`).
+    z0_path: ""                         # File path, directory path, or URL for the media source.
+    z0_width: null                      # Width and height dimensions of the layer.
+    z0_height: null                     # Width and height dimensions of the layer.
+    z0_x: null                          # X and Y absolute layout coordinates of the layer.
+    z0_y: null                          # X and Y absolute layout coordinates of the layer.
+    z0_volume: 100                      # Volume (0-100) for native media elements.
 
-    z1_active: false
-    z1_path: "/opt/VLX_VisionBridge/media/intro.mp4"
-    z1_width: null
-    z1_height: null
-    z1_x: null
-    z1_y: null
-    z1_volume: 100
+    z1_active: false                    # Boolean to enable/disable a specific layer (e.g., `z0_active`).
+    z1_path: "/opt/VLX_VisionBridge/media/intro.mp4" # File path, directory path, or URL for the media source.
+    z1_width: null                      # Width and height dimensions of the layer.
+    z1_height: null                     # Width and height dimensions of the layer.
+    z1_x: null                          # X and Y absolute layout coordinates of the layer.
+    z1_y: null                          # X and Y absolute layout coordinates of the layer.
+    z1_volume: 100                      # Volume (0-100) for native media elements.
 
-    z2_active: false
-    z2_path: ""
-    z2_width: null
-    z2_height: null
-    z2_x: null
-    z2_y: null
-    z2_volume: 100
+    z2_active: false                    # Boolean to enable/disable a specific layer (e.g., `z0_active`).
+    z2_path: ""                         # File path, directory path, or URL for the media source.
+    z2_width: null                      # Width and height dimensions of the layer.
+    z2_height: null                     # Width and height dimensions of the layer.
+    z2_x: null                          # X and Y absolute layout coordinates of the layer.
+    z2_y: null                          # X and Y absolute layout coordinates of the layer.
+    z2_volume: 100                      # Volume (0-100) for native media elements.
 
-    z3_active: false
-    z3_path: ""
-    z3_width: null
-    z3_height: null
-    z3_x: null
-    z3_y: null
-    z3_volume: 100
+    z3_active: false                    # Boolean to enable/disable a specific layer (e.g., `z0_active`).
+    z3_path: ""                         # File path, directory path, or URL for the media source.
+    z3_width: null                      # Width and height dimensions of the layer.
+    z3_height: null                     # Width and height dimensions of the layer.
+    z3_x: null                          # X and Y absolute layout coordinates of the layer.
+    z3_y: null                          # X and Y absolute layout coordinates of the layer.
+    z3_volume: 100                      # Volume (0-100) for native media elements.
 
-    z4_active: false
-    z4_path: ""
-    z4_width: null
-    z4_height: null
-    z4_x: null
-    z4_y: null
-    z4_volume: 100
+    z4_active: false                    # Boolean to enable/disable a specific layer (e.g., `z0_active`).
+    z4_path: ""                         # File path, directory path, or URL for the media source.
+    z4_width: null                      # Width and height dimensions of the layer.
+    z4_height: null                     # Width and height dimensions of the layer.
+    z4_x: null                          # X and Y absolute layout coordinates of the layer.
+    z4_y: null                          # X and Y absolute layout coordinates of the layer.
+    z4_volume: 100                      # Volume (0-100) for native media elements.
 
-    z5_active: false
-    z5_path: ""
-    z5_width: null
-    z5_height: null
-    z5_x: null
-    z5_y: null
-    z5_volume: 100
+    z5_active: false                    # Boolean to enable/disable a specific layer (e.g., `z0_active`).
+    z5_path: ""                         # File path, directory path, or URL for the media source.
+    z5_width: null                      # Width and height dimensions of the layer.
+    z5_height: null                     # Width and height dimensions of the layer.
+    z5_x: null                          # X and Y absolute layout coordinates of the layer.
+    z5_y: null                          # X and Y absolute layout coordinates of the layer.
+    z5_volume: 100                      # Volume (0-100) for native media elements.
 
-    z6_active: false
-    z6_path: ""
-    z6_width: null
-    z6_height: null
-    z6_x: null
-    z6_y: null
-    z6_volume: 100
+    z6_active: false                    # Boolean to enable/disable a specific layer (e.g., `z0_active`).
+    z6_path: ""                         # File path, directory path, or URL for the media source.
+    z6_width: null                      # Width and height dimensions of the layer.
+    z6_height: null                     # Width and height dimensions of the layer.
+    z6_x: null                          # X and Y absolute layout coordinates of the layer.
+    z6_y: null                          # X and Y absolute layout coordinates of the layer.
+    z6_volume: 100                      # Volume (0-100) for native media elements.
 
-    z7_active: false
-    z7_path: ""
-    z7_width: null
-    z7_height: null
-    z7_x: null
-    z7_y: null
-    z7_volume: 100
+    z7_active: false                    # Boolean to enable/disable a specific layer (e.g., `z0_active`).
+    z7_path: ""                         # File path, directory path, or URL for the media source.
+    z7_width: null                      # Width and height dimensions of the layer.
+    z7_height: null                     # Width and height dimensions of the layer.
+    z7_x: null                          # X and Y absolute layout coordinates of the layer.
+    z7_y: null                          # X and Y absolute layout coordinates of the layer.
+    z7_volume: 100                      # Volume (0-100) for native media elements.
 
-    z8_active: false
-    z8_path: ""
-    z8_width: null
-    z8_height: null
-    z8_x: null
-    z8_y: null
-    z8_volume: 100
+    z8_active: false                    # Boolean to enable/disable a specific layer (e.g., `z0_active`).
+    z8_path: ""                         # File path, directory path, or URL for the media source.
+    z8_width: null                      # Width and height dimensions of the layer.
+    z8_height: null                     # Width and height dimensions of the layer.
+    z8_x: null                          # X and Y absolute layout coordinates of the layer.
+    z8_y: null                          # X and Y absolute layout coordinates of the layer.
+    z8_volume: 100                      # Volume (0-100) for native media elements.
 
-    z9_active: false
-    z9_path: ""
-    z9_width: null
-    z9_height: null
-    z9_x: null
-    z9_y: null
-    z9_volume: 100
+    z9_active: false                    # Boolean to enable/disable a specific layer (e.g., `z0_active`).
+    z9_path: ""                         # File path, directory path, or URL for the media source.
+    z9_width: null                      # Width and height dimensions of the layer.
+    z9_height: null                     # Width and height dimensions of the layer.
+    z9_x: null                          # X and Y absolute layout coordinates of the layer.
+    z9_y: null                          # X and Y absolute layout coordinates of the layer.
+    z9_volume: 100                      # Volume (0-100) for native media elements.
 
-    z10_active: false
-    z10_path: ""
-    z10_width: null
-    z10_height: null
-    z10_x: null
-    z10_y: null
-    z10_volume: 100
+    z10_active: false                   # Boolean to enable/disable a specific layer (e.g., `z0_active`).
+    z10_path: ""                        # File path, directory path, or URL for the media source.
+    z10_width: null                     # Width and height dimensions of the layer.
+    z10_height: null                    # Width and height dimensions of the layer.
+    z10_x: null                         # X and Y absolute layout coordinates of the layer.
+    z10_y: null                         # X and Y absolute layout coordinates of the layer.
+    z10_volume: 100                     # Volume (0-100) for native media elements.
 
-    z11_active: false
-    z11_path: ""
-    z11_width: null
-    z11_height: null
-    z11_x: null
-    z11_y: null
-    z11_volume: 100
+    z11_active: false                   # Boolean to enable/disable a specific layer (e.g., `z0_active`).
+    z11_path: ""                        # File path, directory path, or URL for the media source.
+    z11_width: null                     # Width and height dimensions of the layer.
+    z11_height: null                    # Width and height dimensions of the layer.
+    z11_x: null                         # X and Y absolute layout coordinates of the layer.
+    z11_y: null                         # X and Y absolute layout coordinates of the layer.
+    z11_volume: 100                     # Volume (0-100) for native media elements.
 
-    z12_active: false
-    z12_path: ""
-    z12_width: null
-    z12_height: null
-    z12_x: null
-    z12_y: null
-    z12_volume: 100
+    z12_active: false                   # Boolean to enable/disable a specific layer (e.g., `z0_active`).
+    z12_path: ""                        # File path, directory path, or URL for the media source.
+    z12_width: null                     # Width and height dimensions of the layer.
+    z12_height: null                    # Width and height dimensions of the layer.
+    z12_x: null                         # X and Y absolute layout coordinates of the layer.
+    z12_y: null                         # X and Y absolute layout coordinates of the layer.
+    z12_volume: 100                     # Volume (0-100) for native media elements.
 
 control_api:
-  enable: true
-  bind_address: "127.0.0.1"
-  port: "8770"
-  user: "visionbridge"
-  pass: "changeme"
-  log_unit: "visionbridge"
+  enable: true                          # Boolean to enable or disable the control API.
+  bind_address: "127.0.0.1"             # The IP address to bind the API to.
+  port: "8770"                          # The port to bind the API to.
+  user: "visionbridge"                  # The Basic Auth username for the API.
+  pass: "changeme"                      # The Basic Auth password for the API.
+  log_unit: "visionbridge"              # The systemd log unit used for fetching logs in the UI.
