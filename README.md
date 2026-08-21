@@ -1,44 +1,97 @@
-# Project Design: VLX VisionBridge
+# VLX VisionBridge
 
-## Project Overview
+> **Part of the [VLX Stream Flow](#the-vlx-stream-flow-ecosystem) ecosystem — the Composition tier.**
+> A headless, high-performance Chromium-DOM scene compositor with a GStreamer capture core — "headless OBS" for remote VMs.
 
-VLX VisionBridge is a headless, high-performance Linux service written in Go. VLX_VisionBridge utilizes a DOM-dominant Architecture: All media rendering (videos, images, carousels) happens exclusively in the Chromium DOM. GStreamer acts solely as a passive screen recorder using a static pipeline with `ximagesrc` (capturing Xvfb display :99) and `pulsesrc` to push output to MediaMTX. Complex JS screen capturing and dynamic GStreamer source switching are explicitly avoided.
+VLX VisionBridge is a headless Linux service written in Go. It uses a **DOM-dominant architecture**: all media rendering (videos, images, carousels, overlays) happens in the **Chromium DOM**, and **GStreamer** acts purely as a passive screen recorder — a static pipeline with `ximagesrc` (capturing the Xvfb display `:99`) and `pulsesrc` — that pushes the composited output to a local MediaMTX. Complex JS screen-capturing and dynamic GStreamer source switching are deliberately avoided.
 
-The service is designed for professional 24/7 broadcasting environments where configuration must be dynamic and resource efficiency is paramount. We are basically building a sort of obs-studio for remote VMs.
+Built for professional 24/7 broadcasting where configuration must be dynamic and resource use minimal. For the full system design, see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
-## How it Works
+---
 
-VisionBridge employs a highly optimized, Cloud-Native "Sidecar" Architecture based on three pillars:
+## The VLX Stream Flow ecosystem
 
-1. **DOM-dominant Architecture**: All media rendering (videos, images, carousels) happens exclusively in the Chromium DOM.
-2. **GStreamer Core**: GStreamer acts solely as a passive screen recorder using a static pipeline with `ximagesrc` (capturing Xvfb display :99) and `pulsesrc` pushing to MediaMTX.
-3. **Local Proxy (Sidecar)**: GStreamer muxes the output and pushes it unencrypted to a local MediaMTX server (`rtmp://127.0.0.1:1935/live/internal`). External routing and TLS are handled dynamically by Chatbridge invoking MediaMTX REST APIs.
+VLX VisionBridge is one of three cooperating services in the **VLX Stream Flow** ecosystem — an end-to-end, self-hosted stack for IRL and studio broadcasting that runs from the field camera all the way to the streaming platform.
 
-## Requirements Note
+| Project | Tier | Responsibility | |
+| :--- | :--- | :--- | :--- |
+| **[VLX FrameFlow](https://github.com/viruslox/VLX_FrameFlow)** | Edge & Transport | Bonded uplink (MLVPN + MPTCP), SBC multi-camera SRT encode, GPS telemetry, VPS relay | |
+| **[VLX VisionBridge](https://github.com/viruslox/VLX_VisionBridge)** | Composition | Headless Chromium-DOM scene compositor + GStreamer capture → MediaMTX restream | **← this repository** |
+| **[VLX ChatBridge](https://github.com/viruslox/VLX_ChatBridge)** | Control & Engagement | Twitch/YouTube events, Discord audio gateway, overlays, and the ecosystem command router | |
 
-- **Hardware**: Multi-core CPU for GStreamer processing, adequate RAM for media buffering.
-- **Software**: Modern Linux distribution (e.g., Ubuntu 20.04/22.04), GStreamer 1.0 (with good/bad/ugly plugins and libav) installed and accessible, Chromium (optional, if using overlay HTML sources), and `pion/webrtc`.
-- **Network**: High-bandwidth, low-latency network connection to handle multiple SRT/WebRTC streams and simultaneous broadcasting.
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'fontFamily':'ui-monospace, monospace'}}}%%
+flowchart LR
+    classDef ff  fill:#1f6f5c,stroke:#0b3b30,color:#fff;
+    classDef vb  fill:#3b5bdb,stroke:#1e3a8a,color:#fff;
+    classDef cb  fill:#7048e8,stroke:#3b2a86,color:#fff;
+    classDef mtx fill:#b08900,stroke:#6b5300,color:#fff;
+    classDef ext fill:#495057,stroke:#212529,color:#fff;
 
-```bash
-apt-get install gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav
+    subgraph EDGE["FIELD UNIT · SBC"]
+        FFC["FrameFlow Client<br/>cameraman · FFmpeg · GPS"]:::ff
+    end
+    subgraph VPS["REFERENCE VPS · relay + control + composite"]
+        FFS["FrameFlow Server<br/>relay · firewall"]:::ff
+        RMTX(("MediaMTX ingest<br/>zero-drop fallback")):::mtx
+        CB["ChatBridge<br/>events · audio · overlays · router"]:::cb
+        VB["VisionBridge<br/>Chromium DOM · GStreamer"]:::vb
+        VMTX(("MediaMTX egress<br/>RTMPS / TLS")):::mtx
+    end
+    subgraph PLAT["PLATFORMS"]
+        TW["Twitch / YouTube"]:::ext
+        DC["Discord"]:::ext
+    end
+
+    FFC  -- "SRT · bonded (MLVPN)" --> RMTX
+    FFC  -- "POST /api/gps (MLVPN)" --> CB
+    FFC  -. "MLVPN tunnel 10.1.10.x" .- FFS
+    CB   -- "HTTP relay /api/v1/relay/*" --> FFS
+    RMTX -- "WebRTC/WHEP → Z-layer" --> VB
+    CB   -- "IPC /tmp/vlx_control.sock" --> VB
+    VB   -- "RTMP 127.0.0.1:1999/streamout" --> VMTX
+    VMTX -- "RTMPS" --> TW
+    CB   -- "EventSub · Helix · API" --> TW
+    CB   <-- "voice + chat" --> DC
 ```
 
-## Core Principles
+**VisionBridge's role in the ecosystem:** VisionBridge is the compositor. It renders the FrameFlow camera feed (consumed as a Chromium **Z-layer** from the ingest MediaMTX) together with overlays and media into a single 24/7 scene, then screen-captures that scene with GStreamer and pushes it to its **local egress MediaMTX** (`rtmp://127.0.0.1:1999/streamout`), which restreams over RTMPS/TLS to Twitch. Live scene control (show/hide layers, volumes, templates, wake/sleep the stream) arrives over the **VLX Connector** IPC socket from ChatBridge. The canonical inter-service contracts are specified in **[ARCHITECTURE.md → VLX Stream Flow contracts](ARCHITECTURE.md#vlx-stream-flow-contracts)**.
 
-- **DOM-dominant Architecture**: All media rendering happens exclusively in the Chromium DOM. GStreamer acts solely as a passive screen recorder using a static pipeline with `ximagesrc` (capturing Xvfb display :99) and `pulsesrc`. Complex JS screen capturing and dynamic GStreamer source switching are explicitly avoided.
-- **Headless First**: Managed entirely via configuration files or DB entries.
-- **Dynamic Reconfiguration**: Hot-reloading of layouts and sources without dropping the output stream (where technically possible).
-- **Resource Optimization**: Sources marked as "OFF" are completely excluded from the processing pipeline.
-- **Multi-Destination**: Single encoding pass with multiple output clones.
+---
 
-## Best Practices
+## How it works
 
-VisionBridge operates alongside MediaMTX and ChatBridge on the same localhost.
+VisionBridge is a Cloud-Native "sidecar" compositor built on three pillars:
 
-The `input` configuration revolves around `chromium_source`, which supports exactly 13 distinct Z-layers (`Z0` to `Z12`) with explicit `height`, `width`, `x`, `y`, `volume`, and `path` variables. It dynamically generates HTML tags (`<video autoplay loop>`, `<img>`, `<iframe>`) based on the content type inferred from the path.
+1. **DOM-dominant rendering** — all media renders in the Chromium DOM across up to **13 Z-layers** (`Z0`–`Z12`).
+2. **GStreamer capture core** — a static pipeline (`ximagesrc` on Xvfb `:99` + `pulsesrc`) records the composited canvas.
+3. **Local MediaMTX sidecar** — GStreamer muxes and pushes the output unencrypted to a **local** MediaMTX (`rtmp://127.0.0.1:1999/streamout`). All external routing, RTMPS and TLS resilience are delegated to that local MediaMTX via its **static configuration** (destinations + certificate settings), keeping the compositor itself simple and low-latency.
 
-For directory-based media playback in `chromium_source`, the Go backend provides an HTTP endpoint (`/api/list-dir?path=...`) that the Chromium WebSocket client fetches to automatically sequence and loop media as a carousel without GStreamer intervention.
+> **Note:** external routing/TLS is configured statically in the bundled MediaMTX template (and, optionally, MediaMTX's own `runOnReady`/`runOnPublish` hooks). VisionBridge does not depend on any other VLX service to reach its destinations.
+
+## Requirements
+
+- **Hardware:** multi-core CPU for GStreamer, adequate RAM for media buffering.
+- **Software:** modern Linux (e.g. Ubuntu 22.04), GStreamer 1.0 (good/bad/ugly + libav), Chromium, `pion/webrtc`.
+- **Network:** high-bandwidth, low-latency link for SRT/WebRTC ingest and simultaneous output.
+
+```bash
+apt-get install gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+                gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav
+```
+
+## Core principles
+
+- **DOM-dominant** — media renders exclusively in the Chromium DOM; GStreamer only records.
+- **Headless first** — managed entirely via config files / DB entries.
+- **Dynamic reconfiguration** — hot-reload layouts and sources without dropping the output (where technically possible).
+- **Resource optimisation** — sources marked `OFF` are excluded from the pipeline entirely.
+- **Multi-destination** — single encode pass with multiple `tee` output clones.
+
+## Layer control rules
+
+- **SSOT pattern** — inbound JSON control commands update the YAML settings file directly; the file watcher then broadcasts over WebSocket to the Chromium clients for zero-CPU DOM manipulation.
+- **Keep `chromium_source` active** — Z-layers must stay `active: true`; show/hide is done via WebSocket/JS to avoid stream drops. Setting the **output** stream to `Enabled: false` terminates the encoder to halt broadcast.
 
 ```yaml
 input:
@@ -54,97 +107,68 @@ input:
     z1_y: 0
 ```
 
-## Layer Control Rules
+---
 
-- **Rule 1:** Incoming JSON control commands for overlays map to a Single Source of Truth (SSOT) pattern: JSON commands update the YAML settings file directly, and the file watcher triggers WebSocket broadcasts to the Chromium clients for zero-CPU DOM manipulation.
-- **Rule 2:** `chromium_source` layers MUST be kept `active: true` constantly. Show/Hide logic for web layers must be handled via WebSockets/JavaScript to avoid stream drops. Setting the target stream to disabled (`Enabled: false`) triggers a process termination to halt the active stream.
+## Configuration reference
 
-## Configuration Concepts
+VisionBridge is configured via a YAML settings file with five primary sections: `database`, `connector`, `output`, `input`, and `control_api`.
 
-- **Canvas Size vs. Output Size**: The fundamental drawing area for layers and overlays is controlled by `input.resolution` (`InputSettings`). The final resolution of the stream that is encoded and pushed to your destinations is controlled by `output.resolution` (`OutputSettings`).
+### `database`
+- `dsn` — path to the SQLite database file.
 
-## Technology Stack
+### `connector`
+- `ipc_control_in` — enable the inbound IPC control listener (**VisionBridge is the listener**; ChatBridge is the writer).
+- `group` — user group owning the control socket.
+- `control_socket` — Unix domain socket path (default `/tmp/vlx_control.sock`).
 
-- **Language**: Go (Golang)
-- **Processing Engine**: GStreamer (via os/exec)
-- **Database**: SQLite (State persistence, Logs, Metadata)
-- **Messaging**: JSON control commands map to an SSOT pattern updating the YAML settings directly, and the file watcher triggers WebSocket broadcasts to Chromium clients.
+### `output`
+- `active` — toggle streaming output.
+- `resolution` — final scaled output resolution.
+- `fps`, `video_bitrate`, `audio_bitrate`, `audio_sample_rate` — encode parameters.
+- `destinations` — array of output URIs (default `rtmp://127.0.0.1:1999/streamout` → local MediaMTX).
 
-See [Architecture](ARCHITECTURE.md) for High-Level Design details.
+### `input`
+- `bg_color`, `resolution` (master canvas), `framerate`.
+- `carousel_delay`, `carousel_shuffle` — directory-playback behaviour.
+- `webrtc_port_min` / `webrtc_port_max` — inbound WebRTC UDP range (default `50000–50050`).
+- `overlay_server_active` / `overlay_server_port` — internal Web/WebSocket server (default `50051`).
+- `media_folder_path` — base media directory.
+- `chromium_source` — up to 13 DOM Z-layers (`Z0`–`Z12`), each with `z*_active`, `z*_path`, `z*_volume`, `z*_width`, `z*_height`, `z*_x`, `z*_y`.
 
-## Configuration Reference
+### `control_api`
+- `enable`, `bind_address`, `port` (default `8770`), `user`, `pass`, `log_unit`.
 
-VisionBridge is configured via a YAML settings file containing five primary sections: `database`, `connector`, `output`, `input`, and `control_api`.
+### Frontend (`frontend.settings`)
+- `bind_address` / `bind_port` (default `8091`) — GUI web server.
+- `VB_GUI_USER` / `VB_GUI_PASS` — GUI Basic Auth.
+- `backend_address` / `backend_port` / `backend_user` / `backend_pass` — must match the `control_api` block.
 
-### Database
+---
 
-- `dsn`: The Data Source Name or path to the SQLite database file.
-
-### Connector
-
-- `ipc_control_in`: Boolean to enable or disable IPC control socket.
-- `group`: The user group assigned to the control socket for permission access.
-- `control_socket`: The file path for the Unix domain control socket.
-
-### Output
-
-- `active`: Boolean to toggle the streaming output state.
-- `resolution`: The final scaled output resolution (e.g., "1920x1080").
-- `fps`: Target frames per second.
-- `video_bitrate`: Target video encoding bitrate.
-- `audio_bitrate`: Target audio encoding bitrate.
-- `audio_sample_rate`: Target audio sample rate.
-- `destinations`: Array of destination URIs to push the stream to.
-
-### Input
-
-- `bg_color`: The global background color (e.g., "black") used in the Chromium overlay.
-- `resolution`: The base canvas resolution for rendering layers.
-- `framerate`: The processing framerate for inputs.
-- `carousel_delay`: Sleep duration between sequential media playbacks in milliseconds.
-- `carousel_shuffle`: Boolean to randomize carousel playback order.
-- `webrtc_port_min`: Minimum ephemeral UDP port for WebRTC signaling.
-- `webrtc_port_max`: Maximum ephemeral UDP port for WebRTC signaling.
-- `overlay_server_active`: Boolean to enable the internal Web/WebSocket server.
-- `overlay_server_port`: Port for the internal Web/WebSocket server.
-- `media_folder_path`: Base path for the media directory to serve static assets.
-- `chromium_source`: A block that configures up to 13 native DOM Z-layers (`Z0` to `Z12`).
-  - `active`: Boolean to keep the entire Chromium layer active.
-  - `z*_active`: Boolean to enable/disable a specific layer (e.g., `z0_active`).
-  - `z*_path`: File path, directory path, or URL for the media source.
-  - `z*_volume`: Volume (0-100) for native media elements.
-  - `z*_width`, `z*_height`: Width and height dimensions of the layer.
-  - `z*_x`, `z*_y`: X and Y absolute layout coordinates of the layer.
-
-### Control API
-
-- `enable`: Boolean to enable or disable the control API.
-- `bind_address`: The IP address to bind the API to.
-- `port`: The port to bind the API to.
-- `user`: The Basic Auth username for the API.
-- `pass`: The Basic Auth password for the API.
-- `log_unit`: The systemd log unit used for fetching logs in the UI.
-
-## Reverse Proxy
-
-Instruct the users to use apache reverse proxy like this:
+## Reverse proxy (Apache)
 
 ```apache
 # ===== VisionBridge GUI  (frontend :<port> — console WS at /api/console/ws) =====
 RedirectMatch ^/visionbridge$  /visionbridge/
-
 ProxyPass        /visionbridge/api/console/ws ws://127.0.0.1:<port>/api/console/ws
 ProxyPass        /visionbridge/               http://127.0.0.1:<port>/
 ProxyPassReverse /visionbridge/               http://127.0.0.1:<port>/
 ```
 
-### Frontend Settings (frontend.settings)
+## Consuming the FrameFlow feed
 
-- `bind_address`: The IP address to bind the frontend GUI to.
-- `bind_port`: The port to bind the frontend GUI to.
-- `VB_GUI_USER`: The Basic Auth username required to reach the panel.
-- `VB_GUI_PASS`: The Basic Auth password required to reach the panel.
-- `backend_address`: The IP address of the backend control API (must match `control_api.bind_address`).
-- `backend_port`: The port of the backend control API (must match `control_api.port`).
-- `backend_user`: The Basic Auth username of the backend control API (must match `control_api.user`).
-- `backend_pass`: The Basic Auth password of the backend control API (must match `control_api.pass`).
+Point a Z-layer at the FrameFlow **ingest** MediaMTX WebRTC/WHEP (or iframe) URL for the SBC path (e.g. `cameraman`). VisionBridge treats it like any other DOM layer, so the camera can be shown, hidden, resized, or volume-mixed live via the connector.
+
+## Automatic "Be Right Back"
+
+Hook MediaMTX `runOnPublish` / `runOnUnpublish` scripts to inject JSON into VisionBridge's control socket, producing an automatic fallback/BRB screen on signal loss.
+
+---
+
+## License
+
+**GNU General Public License v3.0** — see [LICENSE](LICENSE).
+
+---
+
+<sub>VLX VisionBridge is part of the **VLX Stream Flow** ecosystem · [FrameFlow](https://github.com/viruslox/VLX_FrameFlow) · [VisionBridge](https://github.com/viruslox/VLX_VisionBridge) · [ChatBridge](https://github.com/viruslox/VLX_ChatBridge)</sub>
