@@ -65,7 +65,7 @@ func HandleConfigChange(pm ProcessUpdater, newCfg *models.Config, diff config.Di
 		log.Println("Restarting GStreamer process due to configuration change...")
 		pm.UpdateConfig(newCfg)
 	} else if diff.RequiresFilterUpdate {
-		log.Println("Filter update required. Applying live-update via ZMQ...")
+		log.Println("Filter update required. Applying live-update via IPC...")
 		pm.UpdateFilter(newCfg)
 	}
 }

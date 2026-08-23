@@ -149,7 +149,7 @@ type DatabaseConfig struct {
 	DSN string `yaml:"dsn"`
 }
 
-// ConnectorSettings defines the IPC/ZMQ socket configuration parameters for local control routing.
+// ConnectorSettings defines the IPC socket configuration parameters for local control routing.
 type ConnectorSettings struct {
 	IPCControlIn  bool   `yaml:"ipc_control_in" json:"ipc_control_in"`
 	Group         string `yaml:"group" json:"group"`
