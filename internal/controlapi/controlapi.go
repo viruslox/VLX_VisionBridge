@@ -7,11 +7,11 @@ package controlapi
 import (
 	"context"
 	"crypto/subtle"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"database/sql"
 	"reflect"
 	"strconv"
 	"time"
@@ -31,7 +31,7 @@ type Server struct {
 	shutdown func()
 	httpSrv  *http.Server
 
-	db      *sql.DB         // template store
+	db *sql.DB // template store
 }
 
 // New builds the control API server. If user is empty, requests are not
@@ -120,6 +120,7 @@ type statusResponse struct {
 	Resolution          string        `json:"resolution"`
 	Framerate           int           `json:"framerate"`
 	Layers              []layerStatus `json:"layers"`
+	SystemUsage         SystemUsage   `json:"system_usage"`
 }
 
 // layerState reads a Z-layer's fields by index from the flat ChromiumSource
@@ -151,6 +152,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	resp.OverlayServerActive = cfg.Input.OverlayServerActive
 	resp.Resolution = cfg.Input.Resolution
 	resp.Framerate = cfg.Input.Framerate
+	resp.SystemUsage = GetSystemUsage()
 
 	for i := 0; i < layerCount; i++ {
 		active, path, volume := layerState(cfg.Input.ChromiumSource, i)

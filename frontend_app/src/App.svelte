@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import { getStatus, toggleOutput, toggleLayer, setVolume, shutdown } from "./lib/api.js";
   import Templates from "./lib/Templates.svelte";
+  import SystemStatus from "./lib/SystemStatus.svelte";
 
   let status = $state({
     output: { active: false, resolution: "", fps: 0 },
@@ -10,6 +11,7 @@
     resolution: "",
     framerate: 0,
     layers: [],
+    system_usage: { cpu: 0, ram: 0, swap: 0 },
   });
   let error = $state("");
   let busy = $state(false);
@@ -105,6 +107,8 @@
   {/if}
 
   {#if tab === "control"}
+    <SystemStatus usage={status.system_usage} />
+
     <section class="card">
       <h2>Output</h2>
       <div class="row">
