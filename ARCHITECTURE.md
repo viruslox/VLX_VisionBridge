@@ -73,10 +73,10 @@ The reference deployment is a **single VPS** that co-hosts the FrameFlow Server,
 | FrameFlow | MediaMTX ingest | SRT `8890` · RTMP `1935` · RTMPS `1936` · WebRTC `8889` · API `127.0.0.1:9997` | `cameraman` / `wificam` paths |
 | FrameFlow | gpsd | `1198` | local GPS daemon |
 | ChatBridge | Server (overlays + GPS ingest) | `8000` (test `8001`) | overlays, `POST /api/gps` |
-| ChatBridge | Control API | `127.0.0.1:8760` | management REST + console WS |
+| ChatBridge | Control API | `127.0.0.1:8760` | management REST |
 | ChatBridge | Frontend (Svelte) | `8090` | GUI → control API |
 | ChatBridge | Connector | `/tmp/vlx_control.sock` | IPC **writer** → VisionBridge |
-| VisionBridge | Control API | `127.0.0.1:8770` | management REST + console WS |
+| VisionBridge | Control API | `127.0.0.1:8770` | management REST |
 | VisionBridge | Frontend (Svelte) | `8091` | GUI → control API |
 | VisionBridge | Overlay/WS server | `50051` (WebRTC `50000–50050`) | Chromium DOM sync |
 | VisionBridge | Connector | `/tmp/vlx_control.sock` | IPC **listener** ← ChatBridge |
@@ -135,7 +135,7 @@ SBC cameras → FrameFlow Client FFmpeg **SRT (bonded, MLVPN)** → FrameFlow Se
 - `internal/config` — YAML parsing, config watching, and diffing.
 - `internal/db` — SQLite connection pool (`github.com/mattn/go-sqlite3`) + logging.
 - `internal/engine` — GStreamer pipeline generator and process manager, decoupled into `source` (input parsing / path sanitisation), `mixer` (pipeline construction), and `streamer` (multi-destination output). The connector listener lives here (`internal/engine/connector.go`).
-- `internal/controlapi` — always-on management REST + console WS.
+- `internal/controlapi` — always-on management REST.
 - `internal/ui` — embedded Svelte SPA served by the frontend binary.
 
 ## Configuration & hot-reloading
@@ -179,7 +179,7 @@ SQLite (default `/opt/VLX_VisionBridge/var/visionbridge.db`) stores reusable sou
 
 ## Control API & Web GUI
 
-The `ControlAPI` is always-on and independent of the hot-swappable engine: Basic-Auth REST (`bind_address`, `port` default `8770`) plus an on-demand `journalctl` console over WebSocket (spawned per connection, tied to the socket lifecycle, authorised via short-lived tickets). The optional `frontend` binary embeds a Svelte 5 SPA and reverse-proxies to the control API (`frontend.settings`, GUI on `8091`).
+The `ControlAPI` is always-on and independent of the hot-swappable engine: Basic-Auth REST (`bind_address`, `port` default `8770`). The optional `frontend` binary embeds a Svelte 5 SPA and reverse-proxies to the control API (`frontend.settings`, GUI on `8091`).
 
 ## Security
 

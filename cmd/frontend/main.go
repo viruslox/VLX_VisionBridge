@@ -44,7 +44,7 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
-	mux.Handle("/api/", proxy) // REST + console WebSocket forwarded to the backend
+	mux.Handle("/api/", proxy) // REST forwarded to the backend
 	mux.Handle("/", ui.Handler())
 
 	handler := withGUIAuth(cfg.GUIUser, cfg.GUIPass, mux)
@@ -56,12 +56,11 @@ func main() {
 	}
 }
 
-// withGUIAuth enforces BasicAuth for the GUI, exempting the health check and the
-// console WebSocket (which is authorized by a single-use ticket on the backend).
+// withGUIAuth enforces BasicAuth for the GUI, exempting the health check.
 // If no GUI user is configured, auth is skipped entirely.
 func withGUIAuth(user, pass string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if user == "" || r.URL.Path == "/health" || r.URL.Path == "/api/console/ws" {
+		if user == "" || r.URL.Path == "/health" {
 			next.ServeHTTP(w, r)
 			return
 		}

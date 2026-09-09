@@ -136,7 +136,7 @@ VisionBridge is configured via a YAML settings file with five primary sections: 
 - `chromium_source` — up to 13 DOM Z-layers (`Z0`–`Z12`), each with `z*_active`, `z*_path`, `z*_volume`, `z*_width`, `z*_height`, `z*_x`, `z*_y`.
 
 ### `control_api`
-- `enable`, `bind_address`, `port` (default `8770`), `user`, `pass`, `log_unit`.
+- `enable`, `bind_address`, `port` (default `8770`), `user`, `pass`.
 
 ### Frontend (`frontend.settings`)
 - `bind_address` / `bind_port` (default `8091`) — GUI web server.
@@ -148,9 +148,8 @@ VisionBridge is configured via a YAML settings file with five primary sections: 
 ## Reverse proxy (Apache)
 
 ```apache
-# ===== VisionBridge GUI  (frontend :<port> — console WS at /api/console/ws) =====
+# ===== VisionBridge GUI  (frontend :<port>) =====
 RedirectMatch ^/visionbridge$  /visionbridge/
-ProxyPass        /visionbridge/api/console/ws ws://127.0.0.1:<port>/api/console/ws
 ProxyPass        /visionbridge/               http://127.0.0.1:<port>/
 ProxyPassReverse /visionbridge/               http://127.0.0.1:<port>/
 ```

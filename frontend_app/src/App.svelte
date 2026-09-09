@@ -1,7 +1,6 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import { getStatus, toggleOutput, toggleLayer, setVolume, shutdown } from "./lib/api.js";
-  import Console from "./lib/Console.svelte";
   import Templates from "./lib/Templates.svelte";
 
   let status = $state({
@@ -162,10 +161,7 @@
       </div>
     </section>
 
-    <section class="card">
-      <h2>Console</h2>
-      <Console />
-    </section>
+
 
     <section class="card danger">
       <h2>Service</h2>

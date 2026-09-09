@@ -143,4 +143,3 @@ control_api:
   port: "8770"                          # The port to bind the API to.
   user: "visionbridge"                  # The Basic Auth username for the API.
   pass: "changeme"                      # The Basic Auth password for the API.
-  log_unit: "visionbridge"              # The systemd log unit used for fetching logs in the UI.

@@ -25,11 +25,7 @@ export function shutdown() {
   return post("api/shutdown", {});
 }
 
-export async function consoleTicket() {
-  const r = await fetch("api/console/ticket");
-  if (!r.ok) throw new Error("console ticket failed: " + r.status);
-  return (await r.json()).ticket;
-}
+
 
 export async function listTemplates() {
   const r = await fetch("api/templates");
