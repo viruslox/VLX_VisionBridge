@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/user/VLX_VisionBridge/internal/db"
 	"gopkg.in/yaml.v3"
 )
 
@@ -293,9 +294,8 @@ func findChromiumSourceNode(root *yaml.Node) *yaml.Node {
 }
 
 // applyLayoutTemplate copies the chromium_source (Z-layout) block from a named
-// template file into the live settings file. The template must reside in the
-// same folder as the settings file; path components are stripped to prevent
-// traversal. The write is atomic (temp + rename), so the existing config
+// template (either from the database, or falling back to a file) into the live
+// settings file. The write is atomic (temp + rename), so the existing config
 // watcher detects the change and hot-reloads the new layout.
 func (pm *ProcessManager) applyLayoutTemplate(templateName string) error {
 	name := filepath.Base(strings.TrimSpace(templateName))
@@ -303,21 +303,29 @@ func (pm *ProcessManager) applyLayoutTemplate(templateName string) error {
 		return fmt.Errorf("invalid template name %q", templateName)
 	}
 
+	var templateData []byte
 	configPath := resolveConfigPath()
-	templatePath := filepath.Join(filepath.Dir(configPath), name)
 
-	templateData, err := os.ReadFile(templatePath)
-	if err != nil {
-		return fmt.Errorf("read template %s: %w", templatePath, err)
+	// 1. Try to load from the Database first
+	dbYaml, err := db.GetTemplate(pm.db, name)
+	if err == nil {
+		templateData = []byte(dbYaml)
+	} else {
+		// 2. Fallback to file system if not found in DB
+		templatePath := filepath.Join(filepath.Dir(configPath), name)
+		templateData, err = os.ReadFile(templatePath)
+		if err != nil {
+			return fmt.Errorf("template %q not found in DB or filesystem: %w", name, err)
+		}
 	}
 
 	var templateNode yaml.Node
 	if err := yaml.Unmarshal(templateData, &templateNode); err != nil {
-		return fmt.Errorf("parse template %s: %w", templatePath, err)
+		return fmt.Errorf("parse template %q: %w", name, err)
 	}
 	templateChrom := findChromiumSourceNode(&templateNode)
 	if templateChrom == nil {
-		return fmt.Errorf("template %s has no chromium_source block", templatePath)
+		return fmt.Errorf("template %q has no chromium_source block", name)
 	}
 
 	configMutex.Lock()
