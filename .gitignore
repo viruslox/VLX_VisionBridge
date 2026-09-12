@@ -1,4 +1,33 @@
-VLX_VisionBridge
+# User configuration
+configs/*.settings
+configs/*.yaml
+configs/*.conf
+!configs/*.template
+!configs/*.example
+
+# Node / Frontend
 node_modules/
 frontend_app/node_modules/
+frontend_app/dist/
+frontend_app/.svelte-kit/
+npm-debug.log*
+
+# Go / Build artifacts
+VLX_VisionBridge
 VLX_VisionBridge_frontend
+server
+internal/ui/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# IDEs / OS temp files
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*~
