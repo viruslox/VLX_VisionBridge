@@ -49,13 +49,13 @@ rtsp: no
 rtmp: yes
 rtmpAddress: :1999
 rtmpEncryption: "no"
-rtmpsAddress: :1936
+rtmpsAddress: :1937
 rtmpServerKey:
 rtmpServerCert:
 hls: no
 webrtc: no
 srt: no
-srtAddress: :8890
+srtAddress: :8891
 
 pathDefaults:
   source: publisher

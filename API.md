@@ -27,7 +27,7 @@ Loads a new Z-order layout template into VisionBridge, effectively changing the 
 
 ### 2. Stream Egress Control (`set_input_state` → `stream`)
 
-Enables or disables the final output (restream) from VisionBridge. Disabling it triggers an immediate `SIGKILL` to the egress FFmpeg process.
+Enables or disables the final output (restream) from VisionBridge. Disabling it triggers an immediate `SIGKILL` to the egress GStreamer process.
 
 **ChatBridge Action Structure:**
 ```json

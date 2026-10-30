@@ -36,6 +36,9 @@ export async function listTemplates() {
 export function saveTemplate(name) {
   return post("api/templates/save", { name });
 }
+export function saveTemplateToFile(name) {
+  return post("api/templates/save-file", { name });
+}
 export function applyTemplate(name) {
   return post("api/templates/apply", { name });
 }

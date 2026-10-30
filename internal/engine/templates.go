@@ -3,9 +3,90 @@ package engine
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
+
+// TemplateFileName sanitizes a template name into a safe .yaml filename inside
+// the VisionBridge configuration directory, rejecting path traversal or
+// reserved settings filenames.
+func TemplateFileName(name string) (string, error) {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" || strings.ContainsAny(trimmed, `/\`) {
+		return "", fmt.Errorf("invalid template name %q", name)
+	}
+	base := filepath.Base(trimmed)
+	if base == "" || base == "." || base == ".." {
+		return "", fmt.Errorf("invalid template name %q", name)
+	}
+	lower := strings.ToLower(base)
+	if !strings.HasSuffix(lower, ".yaml") && !strings.HasSuffix(lower, ".yml") {
+		base += ".yaml"
+		lower = strings.ToLower(base)
+	}
+	switch lower {
+	case "visionbridge.settings", "frontend.settings", "mediamtx_visionbridge.settings":
+		return "", fmt.Errorf("reserved configuration filename %q", base)
+	}
+	return base, nil
+}
+
+// HasTemplateFile reports whether a template already has a corresponding .yaml
+// file in the VisionBridge configuration directory alongside visionbridge.settings,
+// returning the resolved filename.
+func (pm *ProcessManager) HasTemplateFile(name string) (bool, string) {
+	fileName, err := TemplateFileName(name)
+	if err != nil {
+		return false, ""
+	}
+	configDir := filepath.Dir(resolveConfigPath())
+	fullPath := filepath.Join(configDir, fileName)
+	if info, err := os.Stat(fullPath); err == nil && !info.IsDir() {
+		return true, fileName
+	}
+	// Also check exact base name if the caller stored a custom suffix.
+	rawBase := filepath.Base(strings.TrimSpace(name))
+	if rawBase != fileName && rawBase != "." && rawBase != ".." {
+		if info, err := os.Stat(filepath.Join(configDir, rawBase)); err == nil && !info.IsDir() {
+			return true, rawBase
+		}
+	}
+	return false, fileName
+}
+
+// SaveTemplateToFile writes a template's chromium_source YAML fragment to a
+// .yaml file in the VisionBridge configuration directory (atomic temp + rename).
+func (pm *ProcessManager) SaveTemplateToFile(name string, templateData []byte) (string, error) {
+	fileName, err := TemplateFileName(name)
+	if err != nil {
+		return "", err
+	}
+
+	var templateNode yaml.Node
+	if err := yaml.Unmarshal(templateData, &templateNode); err != nil {
+		return "", fmt.Errorf("parse template: %w", err)
+	}
+	if findChromiumSourceNode(&templateNode) == nil {
+		return "", fmt.Errorf("template has no chromium_source block")
+	}
+
+	configMutex.Lock()
+	defer configMutex.Unlock()
+
+	configDir := filepath.Dir(resolveConfigPath())
+	targetPath := filepath.Join(configDir, fileName)
+	tmpFile := targetPath + ".tmp"
+	if err := os.WriteFile(tmpFile, templateData, 0644); err != nil {
+		return "", fmt.Errorf("write temp template file: %w", err)
+	}
+	if err := os.Rename(tmpFile, targetPath); err != nil {
+		os.Remove(tmpFile)
+		return "", fmt.Errorf("rename temp template file: %w", err)
+	}
+	return fileName, nil
+}
 
 // SnapshotChromiumYAML reads the live settings file and returns the current
 // chromium_source (Z-layout) block as a standalone YAML fragment

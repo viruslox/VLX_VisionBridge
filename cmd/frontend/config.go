@@ -18,6 +18,15 @@ type frontendConfig struct {
 	BackendPass string
 }
 
+func trimQuotes(s string) string {
+	if len(s) >= 2 {
+		if (s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'') {
+			return s[1 : len(s)-1]
+		}
+	}
+	return s
+}
+
 func loadFrontendConfig(path string) frontendConfig {
 	cfg := frontendConfig{
 		BindAddr:    "0.0.0.0",
@@ -26,9 +35,26 @@ func loadFrontendConfig(path string) frontendConfig {
 		BackendPort: "8770",
 	}
 
-	f, err := os.Open(path)
+	candidates := []string{
+		"/opt/VLX_VisionBridge/etc/frontend.settings",
+		"configs/frontend.settings",
+		"config/frontend.settings",
+		"frontend.settings",
+	}
+	if path != "" {
+		candidates = []string{path}
+	}
+
+	var f *os.File
+	var err error
+	for _, p := range candidates {
+		f, err = os.Open(p)
+		if err == nil {
+			break
+		}
+	}
 	if err != nil {
-		log.Printf("frontend: could not open %s (%v); using defaults", path, err)
+		log.Printf("frontend: could not open settings (%v); using defaults", err)
 		return cfg
 	}
 	defer f.Close()
@@ -44,7 +70,7 @@ func loadFrontendConfig(path string) frontendConfig {
 			continue
 		}
 		k = strings.TrimSpace(k)
-		v = strings.TrimSpace(v)
+		v = trimQuotes(strings.TrimSpace(v))
 		switch k {
 		case "bind_address":
 			cfg.BindAddr = v

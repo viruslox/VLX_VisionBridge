@@ -327,6 +327,16 @@ func setupUserAndSettings(installBase, etcDir, varDir, selectedUser string, grou
 	if err := exec.Command("chown", "-R", selectedUser+":"+selectedUser, installBase).Run(); err != nil {
 		log.Fatalf("Failed to chown %s: %v", installBase, err)
 	}
+
+	// Best-effort: if the chatbridge user exists on the host, add it to selectedUser's group
+	// so /tmp/vlx_control.sock (0770) is accessible regardless of installation order.
+	if err := exec.Command("id", "-u", "chatbridge").Run(); err == nil {
+		if err := exec.Command("usermod", "-a", "-G", selectedUser, "chatbridge").Run(); err != nil {
+			log.Printf("Warning: Failed to add 'chatbridge' to '%s' group: %v", selectedUser, err)
+		} else {
+			fmt.Printf("Added user 'chatbridge' to '%s' group for IPC socket access.\n", selectedUser)
+		}
+	}
 }
 
 func Install() {
@@ -356,6 +366,9 @@ func Install() {
 	dbConn, err := db.InitDB(dbPath)
 	if err != nil {
 		log.Fatalf("Failed to initialize database at %s: %v", dbPath, err)
+	}
+	if err := db.SetupTemplatesTable(dbConn); err != nil {
+		log.Fatalf("Failed to setup templates table: %v", err)
 	}
 	if err := db.SetupTables(dbConn); err != nil {
 		log.Fatalf("Failed to setup database tables: %v", err)

@@ -69,4 +69,17 @@ input:
 	assert.Contains(t, finalConfigStr, "z0_active: true")
 	assert.Contains(t, finalConfigStr, "z0_path: \"initial_path\"")
 	assert.Contains(t, finalConfigStr, "z1_active: false")
+
+	// 6. Verify HasTemplateFile and SaveTemplateToFile
+	hasFile, fileName := pm.HasTemplateFile("camera1")
+	assert.False(t, hasFile)
+	assert.Equal(t, "camera1.yaml", fileName)
+
+	savedName, err := pm.SaveTemplateToFile("camera1", snapshot)
+	require.NoError(t, err)
+	assert.Equal(t, "camera1.yaml", savedName)
+
+	hasFile, fileName = pm.HasTemplateFile("camera1")
+	assert.True(t, hasFile)
+	assert.Equal(t, "camera1.yaml", fileName)
 }

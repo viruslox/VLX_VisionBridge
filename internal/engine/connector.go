@@ -195,7 +195,7 @@ func (pm *ProcessManager) handleControlCommand(cmd ControlCommand) {
 											chromMap.Content[k+1].Value = "false"
 										}
 									}
-									if cmd.Payload.Enabled && chromMap.Content[k].Value == pathKey {
+									if cmd.Payload.Enabled && cmd.Payload.Text != "" && chromMap.Content[k].Value == pathKey {
 										chromMap.Content[k+1].Value = cmd.Payload.Text
 									}
 								}
@@ -306,14 +306,27 @@ func (pm *ProcessManager) applyLayoutTemplate(templateName string) error {
 	var templateData []byte
 	configPath := resolveConfigPath()
 
-	// 1. Try to load from the Database first
+	// 1. Try to load from the Database first (exact name, or without .yaml/.yml extension)
 	dbYaml, err := db.GetTemplate(pm.db, name)
+	if err != nil {
+		trimmed := strings.TrimSuffix(strings.TrimSuffix(name, ".yaml"), ".yml")
+		if trimmed != name && trimmed != "" {
+			dbYaml, err = db.GetTemplate(pm.db, trimmed)
+		}
+	}
 	if err == nil {
 		templateData = []byte(dbYaml)
 	} else {
-		// 2. Fallback to file system if not found in DB
-		templatePath := filepath.Join(filepath.Dir(configPath), name)
+		// 2. Fallback to file system if not found in DB (exact name, or with .yaml extension)
+		configDir := filepath.Dir(configPath)
+		templatePath := filepath.Join(configDir, name)
 		templateData, err = os.ReadFile(templatePath)
+		if err != nil && !strings.HasSuffix(strings.ToLower(name), ".yaml") && !strings.HasSuffix(strings.ToLower(name), ".yml") {
+			if altData, altErr := os.ReadFile(filepath.Join(configDir, name+".yaml")); altErr == nil {
+				templateData = altData
+				err = nil
+			}
+		}
 		if err != nil {
 			return fmt.Errorf("template %q not found in DB or filesystem: %w", name, err)
 		}

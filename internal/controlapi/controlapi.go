@@ -56,6 +56,7 @@ func New(pm *engine.ProcessManager, dbConn *sql.DB, bindAddr, port, user, pass s
 
 	mux.HandleFunc("/api/templates", s.auth(s.handleTemplatesList))
 	mux.HandleFunc("/api/templates/save", s.auth(s.handleTemplateSave))
+	mux.HandleFunc("/api/templates/save-file", s.auth(s.handleTemplateSaveFile))
 	mux.HandleFunc("/api/templates/apply", s.auth(s.handleTemplateApply))
 	mux.HandleFunc("/api/templates/delete", s.auth(s.handleTemplateDelete))
 

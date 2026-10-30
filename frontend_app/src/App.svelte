@@ -74,8 +74,10 @@
   }
 
   async function onVolume(layer, value) {
+    const vol = Number(value);
+    layer.volume = vol;
     try {
-      await setVolume(layer.index, Number(value));
+      await setVolume(layer.index, vol);
     } catch (e) {
       error = e.message || String(e);
     }

@@ -1,6 +1,6 @@
 <script>
   import { onMount } from "svelte";
-  import { listTemplates, saveTemplate, applyTemplate, deleteTemplate } from "./api.js";
+  import { listTemplates, saveTemplate, saveTemplateToFile, applyTemplate, deleteTemplate } from "./api.js";
 
   let templates = $state([]);
   let newName = $state("");
@@ -25,6 +25,17 @@
     try {
       await saveTemplate(name);
       newName = "";
+      await refresh();
+    } catch (e) {
+      error = e.message || String(e);
+    }
+    busy = false;
+  }
+
+  async function onSaveToFile(name) {
+    busy = true;
+    try {
+      await saveTemplateToFile(name);
       await refresh();
     } catch (e) {
       error = e.message || String(e);
@@ -79,6 +90,20 @@
         <li class="item">
           <span class="tname">{t.name}</span>
           <span class="tmeta">{t.updated_at}</span>
+          {#if t.has_file}
+            <span class="tfile" title="Template is also saved as a .yaml file in the VisionBridge config directory">
+              file: {t.file_name || `${t.name}.yaml`}
+            </span>
+          {:else}
+            <button
+              class="file-btn"
+              onclick={() => onSaveToFile(t.name)}
+              disabled={busy}
+              title="Export this DB-only template to a .yaml file in the VisionBridge config directory"
+            >
+              Save to file
+            </button>
+          {/if}
           <button onclick={() => onApply(t.name)} disabled={busy}>Apply</button>
           <button class="del" onclick={() => onDelete(t.name)} disabled={busy}>Delete</button>
         </li>
@@ -120,7 +145,7 @@
   }
   .item {
     display: grid;
-    grid-template-columns: 1fr auto auto auto;
+    grid-template-columns: 1fr auto auto auto auto;
     align-items: center;
     gap: 0.6rem;
     padding: 0.35rem 0;
@@ -132,6 +157,16 @@
   .tmeta {
     font-size: 0.75rem;
     opacity: 0.6;
+  }
+  .tfile {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.55rem;
+    border-radius: 6px;
+    border: 1px solid rgba(55, 178, 77, 0.4);
+    color: #37b24d;
+  }
+  .file-btn {
+    border-color: rgba(100, 108, 255, 0.45);
   }
   .del {
     border-color: rgba(255, 107, 107, 0.5);

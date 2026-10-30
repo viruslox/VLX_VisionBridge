@@ -11,8 +11,8 @@ if ! command -v go &> /dev/null; then
     exit 1
 fi
 
-echo "Building executable..."
-go build -o ./VLX_VisionBridge cmd/server/*.go
+echo "Building VLX_VisionBridge..."
+go build -o ./VLX_VisionBridge ./cmd/server
 
 echo "Building frontend assets..."
 if command -v npm >/dev/null 2>&1; then

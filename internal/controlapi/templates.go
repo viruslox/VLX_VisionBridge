@@ -12,13 +12,33 @@ type templateNameReq struct {
 	Name string `json:"name"`
 }
 
+type templateListItem struct {
+	Name      string `json:"name"`
+	UpdatedAt string `json:"updated_at"`
+	HasFile   bool   `json:"has_file"`
+	FileName  string `json:"file_name,omitempty"`
+}
+
 func (s *Server) handleTemplatesList(w http.ResponseWriter, r *http.Request) {
 	metas, err := db.ListTemplates(s.db)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]interface{}{"templates": metas})
+	items := make([]templateListItem, 0, len(metas))
+	for _, m := range metas {
+		hasFile, fileName := false, ""
+		if s.pm != nil {
+			hasFile, fileName = s.pm.HasTemplateFile(m.Name)
+		}
+		items = append(items, templateListItem{
+			Name:      m.Name,
+			UpdatedAt: m.UpdatedAt,
+			HasFile:   hasFile,
+			FileName:  fileName,
+		})
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"templates": items})
 }
 
 // handleTemplateSave snapshots the current Z-layout and stores it under a name.
@@ -37,6 +57,26 @@ func (s *Server) handleTemplateSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// handleTemplateSaveFile exports a DB-stored template to a .yaml file in the
+// VisionBridge configuration directory alongside visionbridge.settings.
+func (s *Server) handleTemplateSaveFile(w http.ResponseWriter, r *http.Request) {
+	name, ok := decodeTemplateName(w, r)
+	if !ok {
+		return
+	}
+	yamlStr, err := db.GetTemplate(s.db, name)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+		return
+	}
+	fileName, err := s.pm.SaveTemplateToFile(name, []byte(yamlStr))
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "file_name": fileName})
 }
 
 // handleTemplateApply materializes a stored template into the live settings file.
