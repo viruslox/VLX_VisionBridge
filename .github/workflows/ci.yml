@@ -3,6 +3,11 @@ name: CI
 on:
   push:
     branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
@@ -29,7 +34,7 @@ jobs:
           echo "builder ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
       - name: Run build script
-        run: sudo -u builder bash -c "cd $GITHUB_WORKSPACE && ./build.sh"
+        run: sudo -E -u builder bash -c "cd $GITHUB_WORKSPACE && ./build.sh"
 
       - name: Run tests
-        run: sudo -u builder bash -c "cd $GITHUB_WORKSPACE && go test ./..."
+        run: sudo -E -u builder bash -c "cd $GITHUB_WORKSPACE && go test ./..."
