@@ -19,7 +19,7 @@ jobs:
       - name: Install dependencies
         run: |
           apt-get update
-          apt-get install -y git golang-go build-essential curl ffmpeg sudo npm nodejs
+          apt-get install -y git golang-go build-essential curl ffmpeg npm nodejs
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -27,14 +27,8 @@ jobs:
       - name: Mark checkout directory as safe
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - name: Setup non-root user
-        run: |
-          useradd -m builder
-          chown -R builder:builder "$GITHUB_WORKSPACE"
-          echo "builder ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
-
       - name: Run build script
-        run: sudo -E -u builder bash -c "cd $GITHUB_WORKSPACE && ./build.sh"
+        run: ./build.sh
 
       - name: Run tests
-        run: sudo -E -u builder bash -c "cd $GITHUB_WORKSPACE && go test ./..."
+        run: go test ./...
